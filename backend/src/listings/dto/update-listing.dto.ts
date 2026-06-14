@@ -72,4 +72,14 @@ export class UpdateListingDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  expiryTime?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  conditionNotes?: string;
 }

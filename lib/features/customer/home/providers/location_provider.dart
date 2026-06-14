@@ -25,7 +25,8 @@ class LocationNotifier extends StateNotifier<AsyncValue<Position?>> {
         return;
       }
       final position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
       );
       state = AsyncValue.data(position);
     } catch (e, st) {

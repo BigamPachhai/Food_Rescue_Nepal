@@ -1,5 +1,5 @@
-import { IsOptional, IsEnum, IsString, IsNumber, IsInt, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsEnum, IsString, IsNumber, IsInt, IsBoolean, Min } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { ListingCategory } from '@prisma/client';
 
@@ -45,4 +45,35 @@ export class ListingQueryDto {
   @IsInt()
   @Min(1)
   limit?: number;
+
+  @ApiPropertyOptional({ enum: ['newest', 'price_asc', 'price_desc', 'discount', 'popular', 'nearest'] })
+  @IsOptional()
+  @IsString()
+  sortBy?: string;
+
+  @ApiPropertyOptional({ description: 'Min discounted price in paisa' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  minPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Max discounted price in paisa' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  maxPrice?: number;
+
+  @ApiPropertyOptional({ description: 'Min vendor average rating (0-5)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  minRating?: number;
+
+  @ApiPropertyOptional({ description: 'Only show listings with stock > 0' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  onlyAvailable?: boolean;
 }

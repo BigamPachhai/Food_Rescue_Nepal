@@ -107,13 +107,28 @@ class _AuthInterceptor extends Interceptor {
   }
 
   String _extractMessage(DioException err) {
+    switch (err.type) {
+      case DioExceptionType.connectionError:
+      case DioExceptionType.unknown:
+        return 'No internet connection. Please check your network.';
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return 'Request timed out. Please try again.';
+      case DioExceptionType.cancel:
+        return 'Request cancelled.';
+      default:
+        break;
+    }
     try {
       final data = err.response?.data;
       if (data is Map<String, dynamic>) {
-        return data['message'] as String? ?? 'Something went wrong';
+        final msg = data['message'];
+        if (msg is List) return msg.join(', ');
+        return msg as String? ?? 'Something went wrong';
       }
     } catch (_) {}
-    return err.message ?? 'Network error occurred';
+    return 'Something went wrong. Please try again.';
   }
 }
 

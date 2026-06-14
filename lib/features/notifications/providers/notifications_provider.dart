@@ -52,15 +52,16 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<NotificationEn
 
   Future<void> fetch() async {
     try {
+      state = const AsyncValue.loading();
       final response = await _dio.get(ApiEndpoints.notifications);
-      final data = response.data;
-      List<dynamic> items;
-      if (data is List) {
-        items = data;
-      } else if (data is Map && data['data'] is List) {
-        items = data['data'] as List<dynamic>;
-      } else {
-        items = [];
+      final body = response.data as Map<String, dynamic>;
+      final inner = body['data'];
+      List<dynamic> items = [];
+      if (inner is List) {
+        items = inner;
+      } else if (inner is Map<String, dynamic>) {
+        final notifs = inner['notifications'];
+        if (notifs is List) items = notifs;
       }
       state = AsyncValue.data(
         items.map((e) => NotificationEntity.fromJson(e as Map<String, dynamic>)).toList(),
@@ -83,10 +84,26 @@ class NotificationsNotifier extends StateNotifier<AsyncValue<List<NotificationEn
 
   Future<void> markAllRead() async {
     try {
-      await _dio.post(ApiEndpoints.markAllRead);
+      await _dio.patch(ApiEndpoints.markAllRead);
       state.whenData((list) {
         state = AsyncValue.data(list.map((n) => n.copyWith(isRead: true)).toList());
       });
+    } catch (_) {}
+  }
+
+  Future<void> delete(String id) async {
+    try {
+      await _dio.delete(ApiEndpoints.deleteNotification(id));
+      state.whenData((list) {
+        state = AsyncValue.data(list.where((n) => n.id != id).toList());
+      });
+    } catch (_) {}
+  }
+
+  Future<void> deleteAll() async {
+    try {
+      await _dio.delete(ApiEndpoints.deleteAllNotifications);
+      state = const AsyncValue.data([]);
     } catch (_) {}
   }
 }

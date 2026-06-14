@@ -160,6 +160,44 @@ export class AuthService {
     }
   }
 
+  async forgotPassword(email: string): Promise<{ otp: string; isDevMode: boolean }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    const isDevMode = this.configService.get<string>('NODE_ENV') !== 'production';
+
+    if (!user || user.deletedAt) {
+      // Don't reveal whether email exists; still return success shape
+      return { otp: '', isDevMode };
+    }
+
+    await this.prisma.passwordResetOtp.deleteMany({ where: { email } });
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+    await this.prisma.passwordResetOtp.create({ data: { email, otp, expiresAt } });
+    this.logger.log(`[FORGOT PASSWORD] OTP for ${email}: ${otp}`);
+
+    return { otp: isDevMode ? otp : '', isDevMode };
+  }
+
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<void> {
+    const record = await this.prisma.passwordResetOtp.findFirst({
+      where: { email, otp },
+    });
+
+    if (!record || record.expiresAt < new Date()) {
+      throw new BadRequestException('Invalid or expired OTP. Please request a new one.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { email }, data: { passwordHash } }),
+      this.prisma.passwordResetOtp.deleteMany({ where: { email } }),
+      this.prisma.refreshToken.deleteMany({ where: { user: { email } } }),
+    ]);
+  }
+
   async getMe(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

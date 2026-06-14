@@ -14,6 +14,8 @@ class ApiEndpoints {
   static const String logout = '/auth/logout';
   static const String me = '/auth/me';
   static const String refresh = '/auth/refresh';
+  static const String forgotPassword = '/auth/forgot-password';
+  static const String resetPassword = '/auth/reset-password';
 
   // Listings
   static const String listings = '/listings';
@@ -30,6 +32,8 @@ class ApiEndpoints {
   // Favorites
   static const String customerFavorites = '/favorites';
   static String toggleFavorite(String listingId) => '/favorites/$listingId';
+  static const String vendorFavorites = '/favorites/vendors';
+  static String toggleVendorFavorite(String vendorId) => '/favorites/vendors/$vendorId';
 
   // User profile
   static const String customerProfile = '/users/profile';
@@ -62,6 +66,20 @@ class ApiEndpoints {
   static const String notifications = '/notifications';
   static const String markAllRead = '/notifications/read-all';
   static String markRead(String id) => '/notifications/$id/read';
+  static String deleteNotification(String id) => '/notifications/$id';
+  static const String deleteAllNotifications = '/notifications/all';
+  static const String registerFcmToken = '/notifications/fcm-token';
+
+  // Reviews
+  static const String reviews = '/reviews';
+  static const String myReviews = '/reviews/my';
+  static String reviewByOrder(String orderId) => '/reviews/order/$orderId';
+  static String vendorReviews(String vendorId) => '/reviews/vendor/$vendorId';
+  static String reviewById(String id) => '/reviews/$id';
+  static String reviewRespond(String id) => '/reviews/$id/respond';
+
+  // Reports / Support
+  static const String reports = '/reports';
 
   // Vendors (public)
   static const String vendors = '/vendors';

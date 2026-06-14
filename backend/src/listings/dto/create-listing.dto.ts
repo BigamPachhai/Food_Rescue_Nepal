@@ -54,4 +54,14 @@ export class CreateListingDto {
   @IsArray()
   @IsString({ each: true })
   imageUrls?: string[];
+
+  @ApiPropertyOptional({ example: '2024-01-01T18:00:00.000Z' })
+  @IsOptional()
+  @IsDateString()
+  expiryTime?: string;
+
+  @ApiPropertyOptional({ example: 'Freshly baked, no preservatives' })
+  @IsOptional()
+  @IsString()
+  conditionNotes?: string;
 }

@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -32,6 +33,7 @@ const REFRESH_COOKIE_OPTIONS = {
 
 @ApiTags('Auth')
 @Controller('auth')
+@Throttle({ short: { ttl: 60000, limit: 5 }, medium: { ttl: 3600000, limit: 20 } })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -104,6 +106,31 @@ export class AuthController {
       success: true,
       data: user,
       message: 'Success',
+    };
+  }
+
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Request a password reset OTP' })
+  async forgotPassword(@Body() body: { email: string }) {
+    if (!body.email) throw new (require('@nestjs/common').BadRequestException)('Email is required');
+    const result = await this.authService.forgotPassword(body.email);
+    return {
+      success: true,
+      data: { otp: result.otp, isDevMode: result.isDevMode },
+      message: 'OTP sent to your email',
+    };
+  }
+
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Reset password using OTP' })
+  async resetPassword(@Body() body: { email: string; otp: string; newPassword: string }) {
+    await this.authService.resetPassword(body.email, body.otp, body.newPassword);
+    return {
+      success: true,
+      data: null,
+      message: 'Password reset successfully. Please login with your new password.',
     };
   }
 }

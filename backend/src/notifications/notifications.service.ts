@@ -132,4 +132,22 @@ export class NotificationsService {
     });
     return { count };
   }
+
+  async deleteOne(notificationId: string, userId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id: notificationId, userId },
+    });
+    if (!notification) return null;
+    return this.prisma.notification.delete({ where: { id: notificationId } });
+  }
+
+  async deleteAll(userId: string) {
+    const result = await this.prisma.notification.deleteMany({ where: { userId } });
+    return { deleted: result.count };
+  }
+
+  async registerFcmToken(userId: string, fcmToken: string) {
+    await this.prisma.user.update({ where: { id: userId }, data: { fcmToken } });
+    return { registered: true };
+  }
 }

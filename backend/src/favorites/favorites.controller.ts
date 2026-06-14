@@ -28,4 +28,22 @@ export class FavoritesController {
     const favorites = await this.favoritesService.getMyFavorites(userId);
     return { success: true, data: favorites, message: 'Success' };
   }
+
+  @Post('vendors/:vendorId')
+  @ApiOperation({ summary: 'Toggle favorite vendor (CUSTOMER only)' })
+  async toggleVendor(
+    @CurrentUser('id') userId: string,
+    @Param('vendorId') vendorId: string,
+  ) {
+    const result = await this.favoritesService.toggleVendor(userId, vendorId);
+    const message = result.favorited ? 'Vendor added to favorites' : 'Vendor removed from favorites';
+    return { success: true, data: result, message };
+  }
+
+  @Get('vendors')
+  @ApiOperation({ summary: 'Get my favorite vendors (CUSTOMER only)' })
+  async getMyVendorFavorites(@CurrentUser('id') userId: string) {
+    const favorites = await this.favoritesService.getMyVendorFavorites(userId);
+    return { success: true, data: favorites, message: 'Success' };
+  }
 }

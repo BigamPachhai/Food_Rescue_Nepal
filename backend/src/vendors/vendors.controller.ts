@@ -9,6 +9,7 @@ import {
   UseGuards,
   UseInterceptors,
   UploadedFile,
+  NotFoundException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { VendorsService } from './vendors.service';
@@ -53,6 +54,19 @@ export class VendorsController {
   async getStats(@CurrentUser('id') userId: string) {
     const stats = await this.vendorsService.getStats(userId);
     return { success: true, data: stats, message: 'Success' };
+  }
+
+  @Get('profile')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get own vendor profile' })
+  async getMyProfile(@CurrentUser('id') userId: string) {
+    const vendor = await this.vendorsService.getVendorByUserId(userId);
+    if (!vendor) {
+      throw new NotFoundException('Vendor profile not found');
+    }
+    return { success: true, data: vendor, message: 'Success' };
   }
 
   @Get(':id')

@@ -15,6 +15,8 @@ class VendorListing {
   final int availableQty;
   final DateTime pickupStart;
   final DateTime pickupEnd;
+  final DateTime? expiryTime;
+  final String? conditionNotes;
   final List<String> imageUrls;
   final bool isActive;
 
@@ -30,6 +32,8 @@ class VendorListing {
     required this.availableQty,
     required this.pickupStart,
     required this.pickupEnd,
+    this.expiryTime,
+    this.conditionNotes,
     required this.imageUrls,
     required this.isActive,
   });
@@ -46,6 +50,10 @@ class VendorListing {
         availableQty: json['availableQty'] as int? ?? json['quantity'] as int,
         pickupStart: DateTime.parse(json['pickupStart'] as String),
         pickupEnd: DateTime.parse(json['pickupEnd'] as String),
+        expiryTime: json['expiryTime'] != null
+            ? DateTime.parse(json['expiryTime'] as String)
+            : null,
+        conditionNotes: json['conditionNotes'] as String?,
         imageUrls: (json['imageUrls'] as List<dynamic>?)
                 ?.map((e) => e as String)
                 .toList() ??
@@ -57,6 +65,10 @@ class VendorListing {
     if (originalPrice == 0) return 0;
     return (((originalPrice - discountedPrice) / originalPrice) * 100).round();
   }
+
+  bool get isSoldOut => availableQty == 0;
+
+  int get soldCount => quantity - availableQty;
 }
 
 class VendorListingsNotifier
@@ -67,6 +79,7 @@ class VendorListingsNotifier
   final Dio _dio;
 
   Future<void> fetch() async {
+    state = const AsyncValue.loading();
     try {
       final response = await _dio.get(ApiEndpoints.vendorListings);
       final data = response.data;
@@ -94,8 +107,28 @@ class VendorListingsNotifier
   }
 
   Future<void> toggleActive(String id, bool isActive) async {
-    await _dio.patch(ApiEndpoints.vendorListingById(id),
-        data: {'isActive': isActive});
+    await _dio.patch(ApiEndpoints.vendorListingById(id), data: {'isActive': isActive});
+    await fetch();
+  }
+
+  Future<void> markSoldOut(String id) async {
+    await _dio.patch(ApiEndpoints.vendorListingById(id), data: {'availableQty': 0});
+    await fetch();
+  }
+
+  Future<void> duplicateListing(VendorListing listing) async {
+    await _dio.post(ApiEndpoints.createListing, data: {
+      'name': '${listing.name} (Copy)',
+      'description': listing.description,
+      'category': listing.category,
+      'originalPrice': listing.originalPrice,
+      'discountedPrice': listing.discountedPrice,
+      'quantity': listing.quantity,
+      'pickupStart': DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+      'pickupEnd': DateTime.now().add(const Duration(hours: 4)).toIso8601String(),
+      'imageUrls': listing.imageUrls,
+      if (listing.conditionNotes != null) 'conditionNotes': listing.conditionNotes,
+    });
     await fetch();
   }
 }

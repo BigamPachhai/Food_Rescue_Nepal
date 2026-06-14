@@ -7,6 +7,8 @@ import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/role_select_screen.dart';
 import '../../features/auth/presentation/screens/register_screen.dart';
+import '../../features/auth/presentation/screens/forgot_password_screen.dart';
+import '../../features/auth/presentation/screens/reset_password_screen.dart';
 import '../../features/customer/home/screens/customer_home_screen.dart';
 import '../../features/customer/home/screens/listing_detail_screen.dart';
 import '../../features/customer/map/screens/map_screen.dart';
@@ -32,6 +34,10 @@ import '../../features/admin/screens/admin_vendor_detail_screen.dart';
 import '../../features/admin/screens/admin_listings_screen.dart';
 import '../../features/admin/screens/admin_orders_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
+import '../../features/reviews/screens/write_review_screen.dart';
+import '../../features/reviews/screens/vendor_reviews_screen.dart';
+import '../../features/reviews/providers/reviews_provider.dart';
+import '../../features/support/screens/support_screen.dart';
 
 // Shell widgets
 class CustomerShell extends StatefulWidget {
@@ -159,10 +165,27 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (isAuthenticated) {
         final user = authState.user;
+        final path = state.matchedLocation;
+
+        // Redirect away from auth/root routes
         if (isLoginRoute || isRegisterRoute || isRootRoute) {
           if (user.isCustomer) return '/customer/home';
           if (user.isVendor) return '/vendor/dashboard';
           if (user.isAdmin) return '/admin/dashboard';
+        }
+
+        // Block cross-role access
+        if (user.isCustomer &&
+            (path.startsWith('/vendor/') || path.startsWith('/admin/'))) {
+          return '/customer/home';
+        }
+        if (user.isVendor &&
+            (path.startsWith('/customer/') || path.startsWith('/admin/'))) {
+          return '/vendor/dashboard';
+        }
+        if (user.isAdmin &&
+            (path.startsWith('/customer/') || path.startsWith('/vendor/'))) {
+          return '/admin/dashboard';
         }
       }
 
@@ -179,6 +202,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register/vendor',
         builder: (_, __) => const RegisterScreen(role: 'VENDOR'),
+      ),
+      GoRoute(path: '/forgot-password', builder: (_, __) => const ForgotPasswordScreen()),
+      GoRoute(
+        path: '/reset-password',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, String?>? ?? {};
+          return ResetPasswordScreen(
+            email: extra['email'] ?? '',
+            devOtp: extra['devOtp'],
+          );
+        },
       ),
       ShellRoute(
         builder: (_, __, child) => CustomerShell(child: child),
@@ -202,6 +236,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/customer/profile', builder: (_, __) => const CustomerProfileScreen()),
           GoRoute(path: '/customer/profile/edit', builder: (_, __) => const EditProfileScreen()),
           GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
+          GoRoute(path: '/customer/support', builder: (_, __) => const SupportScreen()),
+          GoRoute(
+            path: '/customer/orders/:id/review',
+            builder: (_, state) {
+              final extra = state.extra as Map<String, dynamic>? ?? {};
+              return WriteReviewScreen(
+                orderId: state.pathParameters['id']!,
+                vendorId: extra['vendorId'] as String? ?? '',
+                vendorName: extra['vendorName'] as String? ?? 'Vendor',
+                existingReview: extra['existingReview'] as ReviewEntity?,
+              );
+            },
+          ),
         ],
       ),
       ShellRoute(
@@ -228,6 +275,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/vendor/scanner', builder: (_, __) => const QrScannerScreen()),
           GoRoute(path: '/vendor/profile', builder: (_, __) => const VendorProfileScreen()),
           GoRoute(path: '/vendor/profile/edit', builder: (_, __) => const EditVendorProfileScreen()),
+          GoRoute(
+            path: '/vendor/reviews/:vendorId',
+            builder: (_, state) =>
+                VendorReviewsScreen(vendorId: state.pathParameters['vendorId']!),
+          ),
         ],
       ),
       ShellRoute(

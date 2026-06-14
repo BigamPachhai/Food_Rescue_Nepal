@@ -1,13 +1,23 @@
+import 'package:dio/dio.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'core/constants/api_endpoints.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/offline_banner.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
+
+const _androidChannel = AndroidNotificationChannel(
+  'food_rescue_channel',
+  'Food Rescue Notifications',
+  description: 'Order updates, nearby food, pickup reminders',
+  importance: Importance.high,
+);
 
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -19,22 +29,23 @@ Future<void> main() async {
   try {
     await Firebase.initializeApp();
     final messaging = FirebaseMessaging.instance;
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    await messaging.requestPermission(alert: true, badge: true, sound: true);
 
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+    // Create Android notification channel
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(_androidChannel);
+
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
+    await _localNotifications.initialize(
+      const InitializationSettings(android: androidSettings, iOS: iosSettings),
     );
-    await _localNotifications.initialize(initSettings);
 
+    // Show local notification when app is in foreground
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final notification = message.notification;
       if (notification != null) {
@@ -42,23 +53,34 @@ Future<void> main() async {
           notification.hashCode,
           notification.title,
           notification.body,
-          const NotificationDetails(
+          NotificationDetails(
             android: AndroidNotificationDetails(
-              'food_rescue_channel',
-              'Food Rescue Notifications',
+              _androidChannel.id,
+              _androidChannel.name,
               importance: Importance.high,
               priority: Priority.high,
+              icon: '@mipmap/ic_launcher',
             ),
-            iOS: DarwinNotificationDetails(),
+            iOS: const DarwinNotificationDetails(),
           ),
         );
       }
     });
   } catch (_) {
-    // Firebase not configured — continue without it
+    // Firebase not configured — continue without push notifications
   }
 
   runApp(const ProviderScope(child: FoodRescueApp()));
+}
+
+/// Called after login to register the device FCM token with the backend.
+Future<void> registerFcmToken(Dio dio) async {
+  try {
+    final token = await FirebaseMessaging.instance.getToken();
+    if (token != null) {
+      await dio.post(ApiEndpoints.registerFcmToken, data: {'fcmToken': token});
+    }
+  } catch (_) {}
 }
 
 class FoodRescueApp extends ConsumerWidget {
@@ -74,6 +96,12 @@ class FoodRescueApp extends ConsumerWidget {
       themeMode: ThemeMode.light,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
+      builder: (context, child) => Column(
+        children: [
+          const OfflineBanner(),
+          Expanded(child: child ?? const SizedBox.shrink()),
+        ],
+      ),
     );
   }
 }

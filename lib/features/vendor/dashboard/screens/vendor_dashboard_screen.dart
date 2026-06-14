@@ -11,6 +11,7 @@ import '../../../auth/domain/auth_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../listings/providers/vendor_listings_provider.dart';
 import '../../orders/providers/vendor_orders_provider.dart';
+import '../../profile/providers/vendor_profile_provider.dart';
 import '../providers/vendor_stats_provider.dart';
 
 class VendorDashboardScreen extends ConsumerWidget {
@@ -22,6 +23,7 @@ class VendorDashboardScreen extends ConsumerWidget {
     final ordersAsync = ref.watch(vendorOrdersProvider);
     final listingsAsync = ref.watch(vendorListingsProvider);
     final authState = ref.watch(authProvider);
+    final vendorProfileAsync = ref.watch(vendorProfileProvider);
 
     return Scaffold(
       body: RefreshIndicator(
@@ -34,21 +36,80 @@ class VendorDashboardScreen extends ConsumerWidget {
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildHeader(authState)),
-            // Pending vendor banner
-            if (authState is AuthAuthenticated)
-              SliverToBoxAdapter(child: _buildPendingBanner(authState)),
+            // Vendor status banner
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSizes.lg),
-                child: statsAsync.when(
-                  data: (stats) => _StatsRow(stats: stats),
-                  loading: () => const ShimmerCard(height: 90),
-                  error: (e, _) => ErrorView(
+              child: vendorProfileAsync.whenOrNull(
+                    data: (vendor) => _buildStatusBanner(vendor.status),
+                  ) ??
+                  const SizedBox.shrink(),
+            ),
+            SliverToBoxAdapter(
+              child: statsAsync.when(
+                data: (stats) => _StatsPanel(stats: stats),
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(AppSizes.lg),
+                  child: ShimmerCard(height: 160),
+                ),
+                error: (e, _) => Padding(
+                  padding: const EdgeInsets.all(AppSizes.lg),
+                  child: ErrorView(
                     message: e.toString(),
                     onRetry: () => ref.invalidate(vendorStatsProvider),
                   ),
                 ),
               ),
+            ),
+            // Reviews quick-link
+            SliverToBoxAdapter(
+              child: vendorProfileAsync.whenOrNull(
+                    data: (vendor) => Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                      child: InkWell(
+                        onTap: () =>
+                            context.push('/vendor/reviews/${vendor.id}'),
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            boxShadow: [
+                              BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.04),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2)),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.star_outline,
+                                  color: AppColors.accentAmber),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    Text('Customer Reviews',
+                                        style: AppTextStyles.h6),
+                                    Text(
+                                      'See what customers are saying',
+                                      style: AppTextStyles.caption.copyWith(
+                                          color: AppColors.textSecondary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right,
+                                  color: AppColors.textSecondary),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ) ??
+                  const SizedBox.shrink(),
             ),
             // Pending orders section
             SliverToBoxAdapter(
@@ -148,6 +209,16 @@ class VendorDashboardScreen extends ConsumerWidget {
               ),
               error: (_, __) => const SliverToBoxAdapter(child: SizedBox()),
             ),
+            // Listing performance section
+            SliverToBoxAdapter(
+              child: statsAsync.whenOrNull(
+                    data: (stats) => stats.listingPerformance.isEmpty
+                        ? const SizedBox.shrink()
+                        : _ListingPerformanceSection(
+                            listings: stats.listingPerformance),
+                  ) ??
+                  const SizedBox.shrink(),
+            ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
         ),
@@ -202,47 +273,322 @@ class VendorDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildPendingBanner(AuthAuthenticated authState) {
-    // Show banner if vendor status is PENDING (would need vendor data)
-    return const SizedBox.shrink();
+  Widget _buildStatusBanner(String status) {
+    if (status == 'APPROVED') return const SizedBox.shrink();
+    final isPending = status == 'PENDING';
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isPending
+            ? AppColors.warning.withValues(alpha: 0.12)
+            : AppColors.error.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isPending
+              ? AppColors.warning.withValues(alpha: 0.4)
+              : AppColors.error.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPending ? Icons.hourglass_top_rounded : Icons.block,
+            color: isPending ? AppColors.warning : AppColors.error,
+            size: 20,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isPending ? 'Account Pending Approval' : 'Account Suspended',
+                  style: AppTextStyles.h6.copyWith(
+                    color: isPending ? AppColors.warning : AppColors.error,
+                  ),
+                ),
+                Text(
+                  isPending
+                      ? 'Your business is under review. You can set up listings, but they won\'t be visible until approved.'
+                      : 'Your account has been suspended. Please contact support.',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
-class _StatsRow extends StatelessWidget {
-  const _StatsRow({required this.stats});
+// ─── Stats panel: today + all-time ────────────────────────────────────────
+
+class _StatsPanel extends StatelessWidget {
+  const _StatsPanel({required this.stats});
   final VendorStats stats;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _StatCard(
-            label: "Today's Orders",
-            value: '${stats.todayOrders}',
-            icon: Icons.receipt_long,
-            color: AppColors.info,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text("Today's Snapshot", style: AppTextStyles.h5),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  label: 'Orders',
+                  value: '${stats.todayOrders}',
+                  icon: Icons.receipt_long,
+                  color: AppColors.info,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StatCard(
+                  label: 'Earned',
+                  value: Formatters.formatNPR(stats.todayEarnedPaisa),
+                  icon: Icons.payments_outlined,
+                  color: AppColors.primaryMedium,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StatCard(
+                  label: 'Food Saved',
+                  value: '${stats.foodSavedKg.toStringAsFixed(1)} kg',
+                  icon: Icons.eco_outlined,
+                  color: AppColors.success,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            label: 'Earned Today',
-            value: Formatters.formatNPR(stats.todayEarnedPaisa),
-            icon: Icons.payments_outlined,
-            color: AppColors.primaryMedium,
+          const SizedBox(height: 16),
+          Text('All-Time Impact', style: AppTextStyles.h5),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  label: 'Reservations',
+                  value: '${stats.totalReservations}',
+                  icon: Icons.bookmark_outline,
+                  color: AppColors.accentAmber,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StatCard(
+                  label: 'Pickups Done',
+                  value: '${stats.completedPickups}',
+                  icon: Icons.check_circle_outline,
+                  color: AppColors.success,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _StatCard(
+                  label: 'Food Saved',
+                  value: '${stats.totalFoodSavedKg.toStringAsFixed(1)} kg',
+                  icon: Icons.eco,
+                  color: AppColors.primaryMedium,
+                ),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            label: 'Food Saved',
-            value: '${stats.foodSavedKg.toStringAsFixed(1)} kg',
-            icon: Icons.eco_outlined,
-            color: AppColors.success,
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Listing performance section ───────────────────────────────────────────
+
+class _ListingPerformanceSection extends StatelessWidget {
+  const _ListingPerformanceSection({required this.listings});
+  final List<ListingPerf> listings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Listing Performance', style: AppTextStyles.h5),
+          const SizedBox(height: 10),
+          ...listings.map((l) => _PerfTile(listing: l)),
+        ],
+      ),
+    );
+  }
+}
+
+class _PerfTile extends StatelessWidget {
+  const _PerfTile({required this.listing});
+  final ListingPerf listing;
+
+  @override
+  Widget build(BuildContext context) {
+    final conversionRate = listing.totalOrders > 0
+        ? (listing.completedOrders / listing.totalOrders * 100).round()
+        : 0;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-        ),
-      ],
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: listing.isActive
+                      ? AppColors.primarySurface
+                      : const Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  Icons.fastfood_outlined,
+                  size: 18,
+                  color: listing.isActive
+                      ? AppColors.primaryMedium
+                      : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(listing.name,
+                    style: AppTextStyles.h6,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis),
+              ),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: listing.isActive
+                      ? AppColors.success.withValues(alpha: 0.1)
+                      : const Color(0xFFF0F0F0),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  listing.isActive ? 'Active' : 'Inactive',
+                  style: AppTextStyles.caption.copyWith(
+                    color: listing.isActive
+                        ? AppColors.success
+                        : AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              _PerfStat(
+                label: 'Orders',
+                value: '${listing.totalOrders}',
+                icon: Icons.receipt_outlined,
+              ),
+              _PerfStat(
+                label: 'Pickups',
+                value: '${listing.completedOrders}',
+                icon: Icons.check_circle_outline,
+              ),
+              _PerfStat(
+                label: 'Revenue',
+                value: Formatters.formatNPR(listing.revenuePaisa),
+                icon: Icons.payments_outlined,
+              ),
+              _PerfStat(
+                label: 'Qty Left',
+                value: '${listing.availableQty}',
+                icon: Icons.inventory_2_outlined,
+              ),
+            ],
+          ),
+          if (listing.totalOrders > 0) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: conversionRate / 100,
+                      backgroundColor: const Color(0xFFEEEEEE),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        conversionRate >= 70
+                            ? AppColors.success
+                            : conversionRate >= 40
+                                ? AppColors.accentAmber
+                                : AppColors.error,
+                      ),
+                      minHeight: 6,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '$conversionRate% pickup rate',
+                  style: AppTextStyles.caption
+                      .copyWith(color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PerfStat extends StatelessWidget {
+  const _PerfStat({
+    required this.label,
+    required this.value,
+    required this.icon,
+  });
+  final String label;
+  final String value;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, size: 16, color: AppColors.textSecondary),
+          const SizedBox(height: 2),
+          Text(value,
+              style: AppTextStyles.bodySmall
+                  .copyWith(fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+          Text(label, style: AppTextStyles.caption),
+        ],
+      ),
     );
   }
 }

@@ -9,6 +9,7 @@ import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/shimmer_card.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../providers/admin_provider.dart';
+import '../../auth/presentation/providers/auth_provider.dart';
 
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
@@ -20,7 +21,16 @@ class AdminDashboardScreen extends ConsumerWidget {
     final recentOrdersAsync = ref.watch(adminOrdersProvider(''));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Admin Dashboard')),
+      appBar: AppBar(
+        title: const Text('Admin Dashboard'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: 'Logout',
+            onPressed: () => ref.read(authProvider.notifier).logout(),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
         onRefresh: () async {

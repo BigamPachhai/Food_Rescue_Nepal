@@ -56,7 +56,9 @@ model User {
   orders        Order[]        @relation("CustomerOrders")
   reviews       Review[]
   notifications Notification[]
-  favorites     Favorite[]
+  favorites       Favorite[]
+  vendorFavorites VendorFavorite[]
+  reports         Report[]
 
   @@map("users")
 }
@@ -88,10 +90,11 @@ model Vendor {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listings Listing[]
-  orders   Order[]   @relation("VendorOrders")
-  reviews  Review[]
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listings        Listing[]
+  orders          Order[]          @relation("VendorOrders")
+  reviews         Review[]
+  vendorFavorites VendorFavorite[]
 
   @@map("vendors")
 }
@@ -108,6 +111,8 @@ model Listing {
   availableQty    Int
   pickupStart     DateTime
   pickupEnd       DateTime
+  expiryTime      DateTime?
+  conditionNotes  String?
   imageUrls       String[]        @default([])
   isActive        Boolean         @default(true)
   createdAt       DateTime        @default(now())
@@ -142,19 +147,37 @@ model Order {
 }
 
 model Review {
-  id         String   @id @default(cuid())
-  customerId String
-  vendorId   String
-  orderId    String   @unique
-  rating     Int
-  comment    String?
-  createdAt  DateTime @default(now())
+  id                  String    @id @default(cuid())
+  customerId          String
+  vendorId            String
+  orderId             String    @unique
+  rating              Int
+  comment             String?
+  vendorResponse      String?
+  vendorRespondedAt   DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   customer User   @relation(fields: [customerId], references: [id])
   vendor   Vendor @relation(fields: [vendorId], references: [id])
   order    Order  @relation(fields: [orderId], references: [id])
 
   @@map("reviews")
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  reporterId  String
+  type        String   // VENDOR | LISTING | OTHER
+  targetId    String?
+  reason      String
+  description String?
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+
+  reporter User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
 }
 
 model Notification {
@@ -182,4 +205,26 @@ model Favorite {
 
   @@id([userId, listingId])
   @@map("favorites")
+}
+
+model VendorFavorite {
+  userId    String
+  vendorId  String
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@id([userId, vendorId])
+  @@map("vendor_favorites")
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("password_reset_otps")
 }

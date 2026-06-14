@@ -35,6 +35,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
+  final _conditionCtrl = TextEditingController();
   final _originalPriceCtrl = TextEditingController();
   final _discountedPriceCtrl = TextEditingController();
   final _qtyCtrl = TextEditingController();
@@ -42,6 +43,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
   String _category = 'Restaurant';
   DateTime _pickupStart = DateTime.now().add(const Duration(hours: 1));
   DateTime _pickupEnd = DateTime.now().add(const Duration(hours: 4));
+  DateTime? _expiryTime;
   final List<String> _imageUrls = [];
   final List<File> _pendingImages = [];
   bool _isLoading = false;
@@ -82,6 +84,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         await ref.read(vendorListingDetailProvider(widget.listingId!).future);
     _nameCtrl.text = listing.name;
     _descCtrl.text = listing.description ?? '';
+    _conditionCtrl.text = listing.conditionNotes ?? '';
     _originalPriceCtrl.text = (listing.originalPrice ~/ 100).toString();
     _discountedPriceCtrl.text = (listing.discountedPrice ~/ 100).toString();
     _qtyCtrl.text = listing.quantity.toString();
@@ -89,6 +92,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       _category = _normalizeCategory(listing.category);
       _pickupStart = listing.pickupStart;
       _pickupEnd = listing.pickupEnd;
+      _expiryTime = listing.expiryTime;
       _imageUrls.addAll(listing.imageUrls);
     });
   }
@@ -97,6 +101,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _descCtrl.dispose();
+    _conditionCtrl.dispose();
     _originalPriceCtrl.dispose();
     _discountedPriceCtrl.dispose();
     _qtyCtrl.dispose();
@@ -159,6 +164,9 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         'pickupStart': _pickupStart.toIso8601String(),
         'pickupEnd': _pickupEnd.toIso8601String(),
         'imageUrls': allUrls,
+        if (_conditionCtrl.text.trim().isNotEmpty)
+          'conditionNotes': _conditionCtrl.text.trim(),
+        if (_expiryTime != null) 'expiryTime': _expiryTime!.toIso8601String(),
       };
 
       final dio = ref.read(dioClientProvider);
@@ -182,6 +190,25 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       if (mounted) context.showErrorSnackBar(e.toString());
     }
     if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _pickExpiryTime() async {
+    final now = DateTime.now();
+    final date = await showDatePicker(
+      context: context,
+      initialDate: _expiryTime ?? now.add(const Duration(hours: 6)),
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 30)),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_expiryTime ?? now.add(const Duration(hours: 6))),
+    );
+    if (time == null) return;
+    setState(() {
+      _expiryTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    });
   }
 
   Future<void> _pickDateTime({required bool isStart}) async {
@@ -337,6 +364,56 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: AppSizes.lg),
+              // Expiry time
+              GestureDetector(
+                onTap: _pickExpiryTime,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.timer_outlined,
+                        size: 20,
+                        color: _expiryTime != null ? AppColors.warning : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Food Expiry Time (optional)', style: AppTextStyles.caption),
+                            if (_expiryTime != null)
+                              Text(
+                                '${_expiryTime!.day}/${_expiryTime!.month}/${_expiryTime!.year}  ${_expiryTime!.hour.toString().padLeft(2, '0')}:${_expiryTime!.minute.toString().padLeft(2, '0')}',
+                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning, fontWeight: FontWeight.w500),
+                              )
+                            else
+                              Text('Tap to set expiry time', style: AppTextStyles.bodySmall),
+                          ],
+                        ),
+                      ),
+                      if (_expiryTime != null)
+                        GestureDetector(
+                          onTap: () => setState(() => _expiryTime = null),
+                          child: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSizes.lg),
+              AppTextField(
+                label: 'Condition Notes (optional)',
+                hint: 'e.g. Freshly baked, no preservatives, best before pickup',
+                controller: _conditionCtrl,
+                prefixIcon: Icons.info_outline,
+                maxLines: 2,
               ),
               const SizedBox(height: AppSizes.lg),
               Text('Photos', style: AppTextStyles.h5),

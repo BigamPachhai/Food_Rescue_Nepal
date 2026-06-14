@@ -98,26 +98,73 @@ export class VendorsService {
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 
-    const [todayOrders, pendingOrders, activeListings, todayRevenue] =
-      await Promise.all([
-        this.prisma.order.count({
-          where: { vendorId: vendor.id, createdAt: { gte: todayStart } },
-        }),
-        this.prisma.order.count({
-          where: { vendorId: vendor.id, status: 'PENDING' },
-        }),
-        this.prisma.listing.count({
-          where: { vendorId: vendor.id, isActive: true },
-        }),
-        this.prisma.order.aggregate({
-          where: {
-            vendorId: vendor.id,
-            status: { in: ['PICKED_UP', 'READY', 'CONFIRMED'] },
-            createdAt: { gte: todayStart },
+    const [
+      todayOrders,
+      pendingOrders,
+      activeListings,
+      todayRevenue,
+      totalReservations,
+      completedPickups,
+      totalRevenue,
+      listings,
+    ] = await Promise.all([
+      this.prisma.order.count({
+        where: { vendorId: vendor.id, createdAt: { gte: todayStart } },
+      }),
+      this.prisma.order.count({
+        where: { vendorId: vendor.id, status: 'PENDING' },
+      }),
+      this.prisma.listing.count({
+        where: { vendorId: vendor.id, isActive: true },
+      }),
+      this.prisma.order.aggregate({
+        where: {
+          vendorId: vendor.id,
+          status: { in: ['PICKED_UP', 'READY', 'CONFIRMED'] },
+          createdAt: { gte: todayStart },
+        },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.order.count({
+        where: { vendorId: vendor.id },
+      }),
+      this.prisma.order.count({
+        where: { vendorId: vendor.id, status: 'PICKED_UP' },
+      }),
+      this.prisma.order.aggregate({
+        where: { vendorId: vendor.id, status: 'PICKED_UP' },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.listing.findMany({
+        where: { vendorId: vendor.id },
+        select: {
+          id: true,
+          name: true,
+          availableQty: true,
+          originalPrice: true,
+          discountedPrice: true,
+          isActive: true,
+          _count: { select: { orders: true } },
+          orders: {
+            where: { status: 'PICKED_UP' },
+            select: { totalAmount: true, quantity: true },
           },
-          _sum: { totalAmount: true },
-        }),
-      ]);
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    const listingPerformance = listings.map((l) => ({
+      id: l.id,
+      name: l.name,
+      availableQty: l.availableQty,
+      isActive: l.isActive,
+      totalOrders: l._count.orders,
+      completedOrders: l.orders.length,
+      revenuePaisa: l.orders.reduce((sum, o) => sum + o.totalAmount, 0),
+      quantitySold: l.orders.reduce((sum, o) => sum + o.quantity, 0),
+    }));
 
     return {
       todayOrders,
@@ -125,6 +172,11 @@ export class VendorsService {
       foodSavedKg: todayOrders * 0.5,
       pendingOrders,
       activeListings,
+      totalReservations,
+      completedPickups,
+      totalFoodSavedKg: completedPickups * 0.5,
+      totalRevenuePaisa: totalRevenue._sum?.totalAmount ?? 0,
+      listingPerformance,
     };
   }
 

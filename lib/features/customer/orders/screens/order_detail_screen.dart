@@ -11,6 +11,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../providers/customer_orders_provider.dart';
+import '../../../reviews/providers/reviews_provider.dart';
 
 class OrderDetailScreen extends ConsumerStatefulWidget {
   const OrderDetailScreen({super.key, required this.orderId});
@@ -149,6 +150,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                   variant: AppButtonVariant.secondary,
                 ),
               ],
+              if (order.status == 'PICKED_UP') ...[
+                const SizedBox(height: 12),
+                _ReviewButton(order: order),
+              ],
             ],
           ),
         ),
@@ -247,6 +252,33 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
           }),
         ),
       ],
+    );
+  }
+}
+
+class _ReviewButton extends ConsumerWidget {
+  const _ReviewButton({required this.order});
+  final OrderEntity order;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final reviewAsync = ref.watch(orderReviewProvider(order.id));
+    return reviewAsync.when(
+      data: (existing) => AppButton(
+        label: existing != null ? 'Edit Your Review' : 'Rate This Order',
+        onPressed: () => context.push(
+          '/customer/orders/${order.id}/review',
+          extra: {
+            'vendorId': order.vendorId,
+            'vendorName': order.vendor?.businessName ?? 'Vendor',
+            'existingReview': existing,
+          },
+        ),
+        icon: existing != null ? Icons.edit : Icons.star_outline,
+        variant: existing != null ? AppButtonVariant.secondary : AppButtonVariant.primary,
+      ),
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

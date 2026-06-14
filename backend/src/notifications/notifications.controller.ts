@@ -1,8 +1,11 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
+  Delete,
   Param,
+  Body,
   Query,
   UseGuards,
   DefaultValuePipe,
@@ -38,6 +41,16 @@ export class NotificationsController {
     return { success: true, data: result, message: 'Success' };
   }
 
+  @Post('fcm-token')
+  @ApiOperation({ summary: 'Register FCM device token' })
+  async registerFcmToken(
+    @CurrentUser('id') userId: string,
+    @Body('fcmToken') fcmToken: string,
+  ) {
+    const result = await this.notificationsService.registerFcmToken(userId, fcmToken);
+    return { success: true, data: result, message: 'FCM token registered' };
+  }
+
   @Patch('read-all')
   @ApiOperation({ summary: 'Mark all notifications as read' })
   async markAllRead(@CurrentUser('id') userId: string) {
@@ -50,5 +63,19 @@ export class NotificationsController {
   async markRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
     const result = await this.notificationsService.markRead(id, userId);
     return { success: true, data: result, message: 'Notification marked as read' };
+  }
+
+  @Delete('all')
+  @ApiOperation({ summary: 'Delete all notifications' })
+  async deleteAll(@CurrentUser('id') userId: string) {
+    const result = await this.notificationsService.deleteAll(userId);
+    return { success: true, data: result, message: 'All notifications deleted' };
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a notification' })
+  async deleteOne(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    const result = await this.notificationsService.deleteOne(id, userId);
+    return { success: true, data: result, message: 'Notification deleted' };
   }
 }

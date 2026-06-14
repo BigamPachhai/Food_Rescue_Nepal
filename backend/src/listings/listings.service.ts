@@ -18,17 +18,36 @@ export class ListingsService {
     const limit = query.limit || 20;
     const skip = (page - 1) * limit;
 
+    // Build vendor condition
+    const vendorCondition: any = { status: VendorStatus.APPROVED };
+    if (query.minRating != null) {
+      vendorCondition.avgRating = { gte: query.minRating };
+    }
+
+    // Build listing WHERE clause
     const where: any = {
       isActive: true,
-      vendor: { status: VendorStatus.APPROVED },
+      vendor: vendorCondition,
       ...(query.category && { category: query.category }),
-      ...(query.search && {
-        OR: [
-          { name: { contains: query.search, mode: 'insensitive' } },
-          { description: { contains: query.search, mode: 'insensitive' } },
-        ],
-      }),
+      ...(query.onlyAvailable && { availableQty: { gt: 0 } }),
     };
+
+    // Price range filter
+    if (query.minPrice != null || query.maxPrice != null) {
+      where.discountedPrice = {
+        ...(query.minPrice != null && { gte: query.minPrice }),
+        ...(query.maxPrice != null && { lte: query.maxPrice }),
+      };
+    }
+
+    // Search: match name, description, or vendor business name
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: 'insensitive' } },
+        { description: { contains: query.search, mode: 'insensitive' } },
+        { vendor: { businessName: { contains: query.search, mode: 'insensitive' } } },
+      ];
+    }
 
     const listings = await this.prisma.listing.findMany({
       where,
@@ -42,23 +61,52 @@ export class ListingsService {
             lng: true,
             logoUrl: true,
             avgRating: true,
+            totalReviews: true,
           },
         },
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    // Apply distance filtering and sorting if lat/lng provided
-    let result = listings;
+    // Apply distance and sort in-memory
+    let result: any[] = listings;
+
     if (query.lat != null && query.lng != null) {
-      const radius = query.radius || 10;
+      const radius = query.radius || 50;
       result = listings
         .map((l) => ({
           ...l,
           distance: this.haversine(query.lat!, query.lng!, l.vendor.lat, l.vendor.lng),
         }))
-        .filter((l) => (l as any).distance <= radius)
-        .sort((a, b) => (a as any).distance - (b as any).distance);
+        .filter((l) => l.distance <= radius);
+    }
+
+    // Apply sort
+    const sortBy = query.sortBy || 'newest';
+    switch (sortBy) {
+      case 'nearest':
+        if (query.lat != null) result.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
+        break;
+      case 'price_asc':
+        result.sort((a, b) => a.discountedPrice - b.discountedPrice);
+        break;
+      case 'price_desc':
+        result.sort((a, b) => b.discountedPrice - a.discountedPrice);
+        break;
+      case 'discount':
+        result.sort((a, b) => {
+          const dA = a.originalPrice > 0 ? (a.originalPrice - a.discountedPrice) / a.originalPrice : 0;
+          const dB = b.originalPrice > 0 ? (b.originalPrice - b.discountedPrice) / b.originalPrice : 0;
+          return dB - dA;
+        });
+        break;
+      case 'popular':
+        result.sort((a, b) => (b.vendor?.avgRating ?? 0) - (a.vendor?.avgRating ?? 0));
+        break;
+      case 'newest':
+      default:
+        // already sorted by createdAt desc from DB
+        break;
     }
 
     const total = result.length;
@@ -123,6 +171,8 @@ export class ListingsService {
         pickupStart: new Date(dto.pickupStart),
         pickupEnd: new Date(dto.pickupEnd),
         imageUrls: dto.imageUrls || [],
+        ...(dto.expiryTime && { expiryTime: new Date(dto.expiryTime) }),
+        ...(dto.conditionNotes !== undefined && { conditionNotes: dto.conditionNotes }),
       },
     });
   }
@@ -156,6 +206,8 @@ export class ListingsService {
         ...(dto.pickupEnd && { pickupEnd: new Date(dto.pickupEnd) }),
         ...(dto.imageUrls && { imageUrls: dto.imageUrls }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+        ...(dto.expiryTime !== undefined && { expiryTime: dto.expiryTime ? new Date(dto.expiryTime) : null }),
+        ...(dto.conditionNotes !== undefined && { conditionNotes: dto.conditionNotes }),
       },
     });
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -21,6 +22,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   double _radius = 10;
   List<VendorEntity> _vendors = [];
   bool _loading = true;
+  Position? _userPosition;
 
   static const _kathmandu = LatLng(27.7172, 85.3240);
 
@@ -58,11 +60,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Future<void> _goToMyLocation() async {
     await ref.read(locationProvider.notifier).getCurrentLocation();
     final posState = ref.read(locationProvider);
-    posState.whenData((pos) {
-      if (pos != null) {
-        _mapController.move(LatLng(pos.latitude, pos.longitude), 14);
-      }
-    });
+    posState.when(
+      data: (pos) {
+        if (pos != null) {
+          setState(() => _userPosition = pos);
+          _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not get location. Enable location services.')),
+          );
+        }
+      },
+      loading: () {},
+      error: (_, __) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location error. Check permissions.')),
+        );
+      },
+    );
   }
 
   @override
@@ -81,6 +96,24 @@ class _MapScreenState extends ConsumerState<MapScreen> {
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.foodrescue.nepal',
               ),
+              if (_userPosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
+                      width: 20,
+                      height: 20,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 3),
+                          boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 2)],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               MarkerLayer(
                 markers: _vendors.map((v) {
                   return Marker(
