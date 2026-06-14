@@ -91,6 +91,43 @@ export class VendorsService {
     });
   }
 
+  async getStats(userId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const [todayOrders, pendingOrders, activeListings, todayRevenue] =
+      await Promise.all([
+        this.prisma.order.count({
+          where: { vendorId: vendor.id, createdAt: { gte: todayStart } },
+        }),
+        this.prisma.order.count({
+          where: { vendorId: vendor.id, status: 'PENDING' },
+        }),
+        this.prisma.listing.count({
+          where: { vendorId: vendor.id, isActive: true },
+        }),
+        this.prisma.order.aggregate({
+          where: {
+            vendorId: vendor.id,
+            status: { in: ['PICKED_UP', 'READY', 'CONFIRMED'] },
+            createdAt: { gte: todayStart },
+          },
+          _sum: { totalAmount: true },
+        }),
+      ]);
+
+    return {
+      todayOrders,
+      todayEarned: todayRevenue._sum?.totalAmount ?? 0,
+      foodSavedKg: todayOrders * 0.5,
+      pendingOrders,
+      activeListings,
+    };
+  }
+
   async getVendorByUserId(userId: string) {
     return this.prisma.vendor.findUnique({ where: { userId } });
   }

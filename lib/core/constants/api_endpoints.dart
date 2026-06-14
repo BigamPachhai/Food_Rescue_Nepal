@@ -20,25 +20,28 @@ class ApiEndpoints {
   static String listingById(String id) => '/listings/$id';
   static const String uploadImage = '/upload/image';
 
-  // Orders
+  // Orders (customer)
   static const String orders = '/orders';
+  static const String customerOrders = '/orders/my';
   static String orderById(String id) => '/orders/$id';
   static String orderPickup(String id) => '/orders/$id/pickup';
   static String orderCancel(String id) => '/orders/$id/cancel';
 
-  // Vendor
-  static const String vendorProfile = '/vendor/profile';
-  static const String vendorStats = '/vendor/stats';
-  static const String vendorListings = '/vendor/listings';
-  static String vendorListingById(String id) => '/vendor/listings/$id';
-  static const String vendorOrders = '/vendor/orders';
-  static String vendorOrderById(String id) => '/vendor/orders/$id';
+  // Favorites
+  static const String customerFavorites = '/favorites';
+  static String toggleFavorite(String listingId) => '/favorites/$listingId';
 
-  // Customer
-  static const String customerProfile = '/customer/profile';
-  static const String customerOrders = '/customer/orders';
-  static const String customerFavorites = '/customer/favorites';
-  static String toggleFavorite(String listingId) => '/customer/favorites/$listingId';
+  // User profile
+  static const String customerProfile = '/users/profile';
+
+  // Vendor
+  static const String vendorProfile = '/vendors/profile';
+  static const String vendorStats = '/vendors/stats';
+  static const String vendorListings = '/listings/vendor/mine';
+  static const String createListing = '/listings';
+  static String vendorListingById(String id) => '/listings/$id';
+  static const String vendorOrders = '/orders/vendor';
+  static String vendorOrderById(String id) => '/orders/$id';
 
   // Admin
   static const String adminStats = '/admin/stats';

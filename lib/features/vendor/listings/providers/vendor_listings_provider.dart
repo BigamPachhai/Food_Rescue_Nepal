@@ -110,5 +110,7 @@ final vendorListingDetailProvider =
     FutureProvider.family<VendorListing, String>((ref, id) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.vendorListingById(id));
-  return VendorListing.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final d = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return VendorListing.fromJson(d);
 });

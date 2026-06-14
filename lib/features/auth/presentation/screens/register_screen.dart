@@ -65,6 +65,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       lng: isVendor ? _markerPosition.longitude : null,
     );
     await ref.read(authProvider.notifier).register(request);
+    // Router refreshListenable handles redirect
   }
 
   @override

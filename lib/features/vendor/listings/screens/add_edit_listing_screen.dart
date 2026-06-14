@@ -55,6 +55,11 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
     'Other',
   ];
 
+  String _normalizeCategory(String cat) {
+    final lower = cat.toLowerCase();
+    return lower[0].toUpperCase() + lower.substring(1);
+  }
+
   int get _discountPercent {
     final orig = int.tryParse(_originalPriceCtrl.text) ?? 0;
     final disc = int.tryParse(_discountedPriceCtrl.text) ?? 0;
@@ -81,7 +86,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
     _discountedPriceCtrl.text = (listing.discountedPrice ~/ 100).toString();
     _qtyCtrl.text = listing.quantity.toString();
     setState(() {
-      _category = listing.category;
+      _category = _normalizeCategory(listing.category);
       _pickupStart = listing.pickupStart;
       _pickupEnd = listing.pickupEnd;
       _imageUrls.addAll(listing.imageUrls);
@@ -158,7 +163,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
 
       final dio = ref.read(dioClientProvider);
       if (widget.mode == ListingFormMode.add) {
-        await dio.post(ApiEndpoints.vendorListings, data: payload);
+        await dio.post(ApiEndpoints.createListing, data: payload);
       } else {
         await dio.patch(
           ApiEndpoints.vendorListingById(widget.listingId!),

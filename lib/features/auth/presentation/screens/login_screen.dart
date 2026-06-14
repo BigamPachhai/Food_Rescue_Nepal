@@ -23,14 +23,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordCtrl = TextEditingController();
 
   @override
-  void initState() {
-    super.initState();
-    // DEBUG: auto-fill for screenshot
-    _emailCtrl.text = 'customer@test.com';
-    _passwordCtrl.text = 'Test@1234!';
-  }
-
-  @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
@@ -40,7 +32,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     await ref.read(authProvider.notifier).login(_emailCtrl.text.trim(), _passwordCtrl.text);
-    // Router redirect handles navigation
+    // Router refreshListenable handles redirect
   }
 
   @override
@@ -51,6 +43,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ref.listen<AuthState>(authProvider, (_, next) {
       if (next is AuthError) {
         context.showErrorSnackBar(next.message);
+      } else if (next is AuthAuthenticated) {
+        final user = next.user;
+        if (user.isAdmin) {
+          context.go('/admin/dashboard');
+        } else if (user.isVendor) {
+          context.go('/vendor/dashboard');
+        } else {
+          context.go('/customer/home');
+        }
       }
     });
 

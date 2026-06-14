@@ -11,7 +11,8 @@ class AppException implements Exception {
   String toString() => message;
 }
 
-const _storage = FlutterSecureStorage();
+const _androidOptions = AndroidOptions(encryptedSharedPreferences: true);
+const _storage = FlutterSecureStorage(aOptions: _androidOptions);
 const _tokenKey = 'access_token';
 const _refreshKey = 'refresh_token';
 

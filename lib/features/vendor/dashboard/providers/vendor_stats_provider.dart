@@ -29,5 +29,7 @@ class VendorStats {
 final vendorStatsProvider = FutureProvider<VendorStats>((ref) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.vendorStats);
-  return VendorStats.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final data = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return VendorStats.fromJson(data);
 });

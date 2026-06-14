@@ -45,6 +45,16 @@ export class VendorsController {
     return { success: true, data: vendors, message: 'Success' };
   }
 
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get vendor dashboard stats' })
+  async getStats(@CurrentUser('id') userId: string) {
+    const stats = await this.vendorsService.getStats(userId);
+    return { success: true, data: stats, message: 'Success' };
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get vendor detail with listings and reviews (public)' })
   async findOne(@Param('id') id: string) {

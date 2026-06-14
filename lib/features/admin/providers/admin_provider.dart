@@ -121,7 +121,9 @@ class AdminOrder {
 final adminStatsProvider = FutureProvider<AdminStats>((ref) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.adminStats);
-  return AdminStats.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final data = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return AdminStats.fromJson(data);
 });
 
 // Users
@@ -149,7 +151,9 @@ final adminUserDetailProvider =
     FutureProvider.family<AdminUser, String>((ref, id) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.adminUserById(id));
-  return AdminUser.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final d = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return AdminUser.fromJson(d);
 });
 
 // Vendors
@@ -177,7 +181,9 @@ final adminVendorDetailProvider =
     FutureProvider.family<AdminVendor, String>((ref, id) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.adminVendorById(id));
-  return AdminVendor.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final d = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return AdminVendor.fromJson(d);
 });
 
 // Orders
