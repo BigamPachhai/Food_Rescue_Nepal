@@ -8,6 +8,7 @@ import 'core/constants/api_endpoints.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/offline_banner.dart';
+import 'features/settings/providers/settings_provider.dart';
 
 final FlutterLocalNotificationsPlugin _localNotifications =
     FlutterLocalNotificationsPlugin();
@@ -89,11 +90,12 @@ class FoodRescueApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    final themeMode = ref.watch(themeProvider);
     return MaterialApp.router(
       title: 'Food Rescue Nepal',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.light,
+      themeMode: themeMode,
       routerConfig: router,
       debugShowCheckedModeBanner: false,
       builder: (context, child) => Column(

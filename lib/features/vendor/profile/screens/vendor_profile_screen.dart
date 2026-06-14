@@ -72,6 +72,12 @@ class VendorProfileScreen extends ConsumerWidget {
                       title: 'Settings',
                       children: [
                         _ProfileTile(
+                          icon: Icons.settings_outlined,
+                          label: 'App Settings',
+                          subtitle: 'Theme, language, notifications',
+                          onTap: () => context.push('/vendor/settings'),
+                        ),
+                        _ProfileTile(
                           icon: Icons.notifications_outlined,
                           label: 'Notifications',
                           subtitle: 'Manage order alerts',

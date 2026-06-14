@@ -65,16 +65,16 @@ class CustomerProfileScreen extends ConsumerWidget {
                     title: 'Preferences',
                     children: [
                       _ProfileTile(
+                        icon: Icons.settings_outlined,
+                        label: 'Settings',
+                        subtitle: 'Theme, language, notifications',
+                        onTap: () => context.push('/settings'),
+                      ),
+                      _ProfileTile(
                         icon: Icons.notifications_outlined,
                         label: 'Notifications',
                         subtitle: 'Manage notification preferences',
                         onTap: () => context.push('/notifications'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.language_outlined,
-                        label: 'Language',
-                        subtitle: 'English',
-                        onTap: () => _showLanguageSheet(context),
                         showDivider: false,
                       ),
                     ],
@@ -222,37 +222,6 @@ class CustomerProfileScreen extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-
-  void _showLanguageSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Language', style: AppTextStyles.h5),
-            const SizedBox(height: 16),
-            _langOption(context, 'English', true),
-            _langOption(context, 'नेपाली (Nepali)', false),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _langOption(BuildContext context, String label, bool selected) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(label, style: AppTextStyles.bodyMedium),
-      trailing: selected ? const Icon(Icons.check, color: AppColors.primaryMedium) : null,
-      onTap: () => Navigator.pop(context),
     );
   }
 

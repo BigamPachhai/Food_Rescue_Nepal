@@ -11,12 +11,20 @@ class ConnectivityNotifier extends StateNotifier<bool> {
   late final StreamSubscription<List<ConnectivityResult>> _subscription;
 
   Future<void> _checkInitial() async {
-    final result = await Connectivity().checkConnectivity();
-    _update(result);
+    try {
+      final result = await Connectivity().checkConnectivity();
+      _update(result);
+    } catch (_) {
+      state = true; // assume online if plugin not yet registered
+    }
   }
 
   void _update(List<ConnectivityResult> results) {
-    state = results.any((r) => r != ConnectivityResult.none);
+    try {
+      state = results.any((r) => r != ConnectivityResult.none);
+    } catch (_) {
+      state = true;
+    }
   }
 
   @override

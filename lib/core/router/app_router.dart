@@ -38,6 +38,7 @@ import '../../features/reviews/screens/write_review_screen.dart';
 import '../../features/reviews/screens/vendor_reviews_screen.dart';
 import '../../features/reviews/providers/reviews_provider.dart';
 import '../../features/support/screens/support_screen.dart';
+import '../../features/settings/screens/settings_screen.dart';
 
 // Shell widgets
 class CustomerShell extends StatefulWidget {
@@ -237,6 +238,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/customer/profile/edit', builder: (_, __) => const EditProfileScreen()),
           GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
           GoRoute(path: '/customer/support', builder: (_, __) => const SupportScreen()),
+          GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           GoRoute(
             path: '/customer/orders/:id/review',
             builder: (_, state) {
@@ -280,6 +282,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, state) =>
                 VendorReviewsScreen(vendorId: state.pathParameters['vendorId']!),
           ),
+          GoRoute(path: '/vendor/settings', builder: (_, __) => const SettingsScreen()),
         ],
       ),
       ShellRoute(

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -99,7 +100,7 @@ class _QrDisplayScreenState extends ConsumerState<QrDisplayScreen>
                         borderRadius: BorderRadius.circular(24),
                       ),
                       child: QrImageView(
-                        data: order.pickupCode!,
+                        data: jsonEncode({'o': order.id, 'c': order.pickupCode}),
                         size: 200,
                         backgroundColor: Colors.white,
                         eyeStyle: const QrEyeStyle(
