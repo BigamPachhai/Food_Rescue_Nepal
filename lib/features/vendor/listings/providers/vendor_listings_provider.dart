@@ -1,0 +1,114 @@
+import 'package:dio/dio.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/dio_client.dart';
+
+class VendorListing {
+  final String id;
+  final String vendorId;
+  final String name;
+  final String? description;
+  final String category;
+  final int originalPrice;
+  final int discountedPrice;
+  final int quantity;
+  final int availableQty;
+  final DateTime pickupStart;
+  final DateTime pickupEnd;
+  final List<String> imageUrls;
+  final bool isActive;
+
+  const VendorListing({
+    required this.id,
+    required this.vendorId,
+    required this.name,
+    this.description,
+    required this.category,
+    required this.originalPrice,
+    required this.discountedPrice,
+    required this.quantity,
+    required this.availableQty,
+    required this.pickupStart,
+    required this.pickupEnd,
+    required this.imageUrls,
+    required this.isActive,
+  });
+
+  factory VendorListing.fromJson(Map<String, dynamic> json) => VendorListing(
+        id: json['id'] as String,
+        vendorId: json['vendorId'] as String,
+        name: json['name'] as String,
+        description: json['description'] as String?,
+        category: json['category'] as String,
+        originalPrice: json['originalPrice'] as int,
+        discountedPrice: json['discountedPrice'] as int,
+        quantity: json['quantity'] as int,
+        availableQty: json['availableQty'] as int? ?? json['quantity'] as int,
+        pickupStart: DateTime.parse(json['pickupStart'] as String),
+        pickupEnd: DateTime.parse(json['pickupEnd'] as String),
+        imageUrls: (json['imageUrls'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
+        isActive: json['isActive'] as bool? ?? true,
+      );
+
+  int get discountPercent {
+    if (originalPrice == 0) return 0;
+    return (((originalPrice - discountedPrice) / originalPrice) * 100).round();
+  }
+}
+
+class VendorListingsNotifier
+    extends StateNotifier<AsyncValue<List<VendorListing>>> {
+  VendorListingsNotifier(this._dio) : super(const AsyncValue.loading()) {
+    fetch();
+  }
+  final Dio _dio;
+
+  Future<void> fetch() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.vendorListings);
+      final data = response.data;
+      List<dynamic> items;
+      if (data is List) {
+        items = data;
+      } else if (data is Map && data['data'] is List) {
+        items = data['data'] as List<dynamic>;
+      } else {
+        items = [];
+      }
+      state = AsyncValue.data(
+        items
+            .map((e) => VendorListing.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> deleteListing(String id) async {
+    await _dio.delete(ApiEndpoints.vendorListingById(id));
+    await fetch();
+  }
+
+  Future<void> toggleActive(String id, bool isActive) async {
+    await _dio.patch(ApiEndpoints.vendorListingById(id),
+        data: {'isActive': isActive});
+    await fetch();
+  }
+}
+
+final vendorListingsProvider =
+    StateNotifierProvider<VendorListingsNotifier, AsyncValue<List<VendorListing>>>(
+        (ref) {
+  return VendorListingsNotifier(ref.read(dioClientProvider));
+});
+
+final vendorListingDetailProvider =
+    FutureProvider.family<VendorListing, String>((ref, id) async {
+  final dio = ref.read(dioClientProvider);
+  final response = await dio.get(ApiEndpoints.vendorListingById(id));
+  return VendorListing.fromJson(response.data as Map<String, dynamic>);
+});
