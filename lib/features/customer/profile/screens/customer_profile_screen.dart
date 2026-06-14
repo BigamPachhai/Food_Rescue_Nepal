@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/utils/extensions.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../auth/domain/auth_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -86,7 +85,43 @@ class CustomerProfileScreen extends ConsumerWidget {
                   _ProfileTile(
                     icon: Icons.help_outline,
                     label: 'Help & Support',
-                    onTap: () => context.showSnackBar('Coming soon'),
+                    onTap: () => showDialog(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        title: const Text('Help & Support'),
+                        content: const Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Need help? Contact us:'),
+                            SizedBox(height: 12),
+                            Row(children: [
+                              Icon(Icons.email_outlined, size: 16),
+                              SizedBox(width: 8),
+                              Text('support@foodrescuenepal.com'),
+                            ]),
+                            SizedBox(height: 8),
+                            Row(children: [
+                              Icon(Icons.phone_outlined, size: 16),
+                              SizedBox(width: 8),
+                              Text('+977-01-5555000'),
+                            ]),
+                            SizedBox(height: 8),
+                            Row(children: [
+                              Icon(Icons.access_time, size: 16),
+                              SizedBox(width: 8),
+                              Text('Sun–Fri, 9AM–6PM'),
+                            ]),
+                          ],
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Close'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                   const SizedBox(height: AppSizes.xxl),
                   AppButton(

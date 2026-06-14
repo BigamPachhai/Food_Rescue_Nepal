@@ -58,11 +58,14 @@ class AuthResponse {
     required this.user,
   });
 
-  factory AuthResponse.fromJson(Map<String, dynamic> json) => AuthResponse(
-        accessToken: json['accessToken'] as String,
-        refreshToken: json['refreshToken'] as String?,
-        user: UserModel.fromJson(json['user'] as Map<String, dynamic>),
-      );
+  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    final data = (json['data'] ?? json) as Map<String, dynamic>;
+    return AuthResponse(
+      accessToken: data['accessToken'] as String,
+      refreshToken: data['refreshToken'] as String?,
+      user: UserModel.fromJson(data['user'] as Map<String, dynamic>),
+    );
+  }
 }
 
 class UserModel {
@@ -88,17 +91,21 @@ class UserModel {
     required this.createdAt,
   });
 
-  factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        email: json['email'] as String,
-        phone: json['phone'] as String?,
-        role: json['role'] as String,
-        avatarUrl: json['avatarUrl'] as String?,
-        fcmToken: json['fcmToken'] as String?,
-        isActive: json['isActive'] as bool? ?? true,
-        createdAt: DateTime.parse(json['createdAt'] as String),
-      );
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    // Unwrap API envelope if present
+    final d = json.containsKey('data') ? json['data'] as Map<String, dynamic> : json;
+    return UserModel(
+      id: d['id'] as String,
+      name: d['name'] as String,
+      email: d['email'] as String,
+      phone: d['phone'] as String?,
+      role: d['role'] as String,
+      avatarUrl: d['avatarUrl'] as String?,
+      fcmToken: d['fcmToken'] as String?,
+      isActive: d['isActive'] as bool? ?? true,
+      createdAt: d['createdAt'] != null ? DateTime.parse(d['createdAt'] as String) : DateTime.now(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,

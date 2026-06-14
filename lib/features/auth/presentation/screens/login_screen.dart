@@ -23,6 +23,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordCtrl = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    // DEBUG: auto-fill for screenshot
+    _emailCtrl.text = 'customer@test.com';
+    _passwordCtrl.text = 'Test@1234!';
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();

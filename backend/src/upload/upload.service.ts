@@ -54,8 +54,8 @@ export class UploadService {
           resource_type: 'image',
           transformation: [{ quality: 'auto', fetch_format: 'auto' }],
         },
-        (error, result: UploadApiResponse) => {
-          if (error) {
+        (error, result) => {
+          if (error || !result) {
             this.logger.error('Cloudinary upload error:', error);
             reject(new BadRequestException('Failed to upload image'));
           } else {

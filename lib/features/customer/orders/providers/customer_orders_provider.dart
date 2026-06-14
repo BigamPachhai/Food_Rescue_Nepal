@@ -95,6 +95,9 @@ class CustomerOrdersNotifier
         items = data;
       } else if (data is Map && data['data'] is List) {
         items = data['data'] as List<dynamic>;
+      } else if (data is Map && data['data'] is Map) {
+        final inner = data['data'] as Map;
+        items = inner['orders'] as List<dynamic>? ?? [];
       } else {
         items = [];
       }
@@ -119,5 +122,7 @@ final orderDetailProvider =
     FutureProvider.family<OrderEntity, String>((ref, id) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.orderById(id));
-  return OrderEntity.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final data = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return OrderEntity.fromJson(data);
 });

@@ -179,5 +179,7 @@ final listingDetailProvider =
     FutureProvider.family<ListingEntity, String>((ref, id) async {
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.listingById(id));
-  return ListingEntity.fromJson(response.data as Map<String, dynamic>);
+  final raw = response.data as Map<String, dynamic>;
+  final data = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return ListingEntity.fromJson(data);
 });

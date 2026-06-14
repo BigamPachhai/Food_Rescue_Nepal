@@ -32,7 +32,7 @@ export class NotificationsService {
           title: payload.title,
           body: payload.body,
           type: payload.type,
-          data: payload.data || null,
+          data: payload.data ?? undefined,
         },
       });
     } catch (err) {
@@ -87,7 +87,7 @@ export class NotificationsService {
       await admin.messaging().send(message);
       this.logger.debug(`FCM sent: ${title}`);
     } catch (err) {
-      this.logger.warn(`FCM send failed (non-fatal): ${err.message}`);
+      this.logger.warn(`FCM send failed (non-fatal): ${(err as Error).message}`);
     }
   }
 
