@@ -133,15 +133,9 @@ final adminUsersProvider =
   final params = search.isNotEmpty ? {'search': search} : null;
   final response =
       await dio.get(ApiEndpoints.adminUsers, queryParameters: params);
-  final data = response.data;
-  List<dynamic> items;
-  if (data is List) {
-    items = data;
-  } else if (data is Map && data['data'] is List) {
-    items = data['data'] as List<dynamic>;
-  } else {
-    items = [];
-  }
+  final body = response.data as Map<String, dynamic>;
+  final paginated = body['data'] as Map<String, dynamic>;
+  final items = paginated['users'] as List<dynamic>? ?? [];
   return items
       .map((e) => AdminUser.fromJson(e as Map<String, dynamic>))
       .toList();
@@ -163,15 +157,9 @@ final adminVendorsProvider =
   final params = status.isNotEmpty ? {'status': status} : null;
   final response =
       await dio.get(ApiEndpoints.adminVendors, queryParameters: params);
-  final data = response.data;
-  List<dynamic> items;
-  if (data is List) {
-    items = data;
-  } else if (data is Map && data['data'] is List) {
-    items = data['data'] as List<dynamic>;
-  } else {
-    items = [];
-  }
+  final body = response.data as Map<String, dynamic>;
+  final paginated = body['data'] as Map<String, dynamic>;
+  final items = paginated['vendors'] as List<dynamic>? ?? [];
   return items
       .map((e) => AdminVendor.fromJson(e as Map<String, dynamic>))
       .toList();
@@ -193,15 +181,9 @@ final adminOrdersProvider =
   final params = status.isNotEmpty ? {'status': status} : null;
   final response =
       await dio.get(ApiEndpoints.adminOrders, queryParameters: params);
-  final data = response.data;
-  List<dynamic> items;
-  if (data is List) {
-    items = data;
-  } else if (data is Map && data['data'] is List) {
-    items = data['data'] as List<dynamic>;
-  } else {
-    items = [];
-  }
+  final body = response.data as Map<String, dynamic>;
+  final paginated = body['data'] as Map<String, dynamic>;
+  final items = paginated['orders'] as List<dynamic>? ?? [];
   return items
       .map((e) => AdminOrder.fromJson(e as Map<String, dynamic>))
       .toList();

@@ -44,7 +44,8 @@ model User {
   name         String
   email        String    @unique
   phone        String?
-  passwordHash String
+  passwordHash String?
+  googleId     String?   @unique
   role         Role
   avatarUrl    String?
   fcmToken     String?

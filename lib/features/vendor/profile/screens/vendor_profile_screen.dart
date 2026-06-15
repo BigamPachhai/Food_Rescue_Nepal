@@ -6,6 +6,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/widgets/shimmer_card.dart';
+import '../../../../core/widgets/verified_badge.dart';
 import '../../../auth/domain/auth_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../../core/utils/responsive.dart';
@@ -191,7 +192,23 @@ class VendorProfileScreen extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Text(vendor?.businessName ?? user?.name ?? 'My Store', style: AppTextStyles.h3OnPrimary),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Flexible(
+                    child: Text(
+                      vendor?.businessName ?? user?.name ?? 'My Store',
+                      style: AppTextStyles.h3OnPrimary,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  if (vendor?.status == 'APPROVED') ...[
+                    const SizedBox(width: 6),
+                    const VerifiedBadge(size: 20),
+                  ],
+                ],
+              ),
               const SizedBox(height: 4),
               Text(user?.email ?? '', style: AppTextStyles.bodySmallOnPrimary),
               const SizedBox(height: 10),

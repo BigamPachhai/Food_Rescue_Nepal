@@ -11,14 +11,27 @@ class RoleSelectScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: SafeArea(
+        top: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Top hero
             Container(
-              padding: const EdgeInsets.fromLTRB(
-                AppSizes.s4, AppSizes.s8, AppSizes.s4, AppSizes.s8,
+              padding: EdgeInsets.fromLTRB(
+                AppSizes.s4,
+                MediaQuery.of(context).padding.top + AppSizes.s8,
+                AppSizes.s4,
+                AppSizes.s8,
               ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -67,7 +80,7 @@ class RoleSelectScreen extends StatelessWidget {
                       title: 'I\'m a Customer',
                       subtitle: 'Discover discounted food near you and rescue it from waste.',
                       benefits: const ['Browse nearby deals', 'Save up to 70%', 'Reserve & pickup'],
-                      onTap: () => context.go('/register/customer'),
+                      onTap: () => context.push('/register/customer'),
                     ),
                     const SizedBox(height: AppSizes.s3),
                     _RoleCard(
@@ -77,7 +90,7 @@ class RoleSelectScreen extends StatelessWidget {
                       title: 'I\'m a Vendor',
                       subtitle: 'List your surplus food, reduce waste, and reach more customers.',
                       benefits: const ['List surplus food', 'Earn extra revenue', 'Reduce waste'],
-                      onTap: () => context.go('/register/vendor'),
+                      onTap: () => context.push('/register/vendor'),
                     ),
                     const Spacer(),
                     Row(
@@ -85,7 +98,7 @@ class RoleSelectScreen extends StatelessWidget {
                       children: [
                         Text('Already have an account?', style: AppTextStyles.bodySmall),
                         TextButton(
-                          onPressed: () => context.go('/login'),
+                          onPressed: () => context.pop(),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2),
                           ),

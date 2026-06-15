@@ -25,3 +25,9 @@ class AuthError extends AuthState {
   final String message;
   const AuthError(this.message);
 }
+
+/// New Google user — account doesn't exist yet; app must ask for role before creating.
+class AuthGoogleNewUser extends AuthState {
+  final String firebaseIdToken;
+  const AuthGoogleNewUser(this.firebaseIdToken);
+}

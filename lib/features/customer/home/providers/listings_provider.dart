@@ -31,9 +31,9 @@ class VendorEntity {
   });
 
   factory VendorEntity.fromJson(Map<String, dynamic> json) => VendorEntity(
-        id: json['id'] as String,
+        id: json['id'] as String? ?? '',
         userId: json['userId'] as String? ?? '',
-        businessName: json['businessName'] as String,
+        businessName: json['businessName'] as String? ?? '',
         businessType: json['businessType'] as String? ?? '',
         address: json['address'] as String?,
         lat: (json['lat'] as num?)?.toDouble(),
@@ -83,15 +83,15 @@ class ListingEntity {
   });
 
   factory ListingEntity.fromJson(Map<String, dynamic> json) => ListingEntity(
-        id: json['id'] as String,
-        vendorId: json['vendorId'] as String,
-        name: json['name'] as String,
+        id: json['id'] as String? ?? '',
+        vendorId: json['vendorId'] as String? ?? '',
+        name: json['name'] as String? ?? '',
         description: json['description'] as String?,
-        category: json['category'] as String,
-        originalPrice: json['originalPrice'] as int,
-        discountedPrice: json['discountedPrice'] as int,
-        quantity: json['quantity'] as int,
-        availableQty: json['availableQty'] as int? ?? json['quantity'] as int,
+        category: json['category'] as String? ?? '',
+        originalPrice: (json['originalPrice'] as num?)?.toInt() ?? 0,
+        discountedPrice: (json['discountedPrice'] as num?)?.toInt() ?? 0,
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+        availableQty: (json['availableQty'] as num?)?.toInt() ?? (json['quantity'] as num?)?.toInt() ?? 0,
         pickupStart: DateTime.parse(json['pickupStart'] as String),
         pickupEnd: DateTime.parse(json['pickupEnd'] as String),
         imageUrls: (json['imageUrls'] as List<dynamic>?)
@@ -305,22 +305,32 @@ final featuredListingsProvider = FutureProvider<List<ListingEntity>>((ref) async
   return items.map((e) => ListingEntity.fromJson(e as Map<String, dynamic>)).toList();
 });
 
-// Public vendor list for "Popular Vendors" section
+// Public vendor list for "Popular Vendors" section — backend filters to APPROVED only
 final publicVendorsProvider = FutureProvider<List<VendorEntity>>((ref) async {
   final dio = ref.read(dioClientProvider);
-  final response = await dio.get(ApiEndpoints.vendors);
+  final response = await dio.get(
+    ApiEndpoints.vendors,
+    queryParameters: {'status': 'APPROVED'},
+  );
   final body = response.data as Map<String, dynamic>;
   final data = body['data'];
-  List<dynamic> items = data is List ? data : [];
+  List<dynamic> items;
+  if (data is List) {
+    items = data;
+  } else if (data is Map<String, dynamic> && data['vendors'] is List) {
+    items = data['vendors'] as List<dynamic>;
+  } else {
+    items = [];
+  }
   return items.map((e) => VendorEntity.fromJson(e as Map<String, dynamic>)).toList();
 });
 
-// Pre-sorted top-10 approved vendors — computed once when publicVendorsProvider settles.
+// Pre-sorted top-10 vendors — all vendors from publicVendorsProvider are already APPROVED.
 final topVendorsProvider = Provider<AsyncValue<List<VendorEntity>>>((ref) {
   return ref.watch(publicVendorsProvider).whenData((vendors) {
-    final approved = vendors.where((v) => v.status == 'APPROVED').toList()
+    final sorted = vendors.toList()
       ..sort((a, b) => b.avgRating.compareTo(a.avgRating));
-    return approved.take(10).toList();
+    return sorted.take(10).toList();
   });
 });
 

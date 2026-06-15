@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../providers/auth_provider.dart';
@@ -120,8 +121,12 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                                 ),
                               ],
                             ),
-                            child: const Center(
-                              child: Text('🥘', style: TextStyle(fontSize: 52)),
+                            child: Center(
+                              child: SvgPicture.asset(
+                                'assets/images/logo.svg',
+                                width: 72,
+                                height: 72,
+                              ),
                             ),
                           ),
                         ),

@@ -13,6 +13,8 @@ import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { Role } from '@prisma/client';
+import * as admin from 'firebase-admin';
+import { MailService } from '../mail/mail.service';
 
 const BCRYPT_ROUNDS = 12;
 
@@ -24,6 +26,7 @@ export class AuthService {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private mailService: MailService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -102,6 +105,10 @@ export class AuthService {
       throw new UnauthorizedException('Account is banned');
     }
 
+    if (!user.passwordHash) {
+      throw new UnauthorizedException('This account uses Google Sign-In. Please sign in with Google.');
+    }
+
     const passwordValid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordValid) {
       throw new UnauthorizedException('Invalid credentials');
@@ -176,6 +183,13 @@ export class AuthService {
 
     await this.prisma.passwordResetOtp.create({ data: { email, otp, expiresAt } });
 
+    try {
+      await this.mailService.sendPasswordResetOtp(email, otp);
+    } catch (err) {
+      this.logger.error(`Failed to send OTP email to ${email}: ${err}`);
+      // In dev mode we still return the OTP so testing isn't blocked by email config
+    }
+
     return { otp: isDevMode ? otp : '', isDevMode };
   }
 
@@ -195,6 +209,74 @@ export class AuthService {
       this.prisma.passwordResetOtp.deleteMany({ where: { email } }),
       this.prisma.refreshToken.deleteMany({ where: { user: { email } } }),
     ]);
+  }
+
+  async googleSignIn(idToken: string, role?: string) {
+    if (admin.apps.length === 0) {
+      throw new BadRequestException('Google Sign-In is not configured on the server');
+    }
+
+    let decoded: admin.auth.DecodedIdToken;
+    try {
+      decoded = await admin.auth().verifyIdToken(idToken);
+    } catch {
+      throw new UnauthorizedException('Invalid Google ID token');
+    }
+
+    const { uid: googleId, email, name, picture } = decoded;
+
+    if (!email) {
+      throw new BadRequestException('Google account must have an email address');
+    }
+
+    // Find existing user by googleId or email
+    let user = await this.prisma.user.findFirst({
+      where: { OR: [{ googleId }, { email }] },
+    });
+
+    if (user) {
+      if (user.deletedAt) throw new UnauthorizedException('Account has been deleted');
+      if (!user.isActive) throw new UnauthorizedException('Account is banned');
+      // Link googleId if the user signed up via email previously
+      if (!user.googleId) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: { googleId, avatarUrl: user.avatarUrl ?? picture ?? null },
+        });
+      }
+
+      const tokens = await this.generateTokens(user.id, user.email, user.role);
+      return {
+        isNewUser: false,
+        user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, avatarUrl: user.avatarUrl, isActive: user.isActive, createdAt: user.createdAt, vendor: null },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
+    }
+
+    // New user — require role selection before creating account
+    if (!role) {
+      return { isNewUser: true, user: null, accessToken: null, refreshToken: null };
+    }
+
+    // Create the new user with the chosen role (CUSTOMER only via Google; VENDOR goes through full registration)
+    const newUser = await this.prisma.user.create({
+      data: {
+        name: name ?? email.split('@')[0],
+        email,
+        googleId,
+        avatarUrl: picture ?? null,
+        role: role as Role,
+      },
+    });
+
+    const tokens = await this.generateTokens(newUser.id, newUser.email, newUser.role);
+    return {
+      isNewUser: true,
+      user: { id: newUser.id, name: newUser.name, email: newUser.email, phone: newUser.phone, role: newUser.role, avatarUrl: newUser.avatarUrl, isActive: newUser.isActive, createdAt: newUser.createdAt, vendor: null },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   async getMe(userId: string) {

@@ -121,9 +121,15 @@ class _AuthInterceptor extends Interceptor {
         retryOptions.headers['Authorization'] = 'Bearer $newAccessToken';
         final retryResponse = await _dio.fetch(retryOptions);
         handler.resolve(retryResponse);
-      } catch (_) {
-        // Refresh failed — clear tokens and reject all queued requests.
-        await DioClient.clearTokens();
+      } catch (e) {
+        // Only wipe tokens when the server definitively rejects the refresh
+        // token (401/403). Network errors and 5xx are transient — clearing
+        // tokens on those would permanently log the user out for no reason.
+        final isAuthFailure = e is DioException &&
+            (e.response?.statusCode == 401 || e.response?.statusCode == 403);
+        if (isAuthFailure) {
+          await DioClient.clearTokens();
+        }
         for (final pending in _pendingQueue) {
           pending.completer.completeError('Refresh failed');
         }

@@ -34,6 +34,17 @@ class UserEntity {
   bool get isVendor => role == 'VENDOR';
   bool get isAdmin => role == 'ADMIN';
 
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'email': email,
+        'phone': phone,
+        'role': role,
+        'avatarUrl': avatarUrl,
+        'isActive': isActive,
+        'createdAt': createdAt.toIso8601String(),
+      };
+
   UserEntity copyWith({
     String? name,
     String? phone,

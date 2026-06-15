@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -74,13 +75,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     setState(() => _isSaving = true);
     try {
       final dio = ref.read(dioClientProvider);
+      final phone = _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim();
       await dio.patch('/users/profile', data: {
         'name': _nameCtrl.text.trim(),
-        'phone': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+        'phone': phone,
       });
       if (mounted) {
+        ref.read(authProvider.notifier).updateUser(
+              name: _nameCtrl.text.trim(),
+              phone: phone,
+            );
         context.showSnackBar('Profile updated!');
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (mounted) context.showErrorSnackBar(e.toString());

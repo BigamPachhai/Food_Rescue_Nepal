@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -12,8 +15,11 @@ import '../../../../core/widgets/discount_badge.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_view.dart';
 import '../../../../core/widgets/shimmer_card.dart';
+import '../../../../core/widgets/verified_badge.dart';
 import '../../../notifications/providers/notifications_provider.dart';
+import '../../favorites/providers/favorites_provider.dart';
 import '../providers/listings_provider.dart';
+import '../providers/location_provider.dart';
 
 class CustomerHomeScreen extends ConsumerStatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -36,6 +42,9 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
   void initState() {
     super.initState();
     _scrollCtrl.addListener(_onScroll);
+    Future.microtask(
+      () => ref.read(locationProvider.notifier).getCurrentLocation(),
+    );
   }
 
   @override
@@ -64,6 +73,19 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     final listingsAsync = ref.watch(listingsProvider);
     final unreadCount = ref.watch(unreadCountProvider);
     final filter = ref.watch(listingsProvider.notifier).currentFilter;
+    final locationLabel = ref.watch(locationProvider).label;
+
+    ref.listen<LocationState>(locationProvider, (prev, next) {
+      final pos = next.position.value;
+      if (pos == null) return;
+      final prevPos = prev?.position.value;
+      if (prevPos?.latitude == pos.latitude && prevPos?.longitude == pos.longitude) return;
+      final notifier = ref.read(listingsProvider.notifier);
+      notifier.applyFilter(notifier.currentFilter.copyWith(
+        userLat: pos.latitude,
+        userLng: pos.longitude,
+      ));
+    });
 
     if (_isSearchMode) {
       return _SearchOverlay(
@@ -83,12 +105,20 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
       backgroundColor: AppColors.backgroundLight,
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
-        onRefresh: () => ref.read(listingsProvider.notifier).refresh(),
+        onRefresh: () async {
+          HapticFeedback.mediumImpact();
+          final messenger = ScaffoldMessenger.of(context);
+          await ref.read(listingsProvider.notifier).refresh();
+          if (!mounted) return;
+          messenger.showSnackBar(
+            const SnackBar(content: Text('Feed refreshed')),
+          );
+        },
         child: CustomScrollView(
           controller: _scrollCtrl,
           physics: const ClampingScrollPhysics(),
           slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context, unreadCount)),
+            SliverToBoxAdapter(child: _buildHeader(context, unreadCount, locationLabel)),
             SliverToBoxAdapter(child: _buildSearchBar(filter.hasActiveFilters, filter)),
             SliverToBoxAdapter(child: _buildCategoryChips()),
             SliverToBoxAdapter(child: _buildFeaturedSection()),
@@ -97,13 +127,29 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
             listingsAsync.when(
               data: (listings) {
                 if (listings.isEmpty) {
-                  return const SliverFillRemaining(
+                  final hasFilters = filter.hasActiveFilters;
+                  return SliverFillRemaining(
                     child: Padding(
-                      padding: EdgeInsets.only(top: 40),
+                      padding: const EdgeInsets.only(top: 40),
                       child: EmptyStateView(
-                        icon: Icons.fastfood_outlined,
-                        title: 'No listings found',
-                        subtitle: 'Try adjusting filters or check back later.',
+                        icon: hasFilters
+                            ? Icons.filter_list_off_rounded
+                            : Icons.fastfood_outlined,
+                        title: hasFilters
+                            ? 'No results for these filters'
+                            : 'No listings nearby',
+                        subtitle: hasFilters
+                            ? 'Try widening your search or clearing filters.'
+                            : 'Check back later — vendors add deals daily!',
+                        ctaLabel: hasFilters ? 'Clear Filters' : null,
+                        onCtaTap: hasFilters
+                            ? () {
+                                ref
+                                    .read(listingsProvider.notifier)
+                                    .resetFilters();
+                                setState(() => _selectedCategory = 'All');
+                              }
+                            : null,
                       ),
                     ),
                   );
@@ -164,7 +210,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, int unreadCount) {
+  Widget _buildHeader(BuildContext context, int unreadCount, String locationLabel) {
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + AppSizes.s3,
@@ -184,15 +230,26 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
           const Icon(Icons.location_on_rounded, color: Colors.white70, size: 16),
           const SizedBox(width: AppSizes.s1),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Delivering to',
-                  style: AppTextStyles.caption.copyWith(color: Colors.white60),
-                ),
-                Text('Kathmandu, Nepal', style: AppTextStyles.h5OnPrimary),
-              ],
+            child: GestureDetector(
+              onTap: () => _showLocationPicker(context),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Delivering to',
+                    style: AppTextStyles.caption.copyWith(color: Colors.white60),
+                  ),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(locationLabel, style: AppTextStyles.h5OnPrimary),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.keyboard_arrow_down_rounded, color: Colors.white70, size: 16),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           Stack(
@@ -330,6 +387,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 3),
             child: GestureDetector(
               onTap: () {
+                HapticFeedback.selectionClick();
                 setState(() => _selectedCategory = cat);
                 ref
                     .read(listingsProvider.notifier)
@@ -411,7 +469,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
               ),
             ),
             SizedBox(
-              height: Responsive.featuredCardWidth(context) * 0.68 + 72,
+              height: Responsive.featuredCardWidth(context) * 0.68 + 88,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 padding:
@@ -441,7 +499,10 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
           ],
         ),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (e, __) => ErrorView(
+        error: e,
+        onRetry: () => ref.invalidate(featuredListingsProvider),
+      ),
     );
   }
 
@@ -449,11 +510,10 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     final vendorsAsync = ref.watch(publicVendorsProvider);
     return vendorsAsync.when(
       data: (vendors) {
-        final topVendors = vendors
-            .where((v) => v.status == 'APPROVED')
-            .toList()
-          ..sort((a, b) => b.avgRating.compareTo(a.avgRating));
-        final featured = topVendors.take(10).toList();
+        final featured = (vendors.toList()
+              ..sort((a, b) => b.avgRating.compareTo(a.avgRating)))
+            .take(10)
+            .toList();
         if (featured.isEmpty) return const SizedBox.shrink();
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,14 +531,48 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: AppSizes.s3),
                 itemCount: featured.length,
-                itemBuilder: (_, i) => _VendorChip(vendor: featured[i]),
+                itemBuilder: (_, i) => _VendorChip(
+                  vendor: featured[i],
+                  onTap: () => ref
+                      .read(listingsProvider.notifier)
+                      .search(featured[i].businessName),
+                ),
               ),
             ),
             const SizedBox(height: AppSizes.s2),
           ],
         );
       },
-      loading: () => const SizedBox.shrink(),
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSizes.s4, AppSizes.s2, AppSizes.s4, AppSizes.s3,
+            ),
+            child: Text('Popular Vendors', style: AppTextStyles.h4),
+          ),
+          SizedBox(
+            height: 100,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3),
+              itemCount: 5,
+              itemBuilder: (_, __) => const Padding(
+                padding: EdgeInsets.only(right: AppSizes.s3),
+                child: SizedBox(
+                  width: 76,
+                  child: ShimmerCard(
+                    height: 76,
+                    margin: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSizes.s2),
+        ],
+      ),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
@@ -499,6 +593,110 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
                 .applyFilter(filter.copyWith(sortBy: s)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showLocationPicker(BuildContext context) {
+    final cityCtrl = TextEditingController();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceLight,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.radiusBottomSheet)),
+          ),
+          padding: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, AppSizes.s6),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36, height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSizes.s4),
+              Text('Set Your Location', style: AppTextStyles.h4),
+              const SizedBox(height: AppSizes.s4),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    ref.read(locationProvider.notifier).getCurrentLocation();
+                  },
+                  icon: const Icon(Icons.my_location_rounded),
+                  label: const Text('Use my current location'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusButton),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSizes.s3),
+              Row(children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3),
+                  child: Text('or enter city', style: AppTextStyles.caption),
+                ),
+                const Expanded(child: Divider()),
+              ]),
+              const SizedBox(height: AppSizes.s3),
+              TextField(
+                controller: cityCtrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  hintText: 'e.g. Pokhara, Lalitpur…',
+                  prefixIcon: const Icon(Icons.location_city_outlined),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(AppSizes.radiusButton),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                ),
+                onSubmitted: (val) {
+                  final city = val.trim();
+                  if (city.isNotEmpty) {
+                    ref.read(locationProvider.notifier).setManualCity(city);
+                    Navigator.pop(ctx);
+                  }
+                },
+              ),
+              const SizedBox(height: AppSizes.s3),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    final city = cityCtrl.text.trim();
+                    if (city.isNotEmpty) {
+                      ref.read(locationProvider.notifier).setManualCity(city);
+                      Navigator.pop(ctx);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusButton),
+                    ),
+                  ),
+                  child: const Text('Confirm'),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -637,14 +835,17 @@ class _FeaturedCard extends StatelessWidget {
 // ─── Vendor Chip ───────────────────────────────────────────────────────────
 
 class _VendorChip extends StatelessWidget {
-  const _VendorChip({required this.vendor});
+  const _VendorChip({required this.vendor, required this.onTap});
   final VendorEntity vendor;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final avatarSize = Responsive.isTablet(context) ? 72.0 : 56.0;
     final chipWidth = avatarSize + 20;
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       width: chipWidth,
       margin: const EdgeInsets.only(right: AppSizes.s3),
       child: Column(
@@ -678,12 +879,23 @@ class _VendorChip extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSizes.s1),
-          Text(
-            vendor.businessName,
-            style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w500),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  vendor.businessName,
+                  style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w500),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              if (vendor.status == 'APPROVED') ...[
+                const SizedBox(width: 2),
+                const VerifiedBadge(size: 10),
+              ],
+            ],
           ),
           const SizedBox(height: 2),
           Row(
@@ -703,6 +915,7 @@ class _VendorChip extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -1125,6 +1338,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
   String _tab = 'food';
   List<VendorEntity> _vendorResults = [];
   bool _loading = false;
+  Timer? _debounce;
 
   static const _cats = [
     'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
@@ -1146,11 +1360,13 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     widget.controller.removeListener(_onSearchChanged);
     super.dispose();
   }
 
   void _onSearchChanged() {
+    _debounce?.cancel();
     final q = widget.controller.text.trim();
     if (q.isEmpty) {
       setState(() {
@@ -1160,7 +1376,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
       ref.read(listingsProvider.notifier).search('');
       return;
     }
-    _doSearch(q);
+    _debounce = Timer(const Duration(milliseconds: 400), () => _doSearch(q));
   }
 
   Future<void> _doSearch(String q) async {
@@ -1450,7 +1666,10 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
               Text(v.avgRating.toStringAsFixed(1), style: AppTextStyles.caption),
             ],
           ),
-          onTap: () {},
+          onTap: () {
+            widget.onBack();
+            ref.read(listingsProvider.notifier).search(v.businessName);
+          },
         );
       },
     );
@@ -1576,104 +1795,141 @@ class ListingCard extends StatelessWidget {
                 ),
                 const SizedBox(width: AppSizes.s3),
                 Expanded(
-                  child: SizedBox(
-                    height: 88,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          listing.name,
-                          style: AppTextStyles.h5,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (listing.vendor != null)
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            listing.vendor!.businessName,
-                            style: AppTextStyles.caption,
+                            listing.name,
+                            style: AppTextStyles.h5,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
-                        const Spacer(),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 12,
-                              color: AppColors.accentAmber,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              listing.vendor?.avgRating.toStringAsFixed(1) ??
-                                  '—',
-                              style: AppTextStyles.caption,
-                            ),
-                            const SizedBox(width: AppSizes.s2),
-                            const Icon(
-                              Icons.location_on_rounded,
-                              size: 12,
-                              color: AppColors.textTertiary,
-                            ),
-                            const SizedBox(width: 2),
-                            Text(
-                              listing.distance != null
-                                  ? '${listing.distance!.toStringAsFixed(1)} km'
-                                  : 'Nearby',
-                              style: AppTextStyles.caption,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Text(
-                              Formatters.formatNPR(listing.discountedPrice),
-                              style: AppTextStyles.h6.copyWith(
-                                color: AppColors.primaryMedium,
-                              ),
-                            ),
-                            const SizedBox(width: AppSizes.s1),
-                            Text(
-                              Formatters.formatNPR(listing.originalPrice),
-                              style: AppTextStyles.caption.copyWith(
-                                decoration: TextDecoration.lineThrough,
-                              ),
-                            ),
-                            const Spacer(),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSoldOut
-                                    ? AppColors.errorSurface
-                                    : isLowStock
-                                        ? AppColors.warningSurface
-                                        : AppColors.primarySurface,
-                                borderRadius: BorderRadius.circular(
-                                  AppSizes.radiusFull,
+                          if (listing.vendor != null)
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    listing.vendor!.businessName,
+                                    style: AppTextStyles.caption,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
+                                if (listing.vendor!.status == 'APPROVED') ...[
+                                  const SizedBox(width: 3),
+                                  const VerifiedBadge(size: 11),
+                                ],
+                              ],
+                            ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.star_rounded,
+                                size: 12,
+                                color: AppColors.accentAmber,
                               ),
-                              child: Text(
-                                isSoldOut
-                                    ? 'Sold out'
-                                    : '${listing.availableQty} left',
+                              const SizedBox(width: 2),
+                              Text(
+                                listing.vendor?.avgRating.toStringAsFixed(1) ??
+                                    '—',
+                                style: AppTextStyles.caption,
+                              ),
+                              const SizedBox(width: AppSizes.s2),
+                              const Icon(
+                                Icons.location_on_rounded,
+                                size: 12,
+                                color: AppColors.textTertiary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                listing.distance != null
+                                    ? '${listing.distance!.toStringAsFixed(1)} km'
+                                    : '—',
+                                style: AppTextStyles.caption,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.schedule_rounded,
+                                size: 11,
+                                color: AppColors.textTertiary,
+                              ),
+                              const SizedBox(width: 2),
+                              Text(
+                                Formatters.formatPickupTime(
+                                  listing.pickupStart,
+                                  listing.pickupEnd,
+                                ),
                                 style: AppTextStyles.caption.copyWith(
-                                  color: isSoldOut
-                                      ? AppColors.error
-                                      : isLowStock
-                                          ? AppColors.warning
-                                          : AppColors.primaryMedium,
-                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textTertiary,
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(
+                                Formatters.formatNPR(listing.discountedPrice),
+                                style: AppTextStyles.h6.copyWith(
+                                  color: AppColors.primaryMedium,
+                                ),
+                              ),
+                              const SizedBox(width: AppSizes.s1),
+                              Text(
+                                Formatters.formatNPR(listing.originalPrice),
+                                style: AppTextStyles.caption.copyWith(
+                                  decoration: TextDecoration.lineThrough,
+                                ),
+                              ),
+                              const Spacer(),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSoldOut
+                                      ? AppColors.errorSurface
+                                      : isLowStock
+                                          ? AppColors.warningSurface
+                                          : AppColors.primarySurface,
+                                  borderRadius: BorderRadius.circular(
+                                    AppSizes.radiusFull,
+                                  ),
+                                ),
+                                child: Text(
+                                  isSoldOut
+                                      ? 'Sold out'
+                                      : '${listing.availableQty} left',
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: isSoldOut
+                                        ? AppColors.error
+                                        : isLowStock
+                                            ? AppColors.warning
+                                            : AppColors.primaryMedium,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],

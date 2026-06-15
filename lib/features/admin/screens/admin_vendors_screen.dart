@@ -35,7 +35,7 @@ class _AdminVendorsScreenState extends ConsumerState<AdminVendorsScreen> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               children:
-                  ['', 'PENDING', 'APPROVED', 'SUSPENDED', 'REJECTED']
+                  ['', 'PENDING', 'APPROVED', 'SUSPENDED']
                       .map((s) {
                 final label = s.isEmpty
                     ? 'All'

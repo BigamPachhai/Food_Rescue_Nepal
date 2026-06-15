@@ -11,9 +11,9 @@ class UserMinimal {
   const UserMinimal({required this.id, required this.name, required this.email});
 
   factory UserMinimal.fromJson(Map<String, dynamic> json) => UserMinimal(
-        id: json['id'] as String,
-        name: json['name'] as String,
-        email: json['email'] as String,
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        email: json['email'] as String? ?? '',
       );
 }
 
@@ -49,13 +49,13 @@ class OrderEntity {
   });
 
   factory OrderEntity.fromJson(Map<String, dynamic> json) => OrderEntity(
-        id: json['id'] as String,
-        customerId: json['customerId'] as String,
-        vendorId: json['vendorId'] as String,
-        listingId: json['listingId'] as String,
-        quantity: json['quantity'] as int,
-        totalAmount: json['totalAmount'] as int,
-        status: json['status'] as String,
+        id: json['id'] as String? ?? '',
+        customerId: json['customerId'] as String? ?? '',
+        vendorId: json['vendorId'] as String? ?? '',
+        listingId: json['listingId'] as String? ?? '',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+        totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+        status: json['status'] as String? ?? 'UNKNOWN',
         pickupCode: json['pickupCode'] as String?,
         notes: json['notes'] as String?,
         createdAt: DateTime.parse(json['createdAt'] as String),

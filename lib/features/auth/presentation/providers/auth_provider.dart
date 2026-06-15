@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import '../../data/auth_models.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/auth_state.dart';
@@ -41,9 +43,61 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  Future<void> googleSignIn() async {
+    state = const AuthLoading();
+    try {
+      final googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) {
+        state = const AuthUnauthenticated();
+        return;
+      }
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final firebaseIdToken = await userCredential.user?.getIdToken();
+      if (firebaseIdToken == null) throw Exception('Failed to get Firebase ID token');
+
+      final user = await _repository.googleSignIn(firebaseIdToken);
+      if (user == null) {
+        // New user — needs to pick a role before account is created
+        state = AuthGoogleNewUser(firebaseIdToken);
+      } else {
+        state = AuthAuthenticated(user);
+      }
+    } catch (e) {
+      state = AuthError(e.toString());
+    }
+  }
+
+  /// Called after a new Google user selects their role.
+  /// role must be 'CUSTOMER' or 'VENDOR'.
+  Future<void> completeGoogleSignIn(String firebaseIdToken, String role) async {
+    state = const AuthLoading();
+    try {
+      final user = await _repository.googleSignIn(firebaseIdToken, role: role);
+      if (user != null) {
+        state = AuthAuthenticated(user);
+      } else {
+        state = const AuthError('Failed to complete sign-in. Please try again.');
+      }
+    } catch (e) {
+      state = AuthError(e.toString());
+    }
+  }
+
   Future<void> logout() async {
     await _repository.logout();
     state = const AuthUnauthenticated();
+  }
+
+  void updateUser({String? name, String? phone, String? avatarUrl}) {
+    final s = state;
+    if (s is AuthAuthenticated) {
+      state = AuthAuthenticated(s.user.copyWith(name: name, phone: phone, avatarUrl: avatarUrl));
+    }
   }
 
   UserEntity? get currentUser {

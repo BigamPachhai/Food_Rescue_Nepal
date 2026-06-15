@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../providers/settings_provider.dart';
@@ -12,6 +13,7 @@ class SettingsScreen extends ConsumerWidget {
     final themeMode = ref.watch(themeProvider);
     final notifPrefs = ref.watch(notifPrefsProvider);
     final language = ref.watch(languageProvider);
+    final versionAsync = ref.watch(appVersionProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -114,14 +116,13 @@ class SettingsScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.privacy_tip_outlined,
               label: 'Privacy Policy',
-              onTap: () => _showLegal(context, 'Privacy Policy', _privacyPolicy),
+              onTap: () => context.push('/legal/privacy'),
             ),
             const Divider(height: 1),
             _NavTile(
               icon: Icons.description_outlined,
               label: 'Terms & Conditions',
-              onTap: () =>
-                  _showLegal(context, 'Terms & Conditions', _termsConditions),
+              onTap: () => context.push('/legal/terms'),
             ),
           ]),
 
@@ -138,22 +139,18 @@ class SettingsScreen extends ConsumerWidget {
               leading: const Icon(Icons.build_outlined,
                   color: AppColors.textSecondary),
               title: const Text('App Version'),
-              trailing: Text('1.0.0',
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textSecondary)),
+              trailing: Text(
+                versionAsync.when(
+                  data: (v) => v,
+                  loading: () => '—',
+                  error: (_, __) => '—',
+                ),
+                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+              ),
             ),
           ]),
           const SizedBox(height: 32),
         ],
-      ),
-    );
-  }
-
-  void _showLegal(BuildContext context, String title, String content) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _LegalScreen(title: title, content: content),
       ),
     );
   }
@@ -377,33 +374,14 @@ class _NavTile extends StatelessWidget {
   }
 }
 
-// ─── Legal screen ──────────────────────────────────────────────────────────
-
-class _LegalScreen extends StatelessWidget {
-  const _LegalScreen({required this.title, required this.content});
-  final String title;
-  final String content;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Text(content,
-            style: AppTextStyles.bodySmall.copyWith(height: 1.7)),
-      ),
-    );
-  }
-}
-
 // ─── About screen ──────────────────────────────────────────────────────────
 
-class _AboutScreen extends StatelessWidget {
+class _AboutScreen extends ConsumerWidget {
   const _AboutScreen();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final version = ref.watch(appVersionProvider).maybeWhen(data: (v) => v, orElse: () => '—');
     return Scaffold(
       appBar: AppBar(title: const Text('About')),
       body: SingleChildScrollView(
@@ -424,7 +402,7 @@ class _AboutScreen extends StatelessWidget {
             const SizedBox(height: 16),
             Text('Food Rescue Nepal', style: AppTextStyles.h3),
             const SizedBox(height: 4),
-            Text('Version 1.0.0',
+            Text('Version $version',
                 style: AppTextStyles.caption
                     .copyWith(color: AppColors.textSecondary)),
             const SizedBox(height: 24),
@@ -475,72 +453,3 @@ class _AboutRow extends StatelessWidget {
   }
 }
 
-// ─── Static legal content ──────────────────────────────────────────────────
-
-const _privacyPolicy = '''
-Last updated: January 2025
-
-1. Information We Collect
-We collect information you provide directly to us, including your name, email address, phone number, and location when you register for an account or use our services.
-
-2. How We Use Your Information
-We use the information we collect to provide, maintain, and improve our services, process transactions, send notifications about your orders, and communicate with you about promotions and updates.
-
-3. Information Sharing
-We do not sell or share your personal information with third parties except as necessary to provide our services (e.g., vendors fulfilling your orders) or as required by law.
-
-4. Location Data
-With your permission, we collect location data to show you nearby food listings. You can disable location access at any time through your device settings.
-
-5. Data Security
-We implement industry-standard security measures to protect your personal information. However, no method of transmission over the internet is 100% secure.
-
-6. Data Retention
-We retain your account information for as long as your account is active. You may request deletion of your data at any time by contacting us.
-
-7. Children's Privacy
-Our service is not directed to children under 13. We do not knowingly collect personal information from children under 13.
-
-8. Changes to This Policy
-We may update this privacy policy from time to time. We will notify you of any changes by posting the new policy on this page.
-
-9. Contact Us
-If you have any questions about this Privacy Policy, please contact us at privacy@foodrescuenepal.com.
-''';
-
-const _termsConditions = '''
-Last updated: January 2025
-
-1. Acceptance of Terms
-By using Food Rescue Nepal, you agree to these Terms & Conditions. If you do not agree, please do not use our service.
-
-2. User Accounts
-You are responsible for maintaining the confidentiality of your account credentials. You must notify us immediately of any unauthorized use of your account.
-
-3. Food Listings
-Vendors are solely responsible for the accuracy of their food listings, including descriptions, pricing, and pickup times. Food Rescue Nepal does not guarantee the quality or safety of any listed food items.
-
-4. Orders & Pickups
-Orders are confirmed upon vendor acceptance. Customers must pick up their orders within the specified pickup window. Failure to pick up may result in order cancellation.
-
-5. Payments
-All payments are processed at pickup (cash on pickup). Food Rescue Nepal does not process online payments.
-
-6. Cancellations
-Customers may cancel orders within 10 minutes of placing them. After this window, cancellations are subject to vendor discretion.
-
-7. Reviews
-Users may leave reviews for completed orders. Reviews must be honest and based on genuine experience. Fake or abusive reviews will be removed.
-
-8. Prohibited Conduct
-You may not use our service to post false information, harass other users, or engage in any illegal activity.
-
-9. Limitation of Liability
-Food Rescue Nepal is not liable for any indirect, incidental, or consequential damages arising from your use of our service.
-
-10. Governing Law
-These terms are governed by the laws of Nepal. Any disputes shall be resolved in the courts of Kathmandu.
-
-11. Contact
-For questions about these terms, contact us at legal@foodrescuenepal.com.
-''';

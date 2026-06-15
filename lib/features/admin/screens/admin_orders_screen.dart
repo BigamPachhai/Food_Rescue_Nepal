@@ -37,10 +37,11 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
               children: [
                 '',
                 'PENDING',
-                'CONFIRMED',
+                'ACCEPTED',
                 'READY',
-                'PICKED_UP',
+                'COMPLETED',
                 'CANCELLED',
+                'REJECTED',
               ].map((s) {
                 final label = s.isEmpty
                     ? 'All'

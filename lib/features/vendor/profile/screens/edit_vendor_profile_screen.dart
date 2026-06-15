@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -92,7 +93,7 @@ class _EditVendorProfileScreenState extends ConsumerState<EditVendorProfileScree
       ref.invalidate(vendorProfileProvider);
       if (mounted) {
         context.showSnackBar('Store profile updated!');
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (mounted) context.showErrorSnackBar(e.toString());

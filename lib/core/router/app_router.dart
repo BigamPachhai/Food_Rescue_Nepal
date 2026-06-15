@@ -39,6 +39,8 @@ import '../../features/reviews/screens/vendor_reviews_screen.dart';
 import '../../features/reviews/providers/reviews_provider.dart';
 import '../../features/support/screens/support_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
+import '../../features/legal/screens/privacy_policy_screen.dart';
+import '../../features/legal/screens/terms_screen.dart';
 
 // Shell widgets
 class CustomerShell extends StatelessWidget {
@@ -52,14 +54,26 @@ class CustomerShell extends StatelessWidget {
     '/customer/profile',
   ];
 
+  static const _profileSubPaths = [
+    '/customer/favorites',
+    '/customer/support',
+    '/settings',
+  ];
+
+  int _tabIndex(String location) {
+    if (_profileSubPaths.any((p) => location.startsWith(p))) return 3;
+    final i = _tabs.indexWhere((t) => location.startsWith(t));
+    return i < 0 ? 0 : i;
+  }
+
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final index = _tabs.indexWhere((t) => location.startsWith(t));
+    final index = _tabIndex(location);
     return Scaffold(
       body: child,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: index < 0 ? 0 : index,
+        currentIndex: index,
         onTap: (i) => context.go(_tabs[i]),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
@@ -83,14 +97,26 @@ class VendorShell extends StatelessWidget {
     '/vendor/profile',
   ];
 
+  static const _profileSubPaths = [
+    '/vendor/scanner',
+    '/vendor/reviews',
+    '/vendor/settings',
+  ];
+
+  int _tabIndex(String location) {
+    if (_profileSubPaths.any((p) => location.startsWith(p))) return 3;
+    final i = _tabs.indexWhere((t) => location.startsWith(t));
+    return i < 0 ? 0 : i;
+  }
+
   @override
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
-    final index = _tabs.indexWhere((t) => location.startsWith(t));
+    final index = _tabIndex(location);
     return Scaffold(
       body: child,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: index < 0 ? 0 : index,
+        currentIndex: index,
         onTap: (i) => context.go(_tabs[i]),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Dashboard'),
@@ -159,7 +185,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isPublicRoute = isLoginRoute ||
           isRegisterRoute ||
           state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/reset-password';
+          state.matchedLocation == '/reset-password' ||
+          state.matchedLocation == '/legal/privacy' ||
+          state.matchedLocation == '/legal/terms';
 
       if (!isAuthenticated && !isPublicRoute) {
         return '/login';
@@ -213,6 +241,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           return ResetPasswordScreen(email: extra['email'] ?? '');
         },
       ),
+      // Shared routes accessible from any role (no shell/bottom nav)
+      GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
+      GoRoute(path: '/legal/privacy', builder: (_, __) => const PrivacyPolicyScreen()),
+      GoRoute(path: '/legal/terms', builder: (_, __) => const TermsScreen()),
       ShellRoute(
         builder: (_, __, child) => CustomerShell(child: child),
         routes: [
@@ -234,7 +266,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/customer/favorites', builder: (_, __) => const FavoritesScreen()),
           GoRoute(path: '/customer/profile', builder: (_, __) => const CustomerProfileScreen()),
           GoRoute(path: '/customer/profile/edit', builder: (_, __) => const EditProfileScreen()),
-          GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
           GoRoute(path: '/customer/support', builder: (_, __) => const SupportScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           GoRoute(

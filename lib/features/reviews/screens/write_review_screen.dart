@@ -39,7 +39,8 @@ class _WriteReviewScreenState extends ConsumerState<WriteReviewScreen> {
   void initState() {
     super.initState();
     _rating = widget.existingReview?.rating ?? 0;
-    _commentCtrl = TextEditingController(text: widget.existingReview?.comment ?? '');
+    _commentCtrl =
+        TextEditingController(text: widget.existingReview?.comment ?? '');
   }
 
   @override
@@ -67,14 +68,17 @@ class _WriteReviewScreenState extends ConsumerState<WriteReviewScreen> {
           data: {
             'orderId': widget.orderId,
             'rating': _rating,
-            'comment': _commentCtrl.text.trim().isEmpty ? null : _commentCtrl.text.trim(),
+            'comment': _commentCtrl.text.trim().isEmpty
+                ? null
+                : _commentCtrl.text.trim(),
           },
         );
       }
       ref.invalidate(orderReviewProvider(widget.orderId));
       ref.invalidate(myReviewsProvider);
       if (mounted) {
-        context.showSnackBar(_isEditing ? 'Review updated!' : 'Review submitted!');
+        context
+            .showSnackBar(_isEditing ? 'Review updated!' : 'Review submitted!');
         context.pop();
       }
     } catch (e) {
@@ -95,7 +99,8 @@ class _WriteReviewScreenState extends ConsumerState<WriteReviewScreen> {
               child: const Text('Cancel')),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: AppColors.error)),
+            child:
+                const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
         ],
       ),
@@ -266,7 +271,8 @@ class _StarRatingPicker extends StatelessWidget {
             child: Icon(
               star <= value ? Icons.star_rounded : Icons.star_outline_rounded,
               size: 44,
-              color: star <= value ? AppColors.accentAmber : AppColors.neutral300,
+              color:
+                  star <= value ? AppColors.accentAmber : AppColors.neutral300,
             ),
           ),
         );

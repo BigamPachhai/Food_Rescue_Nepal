@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { Response, Request } from 'express';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -114,6 +115,23 @@ export class AuthController {
       success: true,
       data: user,
       message: 'Success',
+    };
+  }
+
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Sign in or register with Google (Firebase ID token)' })
+  async googleSignIn(@Body() dto: GoogleAuthDto, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.googleSignIn(dto.idToken, dto.role);
+    if (result.isNewUser && !result.accessToken) {
+      // New user who hasn't selected a role yet — don't set a cookie
+      return { success: true, data: { isNewUser: true }, message: 'Role selection required' };
+    }
+    res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
+    return {
+      success: true,
+      data: { isNewUser: result.isNewUser, user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken },
+      message: 'Google sign-in successful',
     };
   }
 

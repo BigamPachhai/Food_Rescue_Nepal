@@ -47,4 +47,15 @@ class AuthRemoteDataSource {
       'newPassword': newPassword,
     });
   }
+
+  /// Returns `null` when the user is new and needs to select a role first.
+  Future<AuthResponse?> googleSignIn(String firebaseIdToken, {String? role}) async {
+    final body = <String, dynamic>{'idToken': firebaseIdToken};
+    if (role != null) body['role'] = role;
+    final response = await _dio.post(ApiEndpoints.googleSignIn, data: body);
+    final raw = response.data as Map<String, dynamic>;
+    final data = raw['data'] as Map<String, dynamic>;
+    if (data['isNewUser'] == true && data['accessToken'] == null) return null;
+    return AuthResponse.fromJson(raw);
+  }
 }

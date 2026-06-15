@@ -94,11 +94,28 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     });
 
-    return Scaffold(
+    void navigateBack() {
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/register');
+      }
+    }
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) navigateBack();
+      },
+      child: Scaffold(
       backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(isVendor ? 'Register Business' : 'Create Account'),
         backgroundColor: AppColors.surfaceLight,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: navigateBack,
+        ),
       ),
       body: Center(
         child: ConstrainedBox(
@@ -295,7 +312,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 children: [
                   Text('Already have an account?', style: AppTextStyles.bodySmall),
                   TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.pop(),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2),
                     ),
@@ -316,6 +333,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ),
         ),
       ),
+      ), // PopScope
     );
   }
 }

@@ -119,23 +119,39 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       maxWidth: 1200,
       imageQuality: 80,
     );
-    if (picked != null) {
-      setState(() => _pendingImages.add(File(picked.path)));
+    if (picked == null) return;
+
+    final ext = picked.path.toLowerCase();
+    final validExt = ext.endsWith('.jpg') ||
+        ext.endsWith('.jpeg') ||
+        ext.endsWith('.png') ||
+        ext.endsWith('.webp');
+    if (!validExt) {
+      if (mounted) context.showSnackBar('Only JPG, PNG, or WEBP images are allowed');
+      return;
     }
+
+    final file = File(picked.path);
+    final sizeBytes = await file.length();
+    if (sizeBytes > 5 * 1024 * 1024) {
+      if (mounted) context.showSnackBar('Image must be under 5 MB');
+      return;
+    }
+
+    setState(() => _pendingImages.add(file));
   }
 
   Future<List<String>> _uploadPendingImages() async {
     final dio = ref.read(dioClientProvider);
-    final uploaded = <String>[];
-    for (final file in _pendingImages) {
+    final futures = _pendingImages.map((file) async {
       final formData = FormData.fromMap({
-        'image': await MultipartFile.fromFile(file.path),
+        'file': await MultipartFile.fromFile(file.path),
       });
       final response = await dio.post(ApiEndpoints.uploadImage, data: formData);
-      final url = (response.data as Map<String, dynamic>)['url'] as String;
-      uploaded.add(url);
-    }
-    return uploaded;
+      final responseData = response.data as Map<String, dynamic>;
+      return (responseData['data'] as Map<String, dynamic>)['url'] as String;
+    });
+    return Future.wait(futures);
   }
 
   Future<void> _save() async {

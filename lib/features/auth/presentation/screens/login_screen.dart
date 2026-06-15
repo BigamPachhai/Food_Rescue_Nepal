@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -39,6 +40,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     await ref.read(authProvider.notifier).login(_emailCtrl.text.trim(), _passwordCtrl.text);
   }
 
+  void _showRolePicker(BuildContext context, String firebaseIdToken) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GoogleRolePickerSheet(firebaseIdToken: firebaseIdToken),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
@@ -57,6 +67,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         } else {
           context.go('/customer/home');
         }
+      } else if (next is AuthGoogleNewUser) {
+        _showRolePicker(context, next.firebaseIdToken);
       }
     });
 
@@ -108,7 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
-                              onPressed: () => context.go('/forgot-password'),
+                              onPressed: () => context.push('/forgot-password'),
                               style: TextButton.styleFrom(
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: AppSizes.s2,
@@ -199,8 +211,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Text('🥘', style: TextStyle(fontSize: 40)),
+                  child: Center(
+                    child: SvgPicture.asset(
+                      'assets/images/logo.svg',
+                      width: 52,
+                      height: 52,
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSizes.s3),
@@ -227,8 +243,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Widget _buildGoogleButton() {
+    final authState = ref.watch(authProvider);
+    final isLoading = authState is AuthLoading;
     return OutlinedButton(
-      onPressed: () => context.showSnackBar('Google Sign-In coming soon'),
+      onPressed: isLoading ? null : () => ref.read(authProvider.notifier).googleSignIn(),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
         shape: RoundedRectangleBorder(
@@ -241,14 +259,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Text(
-            'G',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFFDB4437),
-            ),
-          ),
+          SvgPicture.asset('assets/images/google_logo.svg', width: 20, height: 20),
           const SizedBox(width: AppSizes.s2),
           Text(
             'Continue with Google',
@@ -265,7 +276,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       children: [
         Text("Don't have an account?", style: AppTextStyles.bodySmall),
         TextButton(
-          onPressed: () => context.go('/register'),
+          onPressed: () => context.push('/register'),
           style: TextButton.styleFrom(
             padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2),
           ),
@@ -330,8 +341,129 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 }
 
 const _devAccounts = [
-  {'label': 'Admin', 'email': 'admin@foodrescuenepal.com', 'password': 'Admin@12345!'},
   {'label': 'Customer', 'email': 'customer@test.com', 'password': 'Test@1234!'},
   {'label': 'Vendor ✓', 'email': 'vendor@test.com', 'password': 'Test@1234!'},
   {'label': 'Vendor ⏳', 'email': 'vendor2@test.com', 'password': 'Test@1234!'},
 ];
+
+class _GoogleRolePickerSheet extends ConsumerWidget {
+  const _GoogleRolePickerSheet({required this.firebaseIdToken});
+  final String firebaseIdToken;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.backgroundLight,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.radiusXxl)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+        AppSizes.s4, AppSizes.s3, AppSizes.s4,
+        AppSizes.s4 + MediaQuery.of(context).viewInsets.bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+            ),
+          ),
+          const SizedBox(height: AppSizes.s5),
+          Text('How will you use the app?', style: AppTextStyles.h3),
+          const SizedBox(height: AppSizes.s2),
+          Text(
+            'Choose your role to complete sign-in',
+            style: AppTextStyles.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSizes.s5),
+          _RoleTile(
+            emoji: '🛒',
+            title: 'Customer',
+            subtitle: 'Browse & reserve discounted food near you',
+            bgColor: AppColors.primarySurface,
+            accentColor: AppColors.primaryMedium,
+            onTap: () {
+              Navigator.pop(context);
+              ref.read(authProvider.notifier).completeGoogleSignIn(firebaseIdToken, 'CUSTOMER');
+            },
+          ),
+          const SizedBox(height: AppSizes.s3),
+          _RoleTile(
+            emoji: '🏪',
+            title: 'Vendor',
+            subtitle: 'List surplus food and reach more customers',
+            bgColor: AppColors.warningSurface,
+            accentColor: AppColors.warning,
+            onTap: () {
+              Navigator.pop(context);
+              // Vendor needs full registration with business details
+              context.push('/register/vendor');
+            },
+          ),
+          const SizedBox(height: AppSizes.s4),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoleTile extends StatelessWidget {
+  const _RoleTile({
+    required this.emoji,
+    required this.title,
+    required this.subtitle,
+    required this.bgColor,
+    required this.accentColor,
+    required this.onTap,
+  });
+
+  final String emoji;
+  final String title;
+  final String subtitle;
+  final Color bgColor;
+  final Color accentColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.s4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              ),
+              child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
+            ),
+            const SizedBox(width: AppSizes.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTextStyles.h4),
+                  const SizedBox(height: AppSizes.s1),
+                  Text(subtitle, style: AppTextStyles.bodySmall),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, size: 16, color: accentColor),
+          ],
+        ),
+      ),
+    );
+  }
+}
