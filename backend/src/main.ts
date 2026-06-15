@@ -46,34 +46,36 @@ async function bootstrap() {
   // Global response interceptor
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  // Swagger
-  const config = new DocumentBuilder()
-    .setTitle('Food Rescue Nepal API')
-    .setDescription(
-      'Backend API for Food Rescue Nepal — a platform connecting surplus food vendors with customers to reduce food waste.',
-    )
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('Auth', 'Authentication endpoints')
-    .addTag('Users', 'User profile management')
-    .addTag('Vendors', 'Vendor management')
-    .addTag('Listings', 'Food listing management')
-    .addTag('Orders', 'Order management')
-    .addTag('Reviews', 'Review management')
-    .addTag('Notifications', 'Push notification management')
-    .addTag('Favorites', 'Favorite listings management')
-    .addTag('Upload', 'File upload endpoints')
-    .addTag('Admin', 'Admin management endpoints')
-    .build();
+  // Swagger — enabled only outside production
+  if (process.env.NODE_ENV !== 'production') {
+    const config = new DocumentBuilder()
+      .setTitle('Food Rescue Nepal API')
+      .setDescription(
+        'Backend API for Food Rescue Nepal — a platform connecting surplus food vendors with customers to reduce food waste.',
+      )
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addTag('Auth', 'Authentication endpoints')
+      .addTag('Users', 'User profile management')
+      .addTag('Vendors', 'Vendor management')
+      .addTag('Listings', 'Food listing management')
+      .addTag('Orders', 'Order management')
+      .addTag('Reviews', 'Review management')
+      .addTag('Notifications', 'Push notification management')
+      .addTag('Favorites', 'Favorite listings management')
+      .addTag('Upload', 'File upload endpoints')
+      .addTag('Admin', 'Admin management endpoints')
+      .build();
 
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document, {
-    swaggerOptions: {
-      persistAuthorization: true,
-      tagsSorter: 'alpha',
-      operationsSorter: 'alpha',
-    },
-  });
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document, {
+      swaggerOptions: {
+        persistAuthorization: true,
+        tagsSorter: 'alpha',
+        operationsSorter: 'alpha',
+      },
+    });
+  }
 
   // Health check endpoint (outside global prefix)
   const httpAdapter = app.getHttpAdapter();
@@ -83,9 +85,11 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`\n🚀 Food Rescue Nepal API running on: http://localhost:${port}`);
-  console.log(`📚 Swagger docs: http://localhost:${port}/api/docs`);
-  console.log(`🏥 Health check: http://localhost:${port}/health\n`);
+  console.log(`\nFood Rescue Nepal API running on port ${port}`);
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`Swagger docs: http://localhost:${port}/api/docs`);
+  }
+  console.log(`Health check: http://localhost:${port}/health\n`);
 }
 
 bootstrap();

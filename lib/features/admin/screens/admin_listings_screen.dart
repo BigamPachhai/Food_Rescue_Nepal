@@ -101,7 +101,7 @@ class AdminListingsScreen extends ConsumerWidget {
           itemBuilder: (_, __) => const ShimmerCard(height: 80),
         ),
         error: (e, _) => ErrorView(
-          message: e.toString(),
+          error: e,
           onRetry: () => ref.invalidate(_adminListingsProvider),
         ),
       ),

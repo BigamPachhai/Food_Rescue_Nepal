@@ -27,8 +27,9 @@ class AuthRepository {
   }
 
   Future<void> logout() async {
+    final refreshToken = await DioClient.getRefreshToken();
     try {
-      await _dataSource.logout();
+      await _dataSource.logout(refreshToken: refreshToken);
     } catch (_) {}
     await DioClient.clearTokens();
   }

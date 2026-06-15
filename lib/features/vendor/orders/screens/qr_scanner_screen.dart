@@ -208,7 +208,7 @@ class _ConfirmPickupSheet extends ConsumerWidget {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDDDDDD),
+                  color: AppColors.neutral300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),

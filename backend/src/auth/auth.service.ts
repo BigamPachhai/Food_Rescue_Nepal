@@ -175,7 +175,6 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     await this.prisma.passwordResetOtp.create({ data: { email, otp, expiresAt } });
-    this.logger.log(`[FORGOT PASSWORD] OTP for ${email}: ${otp}`);
 
     return { otp: isDevMode ? otp : '', isDevMode };
   }
@@ -247,7 +246,10 @@ export class AuthService {
 
     const refreshExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '7d';
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
+    const match = refreshExpiresIn.match(/^(\d+)([smhd])$/);
+    const multipliers: Record<string, number> = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
+    const ttlMs = match ? parseInt(match[1]) * (multipliers[match[2]] ?? 86400000) : 7 * 86400000;
+    expiresAt.setTime(expiresAt.getTime() + ttlMs);
 
     await this.prisma.refreshToken.create({
       data: {

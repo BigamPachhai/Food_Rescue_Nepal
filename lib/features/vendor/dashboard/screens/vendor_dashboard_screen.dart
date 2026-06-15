@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/formatters.dart';
@@ -26,6 +27,7 @@ class VendorDashboardScreen extends ConsumerWidget {
     final vendorProfileAsync = ref.watch(vendorProfileProvider);
 
     return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
         onRefresh: () async {
@@ -35,8 +37,7 @@ class VendorDashboardScreen extends ConsumerWidget {
         },
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(child: _buildHeader(authState)),
-            // Vendor status banner
+            SliverToBoxAdapter(child: _buildHeader(context, authState)),
             SliverToBoxAdapter(
               child: vendorProfileAsync.whenOrNull(
                     data: (vendor) => _buildStatusBanner(vendor.status),
@@ -47,13 +48,14 @@ class VendorDashboardScreen extends ConsumerWidget {
               child: statsAsync.when(
                 data: (stats) => _StatsPanel(stats: stats),
                 loading: () => const Padding(
-                  padding: EdgeInsets.all(AppSizes.lg),
-                  child: ShimmerCard(height: 160),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: AppSizes.s4, vertical: AppSizes.s3),
+                  child: ShimmerCard(height: 180),
                 ),
                 error: (e, _) => Padding(
-                  padding: const EdgeInsets.all(AppSizes.lg),
+                  padding: const EdgeInsets.all(AppSizes.s4),
                   child: ErrorView(
-                    message: e.toString(),
+                    error: e,
                     onRetry: () => ref.invalidate(vendorStatsProvider),
                   ),
                 ),
@@ -63,82 +65,38 @@ class VendorDashboardScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: vendorProfileAsync.whenOrNull(
                     data: (vendor) => Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                      child: InkWell(
+                      padding: const EdgeInsets.fromLTRB(
+                          AppSizes.s4, AppSizes.s2, AppSizes.s4, 0),
+                      child: _QuickLinkCard(
+                        icon: Icons.star_rounded,
+                        iconColor: AppColors.accentAmber,
+                        title: 'Customer Reviews',
+                        subtitle: 'See what customers are saying',
                         onTap: () =>
                             context.push('/vendor/reviews/${vendor.id}'),
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: [
-                              BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.04),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2)),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.star_outline,
-                                  color: AppColors.accentAmber),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text('Customer Reviews',
-                                        style: AppTextStyles.h6),
-                                    Text(
-                                      'See what customers are saying',
-                                      style: AppTextStyles.caption.copyWith(
-                                          color: AppColors.textSecondary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const Icon(Icons.chevron_right,
-                                  color: AppColors.textSecondary),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
                   ) ??
                   const SizedBox.shrink(),
             ),
-            // Pending orders section
+            // Pending orders header
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Row(
-                  children: [
-                    Text('Pending Orders', style: AppTextStyles.h5),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => context.go('/vendor/orders'),
-                      child: const Text('See all'),
-                    ),
-                  ],
-                ),
+              child: _SectionHeader(
+                title: 'Pending Orders',
+                onSeeAll: () => context.go('/vendor/orders'),
               ),
             ),
             ordersAsync.when(
               data: (orders) {
-                final pending = orders
-                    .where((o) => o.status == 'PENDING')
-                    .take(3)
-                    .toList();
+                final pending =
+                    orders.where((o) => o.status == 'PENDING').take(3).toList();
                 if (pending.isEmpty) {
                   return const SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      child: Text('No pending orders',
-                          style: TextStyle(color: AppColors.textSecondary)),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: AppSizes.s4, vertical: AppSizes.s1),
+                      child: _AllClearBanner(
+                          message: 'No pending orders — all caught up!'),
                     ),
                   );
                 }
@@ -150,24 +108,28 @@ class VendorDashboardScreen extends ConsumerWidget {
                 );
               },
               loading: () => const SliverToBoxAdapter(
-                child: ShimmerCard(height: 80),
-              ),
-              error: (_, __) => const SliverToBoxAdapter(child: SizedBox()),
-            ),
-            // Active listings section
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    Text('Active Listings', style: AppTextStyles.h5),
-                    const Spacer(),
-                    TextButton(
-                      onPressed: () => context.go('/vendor/listings'),
-                      child: const Text('See all'),
-                    ),
-                  ],
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSizes.s4),
+                  child: ShimmerCard(height: 76),
                 ),
+              ),
+              error: (e, _) => SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.s4),
+                  child: _InlineError(
+                    message: 'Could not load orders',
+                    onRetry: () =>
+                        ref.read(vendorOrdersProvider.notifier).fetch(),
+                  ),
+                ),
+              ),
+            ),
+            // Active listings header
+            SliverToBoxAdapter(
+              child: _SectionHeader(
+                title: 'Active Listings',
+                onSeeAll: () => context.go('/vendor/listings'),
+                topPadding: AppSizes.s4,
               ),
             ),
             listingsAsync.when(
@@ -178,19 +140,22 @@ class VendorDashboardScreen extends ConsumerWidget {
                   return SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 8),
+                          horizontal: AppSizes.s4, vertical: AppSizes.s2),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('No active listings',
-                              style:
-                                  TextStyle(color: AppColors.textSecondary)),
-                          const SizedBox(height: 8),
-                          ElevatedButton.icon(
-                            onPressed: () =>
-                                context.push('/vendor/listings/add'),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Add Listing'),
+                          Text('No active listings yet',
+                              style: AppTextStyles.bodySmall),
+                          const SizedBox(height: AppSizes.s3),
+                          SizedBox(
+                            width: double.infinity,
+                            height: AppSizes.buttonHeightSm,
+                            child: ElevatedButton.icon(
+                              onPressed: () =>
+                                  context.push('/vendor/listings/add'),
+                              icon: const Icon(Icons.add_rounded, size: 18),
+                              label: const Text('Add your first listing'),
+                            ),
                           ),
                         ],
                       ),
@@ -205,40 +170,61 @@ class VendorDashboardScreen extends ConsumerWidget {
                 );
               },
               loading: () => const SliverToBoxAdapter(
-                child: ShimmerCard(height: 70),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: AppSizes.s4),
+                  child: ShimmerCard(height: 68),
+                ),
               ),
-              error: (_, __) => const SliverToBoxAdapter(child: SizedBox()),
+              error: (e, _) => SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.s4),
+                  child: _InlineError(
+                    message: 'Could not load listings',
+                    onRetry: () =>
+                        ref.read(vendorListingsProvider.notifier).fetch(),
+                  ),
+                ),
+              ),
             ),
-            // Listing performance section
+            // Performance section
             SliverToBoxAdapter(
               child: statsAsync.whenOrNull(
                     data: (stats) => stats.listingPerformance.isEmpty
                         ? const SizedBox.shrink()
                         : _ListingPerformanceSection(
-                            listings: stats.listingPerformance),
+                            listings: stats.listingPerformance,
+                          ),
                   ) ??
                   const SizedBox.shrink(),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
+            SliverToBoxAdapter(
+              child:
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 88),
+            ),
           ],
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/vendor/listings/add'),
-        backgroundColor: AppColors.primaryMedium,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('New Listing',
-            style: TextStyle(color: Colors.white)),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'New Listing',
+          style: TextStyle(fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
 
-  Widget _buildHeader(AuthState authState) {
-    final name = authState is AuthAuthenticated
-        ? authState.user.name
-        : 'Vendor';
+  Widget _buildHeader(BuildContext context, AuthState authState) {
+    final name =
+        authState is AuthAuthenticated ? authState.user.name : 'Vendor';
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 52, 16, 20),
+      padding: EdgeInsets.only(
+        top: MediaQuery.of(context).padding.top + AppSizes.s3,
+        left: AppSizes.s4,
+        right: AppSizes.s4,
+        bottom: AppSizes.s5,
+      ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.primary, AppColors.primaryMedium],
@@ -248,23 +234,35 @@ class VendorDashboardScreen extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
-            backgroundColor: AppColors.primaryLight,
-            radius: 24,
-            child: Icon(Icons.store, color: Colors.white),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.3),
+                width: 1.5,
+              ),
+            ),
+            child:
+                const Icon(Icons.store_rounded, color: Colors.white, size: 24),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: AppSizes.s3),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Welcome back!',
-                    style: AppTextStyles.caption
-                        .copyWith(color: Colors.white70)),
-                Text(name,
-                    style: AppTextStyles.h4
-                        .copyWith(color: Colors.white),
-                    overflow: TextOverflow.ellipsis),
+                Text(
+                  'Welcome back',
+                  style: AppTextStyles.caption
+                      .copyWith(color: Colors.white.withValues(alpha: 0.75)),
+                ),
+                Text(
+                  name,
+                  style: AppTextStyles.h4OnPrimary,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -276,41 +274,41 @@ class VendorDashboardScreen extends ConsumerWidget {
   Widget _buildStatusBanner(String status) {
     if (status == 'APPROVED') return const SizedBox.shrink();
     final isPending = status == 'PENDING';
+    final color = isPending ? AppColors.warning : AppColors.error;
+    final surfaceColor =
+        isPending ? AppColors.warningSurface : AppColors.errorSurface;
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      margin:
+          const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+      padding: const EdgeInsets.all(AppSizes.s3),
       decoration: BoxDecoration(
-        color: isPending
-            ? AppColors.warning.withValues(alpha: 0.12)
-            : AppColors.error.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isPending
-              ? AppColors.warning.withValues(alpha: 0.4)
-              : AppColors.error.withValues(alpha: 0.4),
-        ),
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
           Icon(
-            isPending ? Icons.hourglass_top_rounded : Icons.block,
-            color: isPending ? AppColors.warning : AppColors.error,
-            size: 20,
+            isPending ? Icons.hourglass_top_rounded : Icons.block_rounded,
+            color: color,
+            size: AppSizes.iconMd,
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: AppSizes.s2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  isPending ? 'Account Pending Approval' : 'Account Suspended',
-                  style: AppTextStyles.h6.copyWith(
-                    color: isPending ? AppColors.warning : AppColors.error,
-                  ),
+                  isPending
+                      ? 'Account Pending Approval'
+                      : 'Account Suspended',
+                  style: AppTextStyles.h6.copyWith(color: color),
                 ),
+                const SizedBox(height: 2),
                 Text(
                   isPending
-                      ? 'Your business is under review. You can set up listings, but they won\'t be visible until approved.'
+                      ? 'Your business is under review. Listings won\'t be visible until approved.'
                       : 'Your account has been suspended. Please contact support.',
                   style: AppTextStyles.caption,
                 ),
@@ -323,7 +321,44 @@ class VendorDashboardScreen extends ConsumerWidget {
   }
 }
 
-// ─── Stats panel: today + all-time ────────────────────────────────────────
+// ─── Section header ───────────────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.title,
+    required this.onSeeAll,
+    this.topPadding = AppSizes.s3,
+  });
+  final String title;
+  final VoidCallback onSeeAll;
+  final double topPadding;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+          AppSizes.s4, topPadding, AppSizes.s4, AppSizes.s2),
+      child: Row(
+        children: [
+          Text(title, style: AppTextStyles.h4),
+          const Spacer(),
+          GestureDetector(
+            onTap: onSeeAll,
+            child: Text(
+              'See all',
+              style: AppTextStyles.label.copyWith(
+                color: AppColors.primaryMedium,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Stats Panel ──────────────────────────────────────────────────────────
 
 class _StatsPanel extends StatelessWidget {
   const _StatsPanel({required this.stats});
@@ -332,71 +367,79 @@ class _StatsPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding:
+          const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("Today's Snapshot", style: AppTextStyles.h5),
-          const SizedBox(height: 10),
+          Text("Today's Snapshot", style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s3),
           Row(
             children: [
               Expanded(
                 child: _StatCard(
                   label: 'Orders',
                   value: '${stats.todayOrders}',
-                  icon: Icons.receipt_long,
+                  icon: Icons.receipt_long_rounded,
                   color: AppColors.info,
+                  bgColor: AppColors.infoSurface,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSizes.s2),
               Expanded(
                 child: _StatCard(
                   label: 'Earned',
                   value: Formatters.formatNPR(stats.todayEarnedPaisa),
-                  icon: Icons.payments_outlined,
+                  icon: Icons.payments_rounded,
                   color: AppColors.primaryMedium,
+                  bgColor: AppColors.primarySurface,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSizes.s2),
               Expanded(
                 child: _StatCard(
-                  label: 'Food Saved',
+                  label: 'Saved',
                   value: '${stats.foodSavedKg.toStringAsFixed(1)} kg',
-                  icon: Icons.eco_outlined,
+                  icon: Icons.eco_rounded,
                   color: AppColors.success,
+                  bgColor: AppColors.successSurface,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          Text('All-Time Impact', style: AppTextStyles.h5),
-          const SizedBox(height: 10),
+          const SizedBox(height: AppSizes.s4),
+          Text('All-Time Impact', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s3),
           Row(
             children: [
               Expanded(
                 child: _StatCard(
                   label: 'Reservations',
                   value: '${stats.totalReservations}',
-                  icon: Icons.bookmark_outline,
+                  icon: Icons.bookmark_rounded,
                   color: AppColors.accentAmber,
+                  bgColor: AppColors.warningSurface,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSizes.s2),
               Expanded(
                 child: _StatCard(
-                  label: 'Pickups Done',
+                  label: 'Pickups',
                   value: '${stats.completedPickups}',
-                  icon: Icons.check_circle_outline,
+                  icon: Icons.check_circle_rounded,
                   color: AppColors.success,
+                  bgColor: AppColors.successSurface,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSizes.s2),
               Expanded(
                 child: _StatCard(
                   label: 'Food Saved',
-                  value: '${stats.totalFoodSavedKg.toStringAsFixed(1)} kg',
-                  icon: Icons.eco,
+                  value:
+                      '${stats.totalFoodSavedKg.toStringAsFixed(1)} kg',
+                  icon: Icons.eco_rounded,
                   color: AppColors.primaryMedium,
+                  bgColor: AppColors.primarySurface,
                 ),
               ),
             ],
@@ -407,7 +450,276 @@ class _StatsPanel extends StatelessWidget {
   }
 }
 
-// ─── Listing performance section ───────────────────────────────────────────
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.color,
+    required this.bgColor,
+  });
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color color;
+  final Color bgColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.s3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+        boxShadow: AppShadows.card,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            ),
+            child: Icon(icon, color: color, size: AppSizes.iconSm),
+          ),
+          const SizedBox(height: AppSizes.s2),
+          Text(
+            value,
+            style: AppTextStyles.h5.copyWith(color: color),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          Text(
+            label,
+            style: AppTextStyles.caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Quick Link Card ──────────────────────────────────────────────────────
+
+class _QuickLinkCard extends StatelessWidget {
+  const _QuickLinkCard({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.s4, vertical: AppSizes.s3),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          boxShadow: AppShadows.xs,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              ),
+              child: Icon(icon, color: iconColor, size: AppSizes.iconMd),
+            ),
+            const SizedBox(width: AppSizes.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTextStyles.h6),
+                  Text(subtitle, style: AppTextStyles.caption),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.neutral400,
+              size: AppSizes.iconMd,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── All-Clear Banner ─────────────────────────────────────────────────────
+
+class _AllClearBanner extends StatelessWidget {
+  const _AllClearBanner({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s3, vertical: AppSizes.s3),
+      decoration: BoxDecoration(
+        color: AppColors.successSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle_rounded,
+              color: AppColors.success, size: AppSizes.iconMd),
+          const SizedBox(width: AppSizes.s2),
+          Text(
+            message,
+            style: AppTextStyles.bodySmall.copyWith(
+              color: AppColors.success,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Pending Order Card ───────────────────────────────────────────────────
+
+class _PendingOrderCard extends ConsumerWidget {
+  const _PendingOrderCard({required this.order});
+  final VendorOrder order;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s4, vertical: AppSizes.s1),
+      padding: const EdgeInsets.all(AppSizes.s3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(
+            color: AppColors.statusPending.withValues(alpha: 0.25)),
+        boxShadow: AppShadows.xs,
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.statusPendingSurface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            ),
+            child: const Icon(
+              Icons.pending_actions_rounded,
+              color: AppColors.statusPending,
+              size: AppSizes.iconMd,
+            ),
+          ),
+          const SizedBox(width: AppSizes.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  order.listing?.name ?? 'Order #${order.id.substring(0, 6)}',
+                  style: AppTextStyles.h6,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  'x${order.quantity} · ${Formatters.formatNPR(order.totalAmount)}',
+                  style: AppTextStyles.caption,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSizes.s2),
+          SizedBox(
+            height: 34,
+            child: ElevatedButton(
+              onPressed: () => context.push('/vendor/orders/${order.id}'),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSizes.s3),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                textStyle: AppTextStyles.buttonSm,
+              ),
+              child: const Text('Review'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Active Listing Tile ──────────────────────────────────────────────────
+
+class _ActiveListingTile extends StatelessWidget {
+  const _ActiveListingTile({required this.listing});
+  final VendorListing listing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s4, vertical: AppSizes.s1),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        boxShadow: AppShadows.xs,
+        border: Border.all(color: AppColors.border),
+      ),
+      child: ListTile(
+        leading: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: AppColors.primarySurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+          ),
+          child: const Icon(
+            Icons.fastfood_rounded,
+            color: AppColors.primaryLight,
+            size: AppSizes.iconMd,
+          ),
+        ),
+        title: Text(listing.name, style: AppTextStyles.h6),
+        subtitle: Text(
+          '${listing.availableQty} left · ${Formatters.formatNPR(listing.discountedPrice)}',
+          style: AppTextStyles.caption,
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: AppColors.neutral400,
+        ),
+        onTap: () => context.push('/vendor/listings/${listing.id}/edit'),
+      ),
+    );
+  }
+}
+
+// ─── Listing Performance Section ──────────────────────────────────────────
 
 class _ListingPerformanceSection extends StatelessWidget {
   const _ListingPerformanceSection({required this.listings});
@@ -416,12 +728,13 @@ class _ListingPerformanceSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(
+          AppSizes.s4, AppSizes.s4, AppSizes.s4, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Listing Performance', style: AppTextStyles.h5),
-          const SizedBox(height: 10),
+          Text('Listing Performance', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s3),
           ...listings.map((l) => _PerfTile(listing: l)),
         ],
       ),
@@ -438,20 +751,20 @@ class _PerfTile extends StatelessWidget {
     final conversionRate = listing.totalOrders > 0
         ? (listing.completedOrders / listing.totalOrders * 100).round()
         : 0;
+    final convColor = conversionRate >= 70
+        ? AppColors.success
+        : conversionRate >= 40
+            ? AppColors.accentAmber
+            : AppColors.error;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: AppSizes.s2),
+      padding: const EdgeInsets.all(AppSizes.s3),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        boxShadow: AppShadows.xs,
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -464,32 +777,34 @@ class _PerfTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: listing.isActive
                       ? AppColors.primarySurface
-                      : const Color(0xFFF0F0F0),
-                  borderRadius: BorderRadius.circular(10),
+                      : AppColors.neutral100,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                 ),
                 child: Icon(
-                  Icons.fastfood_outlined,
-                  size: 18,
+                  Icons.fastfood_rounded,
+                  size: AppSizes.iconSm,
                   color: listing.isActive
                       ? AppColors.primaryMedium
                       : AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: AppSizes.s2),
               Expanded(
-                child: Text(listing.name,
-                    style: AppTextStyles.h6,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                child: Text(
+                  listing.name,
+                  style: AppTextStyles.h6,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.s2, vertical: 3),
                 decoration: BoxDecoration(
                   color: listing.isActive
-                      ? AppColors.success.withValues(alpha: 0.1)
-                      : const Color(0xFFF0F0F0),
-                  borderRadius: BorderRadius.circular(20),
+                      ? AppColors.successSurface
+                      : AppColors.neutral100,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                 ),
                 child: Text(
                   listing.isActive ? 'Active' : 'Inactive',
@@ -503,7 +818,7 @@ class _PerfTile extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSizes.s3),
           Row(
             children: [
               _PerfStat(
@@ -529,31 +844,28 @@ class _PerfTile extends StatelessWidget {
             ],
           ),
           if (listing.totalOrders > 0) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: AppSizes.s3),
             Row(
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
+                    borderRadius:
+                        BorderRadius.circular(AppSizes.radiusFull),
                     child: LinearProgressIndicator(
                       value: conversionRate / 100,
-                      backgroundColor: const Color(0xFFEEEEEE),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        conversionRate >= 70
-                            ? AppColors.success
-                            : conversionRate >= 40
-                                ? AppColors.accentAmber
-                                : AppColors.error,
-                      ),
+                      backgroundColor: AppColors.neutral100,
+                      valueColor: AlwaysStoppedAnimation<Color>(convColor),
                       minHeight: 6,
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSizes.s2),
                 Text(
                   '$conversionRate% pickup rate',
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textSecondary),
+                  style: AppTextStyles.caption.copyWith(
+                    color: convColor,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
@@ -579,13 +891,15 @@ class _PerfStat extends StatelessWidget {
     return Expanded(
       child: Column(
         children: [
-          Icon(icon, size: 16, color: AppColors.textSecondary),
+          Icon(icon, size: AppSizes.iconSm, color: AppColors.textSecondary),
           const SizedBox(height: 2),
-          Text(value,
-              style: AppTextStyles.bodySmall
-                  .copyWith(fontWeight: FontWeight.w600),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
+          Text(
+            value,
+            style:
+                AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
           Text(label, style: AppTextStyles.caption),
         ],
       ),
@@ -593,136 +907,48 @@ class _PerfStat extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.color,
-  });
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color color;
+// ─── Inline error banner ───────────────────────────────────────────────────
+
+class _InlineError extends StatelessWidget {
+  const _InlineError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding:
+          const EdgeInsets.fromLTRB(AppSizes.s3, AppSizes.s2, AppSizes.s1, AppSizes.s2),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 6,
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
-          Text(value,
-              style: AppTextStyles.h6.copyWith(color: color),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-          Text(label, style: AppTextStyles.caption, maxLines: 1,
-              overflow: TextOverflow.ellipsis),
-        ],
-      ),
-    );
-  }
-}
-
-class _PendingOrderCard extends ConsumerWidget {
-  const _PendingOrderCard({required this.order});
-  final VendorOrder order;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.statusPending.withValues(alpha: 0.3)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 4,
-          ),
-        ],
+        color: AppColors.errorSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
       ),
       child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: AppColors.statusPending.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.pending_outlined,
-                color: AppColors.statusPending, size: 20),
-          ),
-          const SizedBox(width: 10),
+          const Icon(Icons.error_outline_rounded,
+              color: AppColors.error, size: AppSizes.iconMd),
+          const SizedBox(width: AppSizes.s2),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  order.listing?.name ?? 'Order #${order.id.substring(0, 6)}',
-                  style: AppTextStyles.h6,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text('x${order.quantity} · ${Formatters.formatNPR(order.totalAmount)}',
-                    style: AppTextStyles.caption),
-              ],
+            child: Text(
+              message,
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
             ),
           ),
-          ElevatedButton(
-            onPressed: () => context.push('/vendor/orders/${order.id}'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryMedium,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: AppSizes.s2),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
-            child: const Text('View', style: TextStyle(fontSize: 12)),
+            child: const Text('Retry',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _ActiveListingTile extends StatelessWidget {
-  const _ActiveListingTile({required this.listing});
-  final VendorListing listing;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 44,
-        height: 44,
-        decoration: BoxDecoration(
-          color: AppColors.primarySurface,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: const Icon(Icons.fastfood_outlined,
-            color: AppColors.primaryLight, size: 22),
-      ),
-      title: Text(listing.name, style: AppTextStyles.h6),
-      subtitle: Text(
-        '${listing.availableQty} left · ${Formatters.formatNPR(listing.discountedPrice)}',
-        style: AppTextStyles.caption,
-      ),
-      trailing: const Icon(Icons.chevron_right,
-          color: AppColors.textSecondary),
-      onTap: () => context.push('/vendor/listings/${listing.id}/edit'),
     );
   }
 }

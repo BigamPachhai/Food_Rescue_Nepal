@@ -189,6 +189,7 @@ class ListingsNotifier extends StateNotifier<AsyncValue<List<ListingEntity>>> {
   ListingsFilter _filter = const ListingsFilter();
 
   ListingsFilter get currentFilter => _filter;
+  bool get hasMore => _hasMore;
 
   Future<void> fetch({bool refresh = false}) async {
     if (refresh) {
@@ -312,6 +313,15 @@ final publicVendorsProvider = FutureProvider<List<VendorEntity>>((ref) async {
   final data = body['data'];
   List<dynamic> items = data is List ? data : [];
   return items.map((e) => VendorEntity.fromJson(e as Map<String, dynamic>)).toList();
+});
+
+// Pre-sorted top-10 approved vendors — computed once when publicVendorsProvider settles.
+final topVendorsProvider = Provider<AsyncValue<List<VendorEntity>>>((ref) {
+  return ref.watch(publicVendorsProvider).whenData((vendors) {
+    final approved = vendors.where((v) => v.status == 'APPROVED').toList()
+      ..sort((a, b) => b.avgRating.compareTo(a.avgRating));
+    return approved.take(10).toList();
+  });
 });
 
 final listingDetailProvider =

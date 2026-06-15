@@ -9,6 +9,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/extensions.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
@@ -94,7 +95,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Edit Profile')),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSizes.lg),
         child: Form(
           key: _formKey,
@@ -163,7 +167,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
+                    color: AppColors.neutral100,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -189,6 +193,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 isLoading: _isSaving,
               ),
             ],
+          ),
+        ),
           ),
         ),
       ),

@@ -32,7 +32,7 @@ class _SupportScreenState extends ConsumerState<SupportScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Help & Support'),
         bottom: TabBar(
@@ -471,7 +471,7 @@ class _ReportTabState extends ConsumerState<_ReportTab> {
                 width: 80,
                 height: 80,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFFFEBEE),
+                  color: AppColors.errorSurface,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.flag_outlined,
@@ -520,7 +520,7 @@ class _ReportTabState extends ConsumerState<_ReportTab> {
                       border: Border.all(
                         color: selected
                             ? AppColors.primaryMedium
-                            : const Color(0xFFDDDDDD),
+                            : AppColors.neutral300,
                       ),
                     ),
                     child: Column(

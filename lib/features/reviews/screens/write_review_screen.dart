@@ -121,7 +121,7 @@ class _WriteReviewScreenState extends ConsumerState<WriteReviewScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Review' : 'Rate Your Order'),
         actions: [
@@ -266,7 +266,7 @@ class _StarRatingPicker extends StatelessWidget {
             child: Icon(
               star <= value ? Icons.star_rounded : Icons.star_outline_rounded,
               size: 44,
-              color: star <= value ? AppColors.accentAmber : const Color(0xFFCCCCCC),
+              color: star <= value ? AppColors.accentAmber : AppColors.neutral300,
             ),
           ),
         );

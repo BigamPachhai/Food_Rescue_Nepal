@@ -74,13 +74,23 @@ class VendorOrdersNotifier extends StateNotifier<AsyncValue<List<VendorOrder>>> 
     }
   }
 
-  Future<void> confirmOrder(String id) async {
-    await _dio.patch('${ApiEndpoints.vendorOrderById(id)}/confirm');
+  Future<void> acceptOrder(String id) async {
+    await _dio.patch(ApiEndpoints.orderAccept(id));
+    await fetch();
+  }
+
+  Future<void> rejectReservation(String id) async {
+    await _dio.patch(ApiEndpoints.orderReject(id));
     await fetch();
   }
 
   Future<void> markReady(String id) async {
     await _dio.patch('${ApiEndpoints.vendorOrderById(id)}/ready');
+    await fetch();
+  }
+
+  Future<void> expireReservation(String id) async {
+    await _dio.patch(ApiEndpoints.orderExpire(id));
     await fetch();
   }
 

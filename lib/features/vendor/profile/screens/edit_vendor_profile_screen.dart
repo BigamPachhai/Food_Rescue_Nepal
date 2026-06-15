@@ -12,6 +12,7 @@ import '../../../../core/utils/extensions.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/widgets/error_view.dart';
 import '../providers/vendor_profile_provider.dart';
 
 class EditVendorProfileScreen extends ConsumerStatefulWidget {
@@ -108,7 +109,10 @@ class _EditVendorProfileScreenState extends ConsumerState<EditVendorProfileScree
       body: profileAsync.when(
         data: (profile) => _buildForm(profile),
         loading: () => _buildForm(null),
-        error: (e, _) => Center(child: Text('Error loading profile: $e')),
+        error: (e, _) => ErrorView(
+          error: e,
+          onRetry: () => ref.invalidate(vendorProfileProvider),
+        ),
       ),
     );
   }
@@ -205,7 +209,7 @@ class _EditVendorProfileScreenState extends ConsumerState<EditVendorProfileScree
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
+                color: AppColors.neutral100,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(

@@ -27,11 +27,16 @@ android {
 
     buildTypes {
         release {
+            // TODO: Replace with release keystore before publishing to Play Store.
+            // Configure via: signingConfigs.create("release") { storeFile, storePassword, keyAlias, keyPassword }
             signingConfig = signingConfigs.getByName("debug")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }

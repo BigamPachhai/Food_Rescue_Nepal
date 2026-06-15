@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/widgets/app_card.dart';
 
 class RoleSelectScreen extends StatelessWidget {
   const RoleSelectScreen({super.key});
@@ -11,35 +10,100 @@ class RoleSelectScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Join Food Rescue Nepal')),
+      backgroundColor: AppColors.backgroundLight,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSizes.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 16),
-              Text('Who are you?', style: AppTextStyles.h2),
-              const SizedBox(height: 8),
-              Text('Select your role to get started', style: AppTextStyles.bodySmall),
-              const SizedBox(height: 32),
-              _RoleCard(
-                emoji: '🛒',
-                iconColor: AppColors.primaryLight,
-                title: 'Customer',
-                subtitle: 'Discover discounted food near you and rescue it from waste.',
-                onTap: () => context.go('/register/customer'),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Top hero
+            Container(
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.s4, AppSizes.s8, AppSizes.s4, AppSizes.s8,
               ),
-              const SizedBox(height: 16),
-              _RoleCard(
-                emoji: '🏪',
-                iconColor: AppColors.accentAmber,
-                title: 'Vendor',
-                subtitle: 'List your surplus food, reduce waste, and reach more customers.',
-                onTap: () => context.go('/register/vendor'),
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryMedium],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(AppSizes.radiusXxl),
+                ),
               ),
-            ],
-          ),
+              child: Column(
+                children: [
+                  const Text('🥘', style: TextStyle(fontSize: 48)),
+                  const SizedBox(height: AppSizes.s3),
+                  Text('Join Food Rescue Nepal', style: AppTextStyles.h2OnPrimary),
+                  const SizedBox(height: AppSizes.s2),
+                  Text(
+                    'Save food. Save money. Save the planet.',
+                    style: AppTextStyles.bodySmallOnPrimary.copyWith(
+                      color: Colors.white.withValues(alpha: 0.8),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSizes.s4),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: AppSizes.s4),
+                    Text('How would you like to use the app?', style: AppTextStyles.h4),
+                    const SizedBox(height: AppSizes.s1),
+                    Text(
+                      'Choose your role to get started',
+                      style: AppTextStyles.bodySmall,
+                    ),
+                    const SizedBox(height: AppSizes.s5),
+                    _RoleCard(
+                      emoji: '🛒',
+                      bgColor: AppColors.primarySurface,
+                      accentColor: AppColors.primaryMedium,
+                      title: 'I\'m a Customer',
+                      subtitle: 'Discover discounted food near you and rescue it from waste.',
+                      benefits: const ['Browse nearby deals', 'Save up to 70%', 'Reserve & pickup'],
+                      onTap: () => context.go('/register/customer'),
+                    ),
+                    const SizedBox(height: AppSizes.s3),
+                    _RoleCard(
+                      emoji: '🏪',
+                      bgColor: AppColors.warningSurface,
+                      accentColor: AppColors.warning,
+                      title: 'I\'m a Vendor',
+                      subtitle: 'List your surplus food, reduce waste, and reach more customers.',
+                      benefits: const ['List surplus food', 'Earn extra revenue', 'Reduce waste'],
+                      onTap: () => context.go('/register/vendor'),
+                    ),
+                    const Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text('Already have an account?', style: AppTextStyles.bodySmall),
+                        TextButton(
+                          onPressed: () => context.go('/login'),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2),
+                          ),
+                          child: Text(
+                            'Sign In',
+                            style: AppTextStyles.bodySmall.copyWith(
+                              color: AppColors.primaryMedium,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -49,49 +113,97 @@ class RoleSelectScreen extends StatelessWidget {
 class _RoleCard extends StatelessWidget {
   const _RoleCard({
     required this.emoji,
-    required this.iconColor,
+    required this.bgColor,
+    required this.accentColor,
     required this.title,
     required this.subtitle,
+    required this.benefits,
     required this.onTap,
   });
 
   final String emoji;
-  final Color iconColor;
+  final Color bgColor;
+  final Color accentColor;
   final String title;
   final String subtitle;
+  final List<String> benefits;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return GestureDetector(
       onTap: onTap,
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.s4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: Center(
-              child: Text(emoji, style: const TextStyle(fontSize: 28)),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: bgColor,
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              ),
+              child: Center(
+                child: Text(emoji, style: const TextStyle(fontSize: 26)),
+              ),
             ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTextStyles.h4),
-                const SizedBox(height: 4),
-                Text(subtitle, style: AppTextStyles.bodySmall),
-              ],
+            const SizedBox(width: AppSizes.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: AppTextStyles.h4),
+                  const SizedBox(height: AppSizes.s1),
+                  Text(subtitle, style: AppTextStyles.bodySmall),
+                  const SizedBox(height: AppSizes.s3),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: benefits.map((b) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
+                        decoration: BoxDecoration(
+                          color: bgColor,
+                          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                        ),
+                        child: Text(
+                          b,
+                          style: AppTextStyles.caption.copyWith(
+                            color: accentColor,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: AppColors.textSecondary),
-        ],
+            const SizedBox(width: AppSizes.s2),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 16,
+              color: AppColors.neutral400,
+            ),
+          ],
+        ),
       ),
     );
   }

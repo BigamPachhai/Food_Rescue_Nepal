@@ -41,31 +41,30 @@ import '../../features/support/screens/support_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 
 // Shell widgets
-class CustomerShell extends StatefulWidget {
+class CustomerShell extends StatelessWidget {
   const CustomerShell({super.key, required this.child});
   final Widget child;
-  @override
-  State<CustomerShell> createState() => _CustomerShellState();
-}
 
-class _CustomerShellState extends State<CustomerShell> {
-  int _currentIndex = 0;
-  final _tabs = ['/customer/home', '/customer/map', '/customer/orders', '/customer/profile'];
+  static const _tabs = [
+    '/customer/home',
+    '/customer/map',
+    '/customer/orders',
+    '/customer/profile',
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final index = _tabs.indexWhere((t) => location.startsWith(t));
     return Scaffold(
-      body: widget.child,
+      body: child,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          setState(() => _currentIndex = i);
-          context.go(_tabs[i]);
-        },
+        currentIndex: index < 0 ? 0 : index,
+        onTap: (i) => context.go(_tabs[i]),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), activeIcon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.map_outlined), activeIcon: Icon(Icons.map), label: 'Map'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Reservations'),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), activeIcon: Icon(Icons.person), label: 'Profile'),
         ],
       ),
@@ -73,31 +72,30 @@ class _CustomerShellState extends State<CustomerShell> {
   }
 }
 
-class VendorShell extends StatefulWidget {
+class VendorShell extends StatelessWidget {
   const VendorShell({super.key, required this.child});
   final Widget child;
-  @override
-  State<VendorShell> createState() => _VendorShellState();
-}
 
-class _VendorShellState extends State<VendorShell> {
-  int _currentIndex = 0;
-  final _tabs = ['/vendor/dashboard', '/vendor/listings', '/vendor/orders', '/vendor/profile'];
+  static const _tabs = [
+    '/vendor/dashboard',
+    '/vendor/listings',
+    '/vendor/orders',
+    '/vendor/profile',
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final index = _tabs.indexWhere((t) => location.startsWith(t));
     return Scaffold(
-      body: widget.child,
+      body: child,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          setState(() => _currentIndex = i);
-          context.go(_tabs[i]);
-        },
+        currentIndex: index < 0 ? 0 : index,
+        onTap: (i) => context.go(_tabs[i]),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.restaurant_menu_outlined), activeIcon: Icon(Icons.restaurant_menu), label: 'Listings'),
-          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Orders'),
+          BottomNavigationBarItem(icon: Icon(Icons.receipt_long_outlined), activeIcon: Icon(Icons.receipt_long), label: 'Reservations'),
           BottomNavigationBarItem(icon: Icon(Icons.store_outlined), activeIcon: Icon(Icons.store), label: 'Profile'),
         ],
       ),
@@ -105,27 +103,26 @@ class _VendorShellState extends State<VendorShell> {
   }
 }
 
-class AdminShell extends StatefulWidget {
+class AdminShell extends StatelessWidget {
   const AdminShell({super.key, required this.child});
   final Widget child;
-  @override
-  State<AdminShell> createState() => _AdminShellState();
-}
 
-class _AdminShellState extends State<AdminShell> {
-  int _currentIndex = 0;
-  final _tabs = ['/admin/dashboard', '/admin/users', '/admin/vendors', '/admin/orders'];
+  static const _tabs = [
+    '/admin/dashboard',
+    '/admin/users',
+    '/admin/vendors',
+    '/admin/orders',
+  ];
 
   @override
   Widget build(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    final index = _tabs.indexWhere((t) => location.startsWith(t));
     return Scaffold(
-      body: widget.child,
+      body: child,
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        onTap: (i) {
-          setState(() => _currentIndex = i);
-          context.go(_tabs[i]);
-        },
+        currentIndex: index < 0 ? 0 : index,
+        onTap: (i) => context.go(_tabs[i]),
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), activeIcon: Icon(Icons.dashboard), label: 'Dashboard'),
           BottomNavigationBarItem(icon: Icon(Icons.people_outline), activeIcon: Icon(Icons.people), label: 'Users'),
@@ -159,8 +156,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoginRoute = state.matchedLocation == '/login';
       final isRegisterRoute = state.matchedLocation.startsWith('/register');
       final isRootRoute = state.matchedLocation == '/';
+      final isPublicRoute = isLoginRoute ||
+          isRegisterRoute ||
+          state.matchedLocation == '/forgot-password' ||
+          state.matchedLocation == '/reset-password';
 
-      if (!isAuthenticated && !isLoginRoute && !isRegisterRoute) {
+      if (!isAuthenticated && !isPublicRoute) {
         return '/login';
       }
 
@@ -209,10 +210,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/reset-password',
         builder: (_, state) {
           final extra = state.extra as Map<String, String?>? ?? {};
-          return ResetPasswordScreen(
-            email: extra['email'] ?? '',
-            devOtp: extra['devOtp'],
-          );
+          return ResetPasswordScreen(email: extra['email'] ?? '');
         },
       ),
       ShellRoute(

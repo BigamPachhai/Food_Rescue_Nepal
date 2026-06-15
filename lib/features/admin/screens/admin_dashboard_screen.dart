@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/utils/responsive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/shimmer_card.dart';
@@ -46,43 +47,48 @@ class AdminDashboardScreen extends ConsumerWidget {
             children: [
               // KPI grid
               statsAsync.when(
-                data: (stats) => GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.4,
-                  children: [
-                    _KpiCard(
-                      label: 'Total Users',
-                      value: '${stats.totalUsers}',
-                      icon: Icons.people_outline,
-                      color: AppColors.info,
-                    ),
-                    _KpiCard(
-                      label: 'Total Vendors',
-                      value: '${stats.totalVendors}',
-                      icon: Icons.store_outlined,
-                      color: AppColors.accentAmber,
-                    ),
-                    _KpiCard(
-                      label: 'Total Orders',
-                      value: '${stats.totalOrders}',
-                      icon: Icons.receipt_long_outlined,
-                      color: AppColors.primaryMedium,
-                    ),
-                    _KpiCard(
-                      label: 'Revenue',
-                      value: Formatters.formatNPR(stats.totalRevenuePaisa),
-                      icon: Icons.payments_outlined,
-                      color: AppColors.success,
-                    ),
-                  ],
+                data: (stats) => LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cols = Responsive.gridColumns(context, mobile: 2, tablet: 4);
+                    return GridView.count(
+                      crossAxisCount: cols,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: cols == 4 ? 1.6 : 1.4,
+                      children: [
+                        _KpiCard(
+                          label: 'Total Users',
+                          value: '${stats.totalUsers}',
+                          icon: Icons.people_outline,
+                          color: AppColors.info,
+                        ),
+                        _KpiCard(
+                          label: 'Total Vendors',
+                          value: '${stats.totalVendors}',
+                          icon: Icons.store_outlined,
+                          color: AppColors.accentAmber,
+                        ),
+                        _KpiCard(
+                          label: 'Total Orders',
+                          value: '${stats.totalOrders}',
+                          icon: Icons.receipt_long_outlined,
+                          color: AppColors.primaryMedium,
+                        ),
+                        _KpiCard(
+                          label: 'Revenue',
+                          value: Formatters.formatNPR(stats.totalRevenuePaisa),
+                          icon: Icons.payments_outlined,
+                          color: AppColors.success,
+                        ),
+                      ],
+                    );
+                  },
                 ),
                 loading: () => const ShimmerCard(height: 180),
                 error: (e, _) => ErrorView(
-                  message: e.toString(),
+                  error: e,
                   onRetry: () => ref.invalidate(adminStatsProvider),
                 ),
               ),
@@ -142,7 +148,11 @@ class AdminDashboardScreen extends ConsumerWidget {
                   );
                 },
                 loading: () => const ShimmerCard(height: 60),
-                error: (_, __) => const SizedBox(),
+                error: (e, _) => _AdminInlineError(
+                  message: 'Could not load pending vendors',
+                  onRetry: () =>
+                      ref.invalidate(adminVendorsProvider('PENDING')),
+                ),
               ),
 
               const SizedBox(height: AppSizes.xxl),
@@ -166,7 +176,10 @@ class AdminDashboardScreen extends ConsumerWidget {
                       .toList(),
                 ),
                 loading: () => const ShimmerCard(height: 60),
-                error: (_, __) => const SizedBox(),
+                error: (e, _) => _AdminInlineError(
+                  message: 'Could not load recent orders',
+                  onRetry: () => ref.invalidate(adminOrdersProvider('')),
+                ),
               ),
             ],
           ),
@@ -263,14 +276,63 @@ class _OrderTile extends StatelessWidget {
         overflow: TextOverflow.ellipsis,
       ),
       subtitle: Text(order.customerName ?? '', style: AppTextStyles.caption),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
+      trailing: SizedBox(
+        width: 96,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            StatusBadge(status: order.status, compact: true),
+            const SizedBox(height: 2),
+            Text(
+              Formatters.formatNPR(order.totalAmount),
+              style: AppTextStyles.caption.copyWith(color: AppColors.primaryMedium),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Inline error banner ───────────────────────────────────────────────────
+
+class _AdminInlineError extends StatelessWidget {
+  const _AdminInlineError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+      decoration: BoxDecoration(
+        color: AppColors.errorSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+      ),
+      child: Row(
         children: [
-          StatusBadge(status: order.status),
-          Text(Formatters.formatNPR(order.totalAmount),
-              style: AppTextStyles.caption
-                  .copyWith(color: AppColors.primaryMedium)),
+          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              message,
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+            ),
+          ),
+          TextButton(
+            onPressed: onRetry,
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: const Text('Retry', style: TextStyle(fontSize: 13)),
+          ),
         ],
       ),
     );

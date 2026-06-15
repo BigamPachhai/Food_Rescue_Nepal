@@ -9,6 +9,7 @@ import '../../../../core/utils/validators.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/utils/responsive.dart';
 
 class ForgotPasswordScreen extends ConsumerStatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -33,22 +34,14 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     setState(() => _isLoading = true);
     try {
       final dio = ref.read(dioClientProvider);
-      final response = await dio.post(
+      await dio.post(
         ApiEndpoints.forgotPassword,
         data: {'email': _emailCtrl.text.trim()},
       );
-      final raw = response.data as Map<String, dynamic>;
-      final data = raw['data'] as Map<String, dynamic>? ?? {};
-      final devOtp = data['otp'] as String?;
-      final isDevMode = data['isDevMode'] as bool? ?? false;
-
       if (!mounted) return;
       context.go(
         '/reset-password',
-        extra: {
-          'email': _emailCtrl.text.trim(),
-          'devOtp': (isDevMode && devOtp != null && devOtp.isNotEmpty) ? devOtp : null,
-        },
+        extra: {'email': _emailCtrl.text.trim()},
       );
     } catch (e) {
       if (mounted) context.showErrorSnackBar('Failed to send OTP. Please try again.');
@@ -68,7 +61,10 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
           onPressed: () => context.pop(),
         ),
       ),
-      body: SingleChildScrollView(
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
+          child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
         child: Form(
           key: _formKey,
@@ -118,6 +114,8 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 ),
               ),
             ],
+          ),
+        ),
           ),
         ),
       ),

@@ -71,8 +71,10 @@ class OrderEntity {
       );
 
   bool get isActive =>
-      status == 'PENDING' || status == 'CONFIRMED' || status == 'READY';
-  bool get canShowQr => status == 'CONFIRMED' || status == 'READY';
+      status == 'PENDING' || status == 'ACCEPTED' || status == 'READY';
+  bool get isTerminal =>
+      status == 'COMPLETED' || status == 'CANCELLED' || status == 'REJECTED' || status == 'EXPIRED';
+  bool get canShowQr => status == 'ACCEPTED' || status == 'READY';
   bool get canCancel {
     if (status != 'PENDING') return false;
     return DateTime.now().difference(createdAt).inMinutes < 10;

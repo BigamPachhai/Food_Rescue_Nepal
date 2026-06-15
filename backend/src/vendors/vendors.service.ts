@@ -120,7 +120,7 @@ export class VendorsService {
       this.prisma.order.aggregate({
         where: {
           vendorId: vendor.id,
-          status: { in: ['PICKED_UP', 'READY', 'CONFIRMED'] },
+          status: { in: ['COMPLETED', 'READY', 'ACCEPTED'] },
           createdAt: { gte: todayStart },
         },
         _sum: { totalAmount: true },
@@ -129,10 +129,10 @@ export class VendorsService {
         where: { vendorId: vendor.id },
       }),
       this.prisma.order.count({
-        where: { vendorId: vendor.id, status: 'PICKED_UP' },
+        where: { vendorId: vendor.id, status: 'COMPLETED' },
       }),
       this.prisma.order.aggregate({
-        where: { vendorId: vendor.id, status: 'PICKED_UP' },
+        where: { vendorId: vendor.id, status: 'COMPLETED' },
         _sum: { totalAmount: true },
       }),
       this.prisma.listing.findMany({
@@ -146,7 +146,7 @@ export class VendorsService {
           isActive: true,
           _count: { select: { orders: true } },
           orders: {
-            where: { status: 'PICKED_UP' },
+            where: { status: 'COMPLETED' },
             select: { totalAmount: true, quantity: true },
           },
         },

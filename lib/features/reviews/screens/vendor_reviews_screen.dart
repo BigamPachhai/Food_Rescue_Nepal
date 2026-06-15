@@ -18,7 +18,7 @@ class VendorReviewsScreen extends ConsumerWidget {
     final reviewsAsync = ref.watch(vendorReviewsProvider(vendorId));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(title: const Text('Customer Reviews')),
       body: reviewsAsync.when(
         data: (reviews) {
@@ -64,7 +64,7 @@ class VendorReviewsScreen extends ConsumerWidget {
           ),
         ),
         error: (e, _) => ErrorView(
-          message: e.toString(),
+          error: e,
           onRetry: () => ref.read(vendorReviewsProvider(vendorId).notifier).fetch(),
         ),
       ),
@@ -176,7 +176,7 @@ class _RatingSummary extends StatelessWidget {
                           borderRadius: BorderRadius.circular(4),
                           child: LinearProgressIndicator(
                             value: fraction,
-                            backgroundColor: const Color(0xFFEEEEEE),
+                            backgroundColor: AppColors.neutral200,
                             valueColor: const AlwaysStoppedAnimation<Color>(
                                 AppColors.accentAmber),
                             minHeight: 8,

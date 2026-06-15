@@ -145,7 +145,7 @@ export class OrdersService {
     throw new ForbiddenException('Access denied');
   }
 
-  async confirm(orderId: string, userId: string) {
+  async accept(orderId: string, userId: string) {
     const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
     if (!vendor) throw new ForbiddenException('Vendor profile not found');
 
@@ -165,7 +165,7 @@ export class OrdersService {
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: OrderStatus.CONFIRMED },
+      data: { status: OrderStatus.ACCEPTED },
     });
 
     setImmediate(async () => {
@@ -174,9 +174,9 @@ export class OrdersService {
         const pickupEnd = order.listing.pickupEnd.toLocaleTimeString();
         await this.notificationsService.send({
           userId: order.customer.id,
-          title: 'Order Confirmed ✅',
+          title: 'Order Accepted ✅',
           body: `Pick up your ${order.listing.name} between ${pickupStart} and ${pickupEnd}`,
-          type: 'ORDER_CONFIRMED',
+          type: 'ORDER_ACCEPTED',
           data: { orderId },
           fcmToken: order.customer.fcmToken || undefined,
         });
@@ -200,8 +200,8 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Order not found');
     if (order.vendorId !== vendor.id) throw new ForbiddenException('Not your order');
-    if (order.status !== OrderStatus.CONFIRMED) {
-      throw new BadRequestException('Order is not in CONFIRMED status');
+    if (order.status !== OrderStatus.ACCEPTED) {
+      throw new BadRequestException('Order is not in ACCEPTED status');
     }
 
     const updated = await this.prisma.order.update({
@@ -249,7 +249,7 @@ export class OrdersService {
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: OrderStatus.PICKED_UP },
+      data: { status: OrderStatus.COMPLETED },
     });
 
     setImmediate(async () => {
@@ -259,6 +259,90 @@ export class OrdersService {
           title: 'Enjoy your meal! 🌿',
           body: 'Thanks for rescuing food with us.',
           type: 'ORDER_PICKED_UP',
+          data: { orderId },
+          fcmToken: order.customer.fcmToken || undefined,
+        });
+      } catch (_) {}
+    });
+
+    return updated;
+  }
+
+  async reject(orderId: string, userId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) throw new ForbiddenException('Vendor profile not found');
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        listing: { select: { name: true } },
+        customer: { select: { id: true, fcmToken: true } },
+      },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.vendorId !== vendor.id) throw new ForbiddenException('Not your order');
+    if (order.status !== OrderStatus.PENDING) {
+      throw new BadRequestException('Only PENDING reservations can be rejected');
+    }
+
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.REJECTED },
+      }),
+      this.prisma.listing.update({
+        where: { id: order.listingId },
+        data: { availableQty: { increment: order.quantity } },
+      }),
+    ]);
+
+    setImmediate(async () => {
+      try {
+        await this.notificationsService.send({
+          userId: order.customer.id,
+          title: 'Reservation Rejected',
+          body: `Your reservation for ${order.listing.name} was rejected by the vendor.`,
+          type: 'ORDER_REJECTED',
+          data: { orderId },
+          fcmToken: order.customer.fcmToken || undefined,
+        });
+      } catch (_) {}
+    });
+
+    return updated;
+  }
+
+  async expire(orderId: string, userId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) throw new ForbiddenException('Vendor profile not found');
+
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        listing: { select: { name: true } },
+        customer: { select: { id: true, fcmToken: true } },
+      },
+    });
+
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.vendorId !== vendor.id) throw new ForbiddenException('Not your order');
+    if (order.status !== OrderStatus.READY) {
+      throw new BadRequestException('Only READY reservations can be marked as expired');
+    }
+
+    const updated = await this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.EXPIRED },
+    });
+
+    setImmediate(async () => {
+      try {
+        await this.notificationsService.send({
+          userId: order.customer.id,
+          title: 'Reservation Expired',
+          body: `Your reservation for ${order.listing.name} has expired. The food could not be rescued.`,
+          type: 'ORDER_EXPIRED',
           data: { orderId },
           fcmToken: order.customer.fcmToken || undefined,
         });

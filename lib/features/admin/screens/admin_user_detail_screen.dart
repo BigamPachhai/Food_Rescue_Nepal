@@ -8,6 +8,7 @@ import '../../../core/utils/extensions.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/shimmer_card.dart';
 import '../providers/admin_provider.dart';
 
 class AdminUserDetailScreen extends ConsumerStatefulWidget {
@@ -102,11 +103,9 @@ class _AdminUserDetailScreenState
             ],
           ),
         ),
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryMedium),
-        ),
+        loading: () => const ShimmerAdminDetail(),
         error: (e, _) => ErrorView(
-          message: e.toString(),
+          error: e,
           onRetry: () =>
               ref.invalidate(adminUserDetailProvider(widget.userId)),
         ),

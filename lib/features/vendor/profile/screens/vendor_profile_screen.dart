@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/widgets/shimmer_card.dart';
 import '../../../auth/domain/auth_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/utils/responsive.dart';
 import '../providers/vendor_profile_provider.dart';
 
 class VendorProfileScreen extends ConsumerWidget {
@@ -19,7 +21,7 @@ class VendorProfileScreen extends ConsumerWidget {
     final profileAsync = ref.watch(vendorProfileProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
         onRefresh: () async => ref.invalidate(vendorProfileProvider),
@@ -33,17 +35,46 @@ class VendorProfileScreen extends ConsumerWidget {
                 error: (_, __) => _buildHeader(context, user, null),
               ),
               const SizedBox(height: 20),
-              Padding(
+              Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
+                  child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSizes.lg),
                 child: Column(
                   children: [
                     profileAsync.when(
                       data: (vendor) => _buildInfoCard(vendor),
-                      loading: () => const SizedBox(
-                        height: 80,
-                        child: Center(child: CircularProgressIndicator(color: AppColors.primaryMedium)),
+                      loading: () => const ShimmerCard(height: 120, margin: EdgeInsets.zero),
+                      error: (e, _) => Container(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorSurface,
+                          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.25)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.error_outline, color: AppColors.error, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Could not load store info',
+                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () => ref.invalidate(vendorProfileProvider),
+                              style: TextButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Text('Retry', style: TextStyle(fontSize: 13)),
+                            ),
+                          ],
+                        ),
                       ),
-                      error: (_, __) => const SizedBox(),
                     ),
                     const SizedBox(height: 12),
                     _SectionCard(
@@ -105,6 +136,8 @@ class VendorProfileScreen extends ConsumerWidget {
                   ],
                 ),
               ),
+                  ),
+                ),
             ],
           ),
         ),

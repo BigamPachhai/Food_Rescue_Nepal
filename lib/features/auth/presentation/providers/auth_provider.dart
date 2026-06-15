@@ -25,12 +25,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthLoading();
     try {
       final user = await _repository.login(LoginRequest(email: email, password: password));
-      // ignore: avoid_print
-      print('[AUTH] Login success: ${user.email} role=${user.role}');
       state = AuthAuthenticated(user);
-    } catch (e, st) {
-      // ignore: avoid_print
-      print('[AUTH] Login error: $e\n$st');
+    } catch (e) {
       state = AuthError(e.toString());
     }
   }

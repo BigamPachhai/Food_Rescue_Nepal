@@ -99,7 +99,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                 itemBuilder: (_, __) => const ShimmerCard(height: 80),
               ),
               error: (e, _) => ErrorView(
-                message: e.toString(),
+                error: e,
                 onRetry: () =>
                     ref.invalidate(adminOrdersProvider(_statusFilter)),
               ),
@@ -133,18 +133,22 @@ class _AdminOrderTile extends StatelessWidget {
         style: AppTextStyles.caption,
         overflow: TextOverflow.ellipsis,
       ),
-      trailing: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          StatusBadge(status: order.status),
-          const SizedBox(height: 2),
-          Text(
-            Formatters.formatNPR(order.totalAmount),
-            style: AppTextStyles.caption
-                .copyWith(color: AppColors.primaryMedium),
-          ),
-        ],
+      trailing: SizedBox(
+        width: 96,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            StatusBadge(status: order.status, compact: true),
+            const SizedBox(height: 2),
+            Text(
+              Formatters.formatNPR(order.totalAmount),
+              style: AppTextStyles.caption.copyWith(color: AppColors.primaryMedium),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

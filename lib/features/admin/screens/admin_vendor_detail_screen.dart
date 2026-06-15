@@ -7,6 +7,7 @@ import '../../../core/network/dio_client.dart';
 import '../../../core/utils/extensions.dart';
 import '../../../core/widgets/app_button.dart';
 import '../../../core/widgets/error_view.dart';
+import '../../../core/widgets/shimmer_card.dart';
 import '../../../core/widgets/status_badge.dart';
 import '../providers/admin_provider.dart';
 import '../../../core/constants/api_endpoints.dart';
@@ -129,11 +130,9 @@ class _AdminVendorDetailScreenState
             ],
           ),
         ),
-        loading: () => const Center(
-          child: CircularProgressIndicator(color: AppColors.primaryMedium),
-        ),
+        loading: () => const ShimmerAdminDetail(),
         error: (e, _) => ErrorView(
-          message: e.toString(),
+          error: e,
           onRetry: () =>
               ref.invalidate(adminVendorDetailProvider(widget.vendorId)),
         ),

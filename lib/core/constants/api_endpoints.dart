@@ -26,8 +26,11 @@ class ApiEndpoints {
   static const String orders = '/orders';
   static const String customerOrders = '/orders/my';
   static String orderById(String id) => '/orders/$id';
+  static String orderAccept(String id) => '/orders/$id/accept';
   static String orderPickup(String id) => '/orders/$id/pickup';
   static String orderCancel(String id) => '/orders/$id/cancel';
+  static String orderReject(String id) => '/orders/$id/reject';
+  static String orderExpire(String id) => '/orders/$id/expire';
 
   // Favorites
   static const String customerFavorites = '/favorites';

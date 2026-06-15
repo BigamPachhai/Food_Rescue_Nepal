@@ -44,7 +44,7 @@ export class AuthController {
     res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
     return {
       success: true,
-      data: { user: result.user, accessToken: result.accessToken },
+      data: { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken },
       message: 'Registration successful',
     };
   }
@@ -57,16 +57,20 @@ export class AuthController {
     res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
     return {
       success: true,
-      data: { user: result.user, accessToken: result.accessToken },
+      data: { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken },
       message: 'Login successful',
     };
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Refresh access token using httpOnly cookie' })
-  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.refreshToken;
+  @ApiOperation({ summary: 'Refresh access token (cookie for web, body for mobile)' })
+  async refresh(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: { refreshToken?: string },
+  ) {
+    const refreshToken = req.cookies?.refreshToken ?? body?.refreshToken;
     if (!refreshToken) {
       return {
         success: false,
@@ -77,7 +81,7 @@ export class AuthController {
     res.cookie('refreshToken', tokens.refreshToken, REFRESH_COOKIE_OPTIONS);
     return {
       success: true,
-      data: { accessToken: tokens.accessToken },
+      data: { accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
       message: 'Token refreshed',
     };
   }
@@ -85,8 +89,12 @@ export class AuthController {
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Logout - clears refresh token cookie' })
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.refreshToken;
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: { refreshToken?: string },
+  ) {
+    const refreshToken = req.cookies?.refreshToken ?? body?.refreshToken;
     await this.authService.logout(refreshToken);
     res.clearCookie('refreshToken', { path: '/' });
     return {

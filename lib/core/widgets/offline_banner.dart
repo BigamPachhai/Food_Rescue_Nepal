@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../constants/app_colors.dart';
 import '../network/connectivity_provider.dart';
 
 class OfflineBanner extends ConsumerWidget {
@@ -14,7 +15,7 @@ class OfflineBanner extends ConsumerWidget {
       color: Colors.transparent,
       child: Container(
         width: double.infinity,
-        color: const Color(0xFFB00020),
+        color: AppColors.error,
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
         child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,

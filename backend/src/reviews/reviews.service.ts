@@ -22,8 +22,8 @@ export class ReviewsService {
     if (!order) throw new NotFoundException('Order not found');
     if (order.customerId !== customerId)
       throw new BadRequestException('This is not your order');
-    if (order.status !== OrderStatus.PICKED_UP)
-      throw new BadRequestException('Can only review PICKED_UP orders');
+    if (order.status !== OrderStatus.COMPLETED)
+      throw new BadRequestException('Can only review completed reservations');
     if (order.review)
       throw new ConflictException('You have already reviewed this order');
 

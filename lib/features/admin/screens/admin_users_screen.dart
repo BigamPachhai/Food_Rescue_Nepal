@@ -99,7 +99,7 @@ class _AdminUsersScreenState extends ConsumerState<AdminUsersScreen> {
                 itemBuilder: (_, __) => const ShimmerCard(height: 70),
               ),
               error: (e, _) => ErrorView(
-                message: e.toString(),
+                error: e,
                 onRetry: () =>
                     ref.invalidate(adminUsersProvider(_search)),
               ),

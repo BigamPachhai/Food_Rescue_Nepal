@@ -418,7 +418,9 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
               const SizedBox(height: AppSizes.lg),
               Text('Photos', style: AppTextStyles.h5),
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   // Existing images
                   ..._imageUrls.asMap().entries.map((e) => _ImageSlot(
@@ -439,7 +441,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
                       child: Container(
                         width: 80,
                         height: 80,
-                        margin: const EdgeInsets.only(right: 8),
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: AppColors.primaryLight,
@@ -534,7 +535,6 @@ class _ImageSlot extends StatelessWidget {
         Container(
           width: 80,
           height: 80,
-          margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(12),
             image: DecorationImage(

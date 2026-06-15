@@ -14,7 +14,7 @@ class SettingsScreen extends ConsumerWidget {
     final language = ref.watch(languageProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
         children: [

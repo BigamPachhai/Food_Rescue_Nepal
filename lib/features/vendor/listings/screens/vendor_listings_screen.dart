@@ -28,7 +28,7 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
     final listingsAsync = ref.watch(vendorListingsProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('My Listings'),
         actions: [
@@ -65,7 +65,7 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
                     ),
                     showCheckmark: false,
                     side: BorderSide(
-                      color: selected ? AppColors.primaryMedium : const Color(0xFFDDDDDD),
+                      color: selected ? AppColors.primaryMedium : AppColors.neutral300,
                     ),
                   ),
                 );
@@ -103,12 +103,8 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
                     itemBuilder: (_, i) => _ListingCard(
                       listing: filtered[i],
                       onEdit: () => context.push('/vendor/listings/${filtered[i].id}/edit'),
-                      onToggleActive: () => ref
-                          .read(vendorListingsProvider.notifier)
-                          .toggleActive(filtered[i].id, !filtered[i].isActive),
-                      onMarkSoldOut: () => ref
-                          .read(vendorListingsProvider.notifier)
-                          .markSoldOut(filtered[i].id),
+                      onToggleActive: () => _confirmToggleActive(context, filtered[i]),
+                      onMarkSoldOut: () => _confirmMarkSoldOut(context, filtered[i]),
                       onDuplicate: () async {
                         await ref
                             .read(vendorListingsProvider.notifier)
@@ -130,7 +126,7 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
                 ),
               ),
               error: (e, _) => ErrorView(
-                message: e.toString(),
+                error: e,
                 onRetry: () => ref.read(vendorListingsProvider.notifier).fetch(),
               ),
             ),
@@ -142,6 +138,63 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
         backgroundColor: AppColors.primaryMedium,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('New Listing', style: TextStyle(color: Colors.white)),
+      ),
+    );
+  }
+
+  void _confirmToggleActive(BuildContext context, VendorListing listing) {
+    final pausing = listing.isActive;
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: Text(pausing ? 'Pause Listing' : 'Activate Listing'),
+        content: Text(
+          pausing
+              ? 'Pause "${listing.name}"? Customers will no longer see it.'
+              : 'Activate "${listing.name}"? It will be visible to customers.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await ref
+                  .read(vendorListingsProvider.notifier)
+                  .toggleActive(listing.id, !listing.isActive);
+              if (context.mounted) {
+                context.showSnackBar(pausing ? 'Listing paused' : 'Listing activated');
+              }
+            },
+            child: Text(pausing ? 'Pause' : 'Activate'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmMarkSoldOut(BuildContext context, VendorListing listing) {
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Mark as Sold Out'),
+        content: Text('Mark "${listing.name}" as sold out? Available quantity will be set to 0.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogCtx);
+              await ref.read(vendorListingsProvider.notifier).markSoldOut(listing.id);
+              if (context.mounted) context.showSnackBar('Marked as sold out');
+            },
+            child: const Text('Mark Sold Out', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
       ),
     );
   }
@@ -334,7 +387,7 @@ class _ListingCard extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
             decoration: const BoxDecoration(
               border: Border(
-                top: BorderSide(color: Color(0xFFF0F0F0)),
+                top: BorderSide(color: AppColors.neutral100),
               ),
             ),
             child: Row(

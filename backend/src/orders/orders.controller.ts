@@ -70,19 +70,19 @@ export class OrdersController {
     return { success: true, data: order, message: 'Success' };
   }
 
-  @Patch(':id/confirm')
+  @Patch(':id/accept')
   @UseGuards(RolesGuard)
   @Roles('VENDOR' as any)
-  @ApiOperation({ summary: 'Confirm order - PENDING → CONFIRMED (VENDOR only)' })
-  async confirm(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    const order = await this.ordersService.confirm(id, userId);
-    return { success: true, data: order, message: 'Order confirmed' };
+  @ApiOperation({ summary: 'Accept reservation - PENDING → ACCEPTED (VENDOR only)' })
+  async accept(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    const order = await this.ordersService.accept(id, userId);
+    return { success: true, data: order, message: 'Order accepted' };
   }
 
   @Patch(':id/ready')
   @UseGuards(RolesGuard)
   @Roles('VENDOR' as any)
-  @ApiOperation({ summary: 'Mark order ready - CONFIRMED → READY (VENDOR only)' })
+  @ApiOperation({ summary: 'Mark order ready - ACCEPTED → READY (VENDOR only)' })
   async markReady(@Param('id') id: string, @CurrentUser('id') userId: string) {
     const order = await this.ordersService.markReady(id, userId);
     return { success: true, data: order, message: 'Order marked as ready' };
@@ -91,22 +91,40 @@ export class OrdersController {
   @Patch(':id/pickup')
   @UseGuards(RolesGuard)
   @Roles('VENDOR' as any)
-  @ApiOperation({ summary: 'Mark order picked up - READY → PICKED_UP, verify pickup code (VENDOR only)' })
+  @ApiOperation({ summary: 'Complete order - READY → COMPLETED, verify pickup code (VENDOR only)' })
   async pickup(
     @Param('id') id: string,
     @CurrentUser('id') userId: string,
     @Body('pickupCode') pickupCode: string,
   ) {
     const order = await this.ordersService.pickup(id, userId, pickupCode);
-    return { success: true, data: order, message: 'Order picked up' };
+    return { success: true, data: order, message: 'Order completed' };
+  }
+
+  @Patch(':id/reject')
+  @UseGuards(RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiOperation({ summary: 'Reject reservation - PENDING → REJECTED (VENDOR only)' })
+  async reject(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    const order = await this.ordersService.reject(id, userId);
+    return { success: true, data: order, message: 'Reservation rejected' };
+  }
+
+  @Patch(':id/expire')
+  @UseGuards(RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiOperation({ summary: 'Expire reservation - READY → EXPIRED (VENDOR only)' })
+  async expire(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    const order = await this.ordersService.expire(id, userId);
+    return { success: true, data: order, message: 'Reservation marked as expired' };
   }
 
   @Patch(':id/cancel')
   @UseGuards(RolesGuard)
   @Roles('CUSTOMER' as any)
-  @ApiOperation({ summary: 'Cancel order - PENDING only within 10 min (CUSTOMER only)' })
+  @ApiOperation({ summary: 'Cancel reservation - PENDING only within 10 min (CUSTOMER only)' })
   async cancel(@Param('id') id: string, @CurrentUser('id') userId: string) {
     const order = await this.ordersService.cancel(id, userId);
-    return { success: true, data: order, message: 'Order cancelled' };
+    return { success: true, data: order, message: 'Reservation cancelled' };
   }
 }

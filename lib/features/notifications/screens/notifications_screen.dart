@@ -18,7 +18,7 @@ class NotificationsScreen extends ConsumerWidget {
     final unread = ref.watch(unreadCountProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Row(
           children: [
@@ -149,7 +149,7 @@ class NotificationsScreen extends ConsumerWidget {
           ),
         ),
         error: (e, _) => ErrorView(
-          message: e.toString(),
+          error: e,
           onRetry: () => ref.read(notificationsProvider.notifier).fetch(),
         ),
       ),
@@ -363,7 +363,7 @@ class _NotifIcon extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: isRead ? const Color(0xFFF0F0F0) : color.withValues(alpha: 0.12),
+        color: isRead ? AppColors.neutral100 : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(icon, color: isRead ? AppColors.textSecondary : color, size: 22),

@@ -59,103 +59,110 @@ class _QrDisplayScreenState extends ConsumerState<QrDisplayScreen>
                   style: TextStyle(color: Colors.white)),
             );
           }
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    'Show this QR to the vendor',
-                    style: AppTextStyles.h4.copyWith(color: Colors.white),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'They will scan it to confirm your pickup',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: Colors.white70),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 40),
-                  AnimatedBuilder(
-                    animation: _ringAnimation,
-                    builder: (_, child) => Container(
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: AppColors.primaryLight
-                              .withValues(alpha: 0.5),
-                          width: 3 * _ringAnimation.value,
+          return LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Show this QR to the vendor',
+                          style: AppTextStyles.h4.copyWith(color: Colors.white),
+                          textAlign: TextAlign.center,
                         ),
-                      ),
-                      padding:
-                          EdgeInsets.all(12 * _ringAnimation.value),
-                      child: child,
-                    ),
-                    child: Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                      ),
-                      child: QrImageView(
-                        data: jsonEncode({'o': order.id, 'c': order.pickupCode}),
-                        size: 200,
-                        backgroundColor: Colors.white,
-                        eyeStyle: const QrEyeStyle(
-                          eyeShape: QrEyeShape.square,
-                          color: AppColors.primaryMedium,
+                        const SizedBox(height: 8),
+                        Text(
+                          'They will scan it to confirm your pickup',
+                          style: AppTextStyles.bodySmall
+                              .copyWith(color: Colors.white70),
+                          textAlign: TextAlign.center,
                         ),
-                        dataModuleStyle: const QrDataModuleStyle(
-                          dataModuleShape: QrDataModuleShape.square,
-                          color: AppColors.primary,
+                        const SizedBox(height: 40),
+                        AnimatedBuilder(
+                          animation: _ringAnimation,
+                          builder: (_, child) => Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: AppColors.primaryLight
+                                    .withValues(alpha: 0.5),
+                                width: 3 * _ringAnimation.value,
+                              ),
+                            ),
+                            padding:
+                                EdgeInsets.all(12 * _ringAnimation.value),
+                            child: child,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.all(24),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
+                            ),
+                            child: QrImageView(
+                              data: jsonEncode({'o': order.id, 'c': order.pickupCode}),
+                              size: 200,
+                              backgroundColor: Colors.white,
+                              eyeStyle: const QrEyeStyle(
+                                eyeShape: QrEyeShape.square,
+                                color: AppColors.primaryMedium,
+                              ),
+                              dataModuleStyle: const QrDataModuleStyle(
+                                dataModuleShape: QrDataModuleShape.square,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(height: 32),
+                        if (order.listing != null)
+                          Text(
+                            order.listing!.name,
+                            style:
+                                AppTextStyles.h5.copyWith(color: Colors.white),
+                            textAlign: TextAlign.center,
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          Formatters.formatNPR(order.totalAmount),
+                          style: AppTextStyles.h4
+                              .copyWith(color: AppColors.accent),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Colors.white12,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Code: ${order.pickupCode}',
+                            style: AppTextStyles.caption.copyWith(
+                              color: Colors.white,
+                              letterSpacing: 2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 32),
+                        OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                          child: const Text('Go Back'),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 32),
-                  if (order.listing != null)
-                    Text(
-                      order.listing!.name,
-                      style:
-                          AppTextStyles.h5.copyWith(color: Colors.white),
-                      textAlign: TextAlign.center,
-                    ),
-                  const SizedBox(height: 4),
-                  Text(
-                    Formatters.formatNPR(order.totalAmount),
-                    style: AppTextStyles.h4
-                        .copyWith(color: AppColors.accent),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white12,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'Code: ${order.pickupCode}',
-                      style: AppTextStyles.caption.copyWith(
-                        color: Colors.white,
-                        letterSpacing: 2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.white,
-                      side: const BorderSide(color: Colors.white54),
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Go Back'),
-                  ),
-                ],
+                ),
               ),
             ),
           );
@@ -164,7 +171,7 @@ class _QrDisplayScreenState extends ConsumerState<QrDisplayScreen>
           child: CircularProgressIndicator(color: Colors.white),
         ),
         error: (e, _) => ErrorView(
-          message: e.toString(),
+          error: e,
           onRetry: () =>
               ref.invalidate(orderDetailProvider(widget.orderId)),
         ),

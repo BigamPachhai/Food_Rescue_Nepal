@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../core/widgets/discount_badge.dart';
 import '../../../../core/widgets/empty_state_view.dart';
 import '../../../../core/widgets/error_view.dart';
@@ -26,7 +28,9 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
   bool _isSearchMode = false;
   String _selectedCategory = 'All';
 
-  static const _categories = ['All', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other'];
+  static const _categories = [
+    'All', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
+  ];
 
   @override
   void initState() {
@@ -47,10 +51,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     }
   }
 
-  void _enterSearch() {
-    setState(() => _isSearchMode = true);
-    FocusScope.of(context).requestFocus(FocusNode());
-  }
+  void _enterSearch() => setState(() => _isSearchMode = true);
 
   void _exitSearch() {
     setState(() => _isSearchMode = false);
@@ -64,125 +65,112 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     final unreadCount = ref.watch(unreadCountProvider);
     final filter = ref.watch(listingsProvider.notifier).currentFilter;
 
+    if (_isSearchMode) {
+      return _SearchOverlay(
+        controller: _searchCtrl,
+        onBack: _exitSearch,
+        onCategoryTap: (cat) {
+          setState(() {
+            _selectedCategory = cat;
+            _isSearchMode = false;
+          });
+          ref.read(listingsProvider.notifier).filterByCategory(cat);
+        },
+      );
+    }
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
-      body: _isSearchMode
-          ? _SearchOverlay(
-              controller: _searchCtrl,
-              onBack: _exitSearch,
-              onCategoryTap: (cat) {
-                setState(() {
-                  _selectedCategory = cat;
-                  _isSearchMode = false;
-                });
-                ref.read(listingsProvider.notifier).filterByCategory(cat);
-              },
-            )
-          : RefreshIndicator(
-              color: AppColors.primaryMedium,
-              onRefresh: () => ref.read(listingsProvider.notifier).refresh(),
-              child: CustomScrollView(
-                controller: _scrollCtrl,
-                slivers: [
-                  // Header
-                  SliverToBoxAdapter(child: _buildHeader(context, unreadCount)),
-                  // Search bar
-                  SliverToBoxAdapter(
-                    child: _buildSearchBar(filter.hasActiveFilters, filter),
-                  ),
-                  // Category chips
-                  SliverToBoxAdapter(child: _buildCategoryChips()),
-                  // Featured section
-                  SliverToBoxAdapter(child: _buildFeaturedSection()),
-                  // Popular vendors section
-                  SliverToBoxAdapter(child: _buildPopularVendorsSection()),
-                  // Main feed header
-                  SliverToBoxAdapter(
+      backgroundColor: AppColors.backgroundLight,
+      body: RefreshIndicator(
+        color: AppColors.primaryMedium,
+        onRefresh: () => ref.read(listingsProvider.notifier).refresh(),
+        child: CustomScrollView(
+          controller: _scrollCtrl,
+          physics: const ClampingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(child: _buildHeader(context, unreadCount)),
+            SliverToBoxAdapter(child: _buildSearchBar(filter.hasActiveFilters, filter)),
+            SliverToBoxAdapter(child: _buildCategoryChips()),
+            SliverToBoxAdapter(child: _buildFeaturedSection()),
+            SliverToBoxAdapter(child: _buildPopularVendorsSection()),
+            SliverToBoxAdapter(child: _buildFeedHeader(filter)),
+            listingsAsync.when(
+              data: (listings) {
+                if (listings.isEmpty) {
+                  return const SliverFillRemaining(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 8, 8),
-                      child: Row(
-                        children: [
-                          Text('Nearby Offers 🌿', style: AppTextStyles.h4),
-                          const Spacer(),
-                          _SortButton(
-                            currentSort: filter.sortBy,
-                            onSortChanged: (s) {
-                              ref.read(listingsProvider.notifier).applyFilter(
-                                    filter.copyWith(sortBy: s),
-                                  );
-                            },
-                          ),
-                        ],
+                      padding: EdgeInsets.only(top: 40),
+                      child: EmptyStateView(
+                        icon: Icons.fastfood_outlined,
+                        title: 'No listings found',
+                        subtitle: 'Try adjusting filters or check back later.',
                       ),
                     ),
-                  ),
-                  // Main listings
-                  listingsAsync.when(
-                    data: (listings) {
-                      if (listings.isEmpty) {
-                        return const SliverFillRemaining(
-                          child: Padding(
-                            padding: EdgeInsets.only(top: 40),
-                            child: EmptyStateView(
-                              icon: Icons.fastfood_outlined,
-                              title: 'No listings found',
-                              subtitle: 'Try adjusting filters or check back later.',
+                  );
+                }
+                final hasMore = ref.read(listingsProvider.notifier).hasMore;
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      if (index == listings.length) {
+                        if (!hasMore) return const SizedBox(height: AppSizes.s4);
+                        return const Padding(
+                          padding: EdgeInsets.all(AppSizes.s4),
+                          child: Center(
+                            child: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primaryMedium,
+                              ),
                             ),
                           ),
                         );
                       }
-                      return SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                            if (index == listings.length) {
-                              return const Padding(
-                                padding: EdgeInsets.all(16),
-                                child: Center(
-                                  child: CircularProgressIndicator(
-                                      color: AppColors.primaryMedium),
-                                ),
-                              );
-                            }
-                            return ListingCard(
-                              listing: listings[index],
-                              onTap: () =>
-                                  context.push('/customer/listing/${listings[index].id}'),
-                            );
-                          },
-                          childCount: listings.length + 1,
-                        ),
+                      return ListingCard(
+                        listing: listings[index],
+                        onTap: () =>
+                            context.push('/customer/listing/${listings[index].id}'),
                       );
                     },
-                    loading: () => SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (_, __) => const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                          child: ShimmerCard(height: 100),
-                        ),
-                        childCount: 4,
-                      ),
-                    ),
-                    error: (e, _) => SliverFillRemaining(
-                      child: ErrorView(
-                        message: e.toString(),
-                        onRetry: () => ref.read(listingsProvider.notifier).refresh(),
-                      ),
-                    ),
+                    childCount: listings.length + 1,
                   ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 80)),
-                ],
+                );
+              },
+              loading: () => SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (_, __) => const Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppSizes.s4,
+                      vertical: AppSizes.s1,
+                    ),
+                    child: ShimmerCard(height: 104),
+                  ),
+                  childCount: 4,
+                ),
+              ),
+              error: (e, _) => SliverFillRemaining(
+                child: ErrorView(
+                  error: e,
+                  onRetry: () => ref.read(listingsProvider.notifier).refresh(),
+                ),
               ),
             ),
+            const SliverToBoxAdapter(child: SizedBox(height: 88)),
+          ],
+        ),
+      ),
     );
   }
 
   Widget _buildHeader(BuildContext context, int unreadCount) {
     return Container(
       padding: EdgeInsets.only(
-        top: MediaQuery.of(context).padding.top + 12,
-        left: 16,
-        right: 16,
-        bottom: 20,
+        top: MediaQuery.of(context).padding.top + AppSizes.s3,
+        left: AppSizes.s4,
+        right: AppSizes.s1,
+        bottom: AppSizes.s4,
       ),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -193,16 +181,28 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.location_on, color: Colors.white70, size: 18),
-          const SizedBox(width: 4),
+          const Icon(Icons.location_on_rounded, color: Colors.white70, size: 16),
+          const SizedBox(width: AppSizes.s1),
           Expanded(
-            child: Text('Kathmandu, Nepal',
-                style: AppTextStyles.bodyMedium.copyWith(color: Colors.white)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Delivering to',
+                  style: AppTextStyles.caption.copyWith(color: Colors.white60),
+                ),
+                Text('Kathmandu, Nepal', style: AppTextStyles.h5OnPrimary),
+              ],
+            ),
           ),
           Stack(
             children: [
               IconButton(
-                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                icon: const Icon(
+                  Icons.notifications_outlined,
+                  color: Colors.white,
+                  size: 24,
+                ),
                 onPressed: () => context.push('/notifications'),
               ),
               if (unreadCount > 0)
@@ -221,7 +221,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
                         unreadCount > 9 ? '9+' : '$unreadCount',
                         style: const TextStyle(
                           color: Colors.white,
-                          fontSize: 9,
+                          fontSize: 8,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
@@ -236,62 +236,60 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
   }
 
   Widget _buildSearchBar(bool hasFilters, ListingsFilter filter) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+    return Container(
+      color: AppColors.primaryMedium,
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.s4, 0, AppSizes.s4, AppSizes.s4,
+      ),
       child: Row(
         children: [
           Expanded(
             child: GestureDetector(
               onTap: _enterSearch,
               child: Container(
-                height: 48,
+                height: 46,
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(30),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  boxShadow: AppShadows.sm,
                 ),
                 child: Row(
                   children: [
-                    const SizedBox(width: 12),
-                    const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
-                    const SizedBox(width: 8),
-                    Text('Search food, vendors…', style: AppTextStyles.bodySmall),
+                    const SizedBox(width: AppSizes.s3),
+                    const Icon(
+                      Icons.search_rounded,
+                      color: AppColors.textSecondary,
+                      size: AppSizes.iconMd,
+                    ),
+                    const SizedBox(width: AppSizes.s2),
+                    Text(
+                      'Search food, vendors…',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.textTertiary,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 10),
-          // Filter button
+          const SizedBox(width: AppSizes.s2),
           GestureDetector(
             onTap: () => _showFilterSheet(filter),
             child: Container(
-              width: 48,
-              height: 48,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
-                color: hasFilters ? AppColors.primaryMedium : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
+                color: hasFilters ? Colors.white : Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
               ),
               child: Stack(
                 alignment: Alignment.center,
                 children: [
                   Icon(
-                    Icons.tune,
-                    color: hasFilters ? Colors.white : AppColors.textPrimary,
-                    size: 20,
+                    Icons.tune_rounded,
+                    color: hasFilters ? AppColors.primaryMedium : Colors.white,
+                    size: AppSizes.iconMd,
                   ),
                   if (hasFilters)
                     Positioned(
@@ -317,35 +315,48 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
 
   Widget _buildCategoryChips() {
     return SizedBox(
-      height: 52,
+      height: 48,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s3,
+          vertical: AppSizes.s2,
+        ),
         itemCount: _categories.length,
         itemBuilder: (_, i) {
           final cat = _categories[i];
           final isSelected = cat == _selectedCategory;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            child: FilterChip(
-              label: Text(cat),
-              selected: isSelected,
-              onSelected: (_) {
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: GestureDetector(
+              onTap: () {
                 setState(() => _selectedCategory = cat);
-                ref.read(listingsProvider.notifier).filterByCategory(cat == 'All' ? null : cat);
+                ref
+                    .read(listingsProvider.notifier)
+                    .filterByCategory(cat == 'All' ? null : cat);
               },
-              backgroundColor: Colors.white,
-              selectedColor: AppColors.primaryMedium,
-              labelStyle: AppTextStyles.bodySmall.copyWith(
-                color: isSelected ? Colors.white : AppColors.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.s3,
+                  vertical: AppSizes.s1,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected ? AppColors.primaryMedium : AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  border: Border.all(
+                    color: isSelected ? AppColors.primaryMedium : AppColors.border,
+                  ),
+                  boxShadow: isSelected ? AppShadows.xs : [],
+                ),
+                child: Text(
+                  cat,
+                  style: AppTextStyles.label.copyWith(
+                    color: isSelected ? Colors.white : AppColors.textSecondary,
+                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                  ),
+                ),
               ),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-              side: BorderSide(
-                color: isSelected ? AppColors.primaryMedium : const Color(0xFFDDDDDD),
-              ),
-              showCheckmark: false,
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             ),
           );
         },
@@ -362,46 +373,71 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.s4, AppSizes.s4, AppSizes.s4, AppSizes.s3,
+              ),
               child: Row(
                 children: [
-                  Text('🔥 Featured Deals', style: AppTextStyles.h4),
+                  Text('Featured Deals', style: AppTextStyles.h4),
+                  const SizedBox(width: AppSizes.s2),
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.errorSurface,
+                      borderRadius:
+                          BorderRadius.circular(AppSizes.radiusFull),
+                    ),
+                    child: Text(
+                      'HOT',
+                      style: AppTextStyles.overline
+                          .copyWith(color: AppColors.error),
+                    ),
+                  ),
                   const Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      ref.read(listingsProvider.notifier).applyFilter(
-                            const ListingsFilter(sortBy: 'discount'),
-                          );
-                    },
-                    child: const Text('See all'),
+                  GestureDetector(
+                    onTap: () => ref
+                        .read(listingsProvider.notifier)
+                        .applyFilter(const ListingsFilter(sortBy: 'discount')),
+                    child: Text(
+                      'See all',
+                      style: AppTextStyles.label.copyWith(
+                        color: AppColors.primaryMedium,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ],
               ),
             ),
             SizedBox(
-              height: 200,
+              height: Responsive.featuredCardWidth(context) * 0.68 + 72,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSizes.s3),
                 itemCount: listings.length,
                 itemBuilder: (_, i) => _FeaturedCard(
                   listing: listings[i],
-                  onTap: () => context.push('/customer/listing/${listings[i].id}'),
+                  onTap: () =>
+                      context.push('/customer/listing/${listings[i].id}'),
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSizes.s2),
           ],
         );
       },
       loading: () => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+        padding: const EdgeInsets.fromLTRB(
+          AppSizes.s4, AppSizes.s4, AppSizes.s4, 0,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('🔥 Featured Deals', style: AppTextStyles.h4),
-            const SizedBox(height: 10),
-            const ShimmerCard(height: 200),
+            Text('Featured Deals', style: AppTextStyles.h4),
+            const SizedBox(height: AppSizes.s3),
+            const ShimmerCard(height: 210),
           ],
         ),
       ),
@@ -423,24 +459,47 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-              child: Text('⭐ Popular Vendors', style: AppTextStyles.h4),
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.s4, AppSizes.s2, AppSizes.s4, AppSizes.s3,
+              ),
+              child: Text('Popular Vendors', style: AppTextStyles.h4),
             ),
             SizedBox(
-              height: 100,
+              height: Responsive.isTablet(context) ? 120 : 100,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: AppSizes.s3),
                 itemCount: featured.length,
                 itemBuilder: (_, i) => _VendorChip(vendor: featured[i]),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSizes.s2),
           ],
         );
       },
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildFeedHeader(ListingsFilter filter) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSizes.s4, AppSizes.s2, AppSizes.s2, AppSizes.s2,
+      ),
+      child: Row(
+        children: [
+          Text('Nearby Offers', style: AppTextStyles.h4),
+          const Spacer(),
+          _SortButton(
+            currentSort: filter.sortBy,
+            onSortChanged: (s) => ref
+                .read(listingsProvider.notifier)
+                .applyFilter(filter.copyWith(sortBy: s)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -473,21 +532,18 @@ class _FeaturedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cardW = Responsive.featuredCardWidth(context);
+    final imageH = (cardW * 0.68).roundToDouble();
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 160,
-        margin: const EdgeInsets.only(right: 12, bottom: 4),
+        width: cardW,
+        margin:
+            const EdgeInsets.only(right: AppSizes.s3, bottom: AppSizes.s1),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.07),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+          boxShadow: AppShadows.card,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -495,54 +551,48 @@ class _FeaturedCard extends StatelessWidget {
             Stack(
               children: [
                 ClipRRect(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppSizes.radiusCard),
+                  ),
                   child: listing.imageUrls.isNotEmpty
                       ? CachedNetworkImage(
                           imageUrl: listing.imageUrls.first,
-                          width: 160,
-                          height: 110,
+                          width: cardW,
+                          height: imageH,
                           fit: BoxFit.cover,
-                          errorWidget: (_, __, ___) => Container(
-                            width: 160,
-                            height: 110,
-                            color: AppColors.primarySurface,
-                            child: const Icon(Icons.fastfood, color: AppColors.primaryLight, size: 36),
-                          ),
+                          errorWidget: (_, __, ___) => _placeholder(cardW, imageH),
                         )
-                      : Container(
-                          width: 160,
-                          height: 110,
-                          color: AppColors.primarySurface,
-                          child: const Icon(Icons.fastfood, color: AppColors.primaryLight, size: 36),
-                        ),
+                      : _placeholder(cardW, imageH),
                 ),
                 Positioned(
-                  top: 8,
-                  left: 8,
+                  top: AppSizes.s2,
+                  left: AppSizes.s2,
                   child: DiscountBadge(percent: listing.discountPercent),
                 ),
               ],
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.s2, AppSizes.s2, AppSizes.s2, AppSizes.s3,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(listing.name,
-                      style: AppTextStyles.h6,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
+                  Text(
+                    listing.name,
+                    style: AppTextStyles.h6,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
                   Row(
                     children: [
                       Text(
                         Formatters.formatNPR(listing.discountedPrice),
-                        style: AppTextStyles.bodySmall.copyWith(
-                          color: AppColors.primaryMedium,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: AppTextStyles.h6
+                            .copyWith(color: AppColors.primaryMedium),
                       ),
-                      const SizedBox(width: 4),
+                      const SizedBox(width: AppSizes.s1),
                       Text(
                         Formatters.formatNPR(listing.originalPrice),
                         style: AppTextStyles.caption.copyWith(
@@ -551,11 +601,16 @@ class _FeaturedCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 3),
                   Text(
                     '${listing.availableQty} left',
                     style: AppTextStyles.caption.copyWith(
-                      color: listing.availableQty <= 3 ? AppColors.error : AppColors.textSecondary,
+                      color: listing.availableQty <= 3
+                          ? AppColors.error
+                          : AppColors.textSecondary,
+                      fontWeight: listing.availableQty <= 3
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
                 ],
@@ -566,6 +621,17 @@ class _FeaturedCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _placeholder([double? width, double? height]) => Container(
+        width: width ?? 168,
+        height: height ?? 114,
+        color: AppColors.primarySurface,
+        child: const Icon(
+          Icons.fastfood_rounded,
+          color: AppColors.primaryLight,
+          size: 36,
+        ),
+      );
 }
 
 // ─── Vendor Chip ───────────────────────────────────────────────────────────
@@ -576,23 +642,42 @@ class _VendorChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final avatarSize = Responsive.isTablet(context) ? 72.0 : 56.0;
+    final chipWidth = avatarSize + 20;
     return Container(
-      width: 80,
-      margin: const EdgeInsets.only(right: 12),
+      width: chipWidth,
+      margin: const EdgeInsets.only(right: AppSizes.s3),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: AppColors.primarySurface,
-            backgroundImage: vendor.logoUrl != null
-                ? CachedNetworkImageProvider(vendor.logoUrl!)
-                : null,
-            child: vendor.logoUrl == null
-                ? const Icon(Icons.store, color: AppColors.primaryLight, size: 24)
-                : null,
+          Container(
+            width: avatarSize,
+            height: avatarSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primarySurface,
+              border: Border.all(color: AppColors.border, width: 1.5),
+              boxShadow: AppShadows.xs,
+            ),
+            child: ClipOval(
+              child: vendor.logoUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: vendor.logoUrl!,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => const Icon(
+                        Icons.store_rounded,
+                        color: AppColors.primaryLight,
+                        size: 24,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.store_rounded,
+                      color: AppColors.primaryLight,
+                      size: 24,
+                    ),
+            ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSizes.s1),
           Text(
             vendor.businessName,
             style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w500),
@@ -600,12 +685,20 @@ class _VendorChip extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
           ),
+          const SizedBox(height: 2),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.star, size: 10, color: AppColors.accentAmber),
+              const Icon(
+                Icons.star_rounded,
+                size: 10,
+                color: AppColors.accentAmber,
+              ),
               const SizedBox(width: 2),
-              Text(vendor.avgRating.toStringAsFixed(1), style: AppTextStyles.caption),
+              Text(
+                vendor.avgRating.toStringAsFixed(1),
+                style: AppTextStyles.caption,
+              ),
             ],
           ),
         ],
@@ -636,36 +729,41 @@ class _SortButton extends StatelessWidget {
       onTap: () => showModalBottomSheet(
         context: context,
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusBottomSheet),
+          ),
         ),
         builder: (_) => Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+          padding: const EdgeInsets.fromLTRB(
+            AppSizes.s4, AppSizes.s4, AppSizes.s4, AppSizes.s8,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('Sort By', style: AppTextStyles.h4),
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSizes.s3),
               ..._sorts.entries.map(
                 (e) => InkWell(
                   onTap: () {
                     Navigator.pop(context);
                     onSortChanged(e.key);
                   },
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    padding: const EdgeInsets.symmetric(vertical: AppSizes.s3),
                     child: Row(
                       children: [
                         Icon(
                           currentSort == e.key
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_unchecked,
+                              ? Icons.radio_button_checked_rounded
+                              : Icons.radio_button_unchecked_rounded,
                           color: currentSort == e.key
                               ? AppColors.primaryMedium
-                              : AppColors.textSecondary,
+                              : AppColors.neutral300,
                           size: 20,
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: AppSizes.s3),
                         Text(e.value, style: AppTextStyles.bodyMedium),
                       ],
                     ),
@@ -677,17 +775,22 @@ class _SortButton extends StatelessWidget {
         ),
       ),
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding:
+            const EdgeInsets.symmetric(horizontal: AppSizes.s3, vertical: 6),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFDDDDDD)),
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+          border: Border.all(color: AppColors.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.sort, size: 14, color: AppColors.primaryMedium),
-            const SizedBox(width: 4),
+            const Icon(
+              Icons.swap_vert_rounded,
+              size: 14,
+              color: AppColors.primaryMedium,
+            ),
+            const SizedBox(width: AppSizes.s1),
             Text(
               _sorts[currentSort] ?? 'Sort',
               style: AppTextStyles.caption.copyWith(
@@ -728,8 +831,9 @@ class _FilterSheetState extends State<_FilterSheet> {
 
   static const _maxPriceValue = 5000.0;
   static const _maxDistanceValue = 50.0;
-
-  static const _categories = ['All', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other'];
+  static const _categories = [
+    'All', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
+  ];
 
   @override
   void initState() {
@@ -750,8 +854,10 @@ class _FilterSheetState extends State<_FilterSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppSizes.radiusBottomSheet),
+        ),
       ),
       child: DraggableScrollableSheet(
         initialChildSize: 0.85,
@@ -761,48 +867,52 @@ class _FilterSheetState extends State<_FilterSheet> {
         builder: (_, ctrl) => Column(
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.s4, AppSizes.s3, AppSizes.s4, 0,
+              ),
+              child: Column(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[300],
-                      borderRadius: BorderRadius.circular(2),
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: AppColors.neutral300,
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusFull),
+                      ),
                     ),
                   ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      widget.onReset();
-                    },
-                    child: const Text('Reset'),
+                  const SizedBox(height: AppSizes.s3),
+                  Row(
+                    children: [
+                      Text('Filters', style: AppTextStyles.h4),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          widget.onReset();
+                        },
+                        child: const Text('Reset all'),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Row(
-                children: [
-                  Text('Filters & Sort', style: AppTextStyles.h4),
-                ],
-              ),
-            ),
+            const Divider(height: 1),
             Expanded(
               child: SingleChildScrollView(
                 controller: ctrl,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                padding: const EdgeInsets.all(AppSizes.s4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Sort
-                    const _SectionLabel(label: 'Sort By'),
+                    Text('Sort By', style: AppTextStyles.h5),
+                    const SizedBox(height: AppSizes.s2),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: AppSizes.s2,
+                      runSpacing: AppSizes.s2,
                       children: {
                         'newest': 'Latest',
                         'discount': 'Best Discount',
@@ -810,53 +920,38 @@ class _FilterSheetState extends State<_FilterSheet> {
                         'price_desc': 'Highest Price',
                         'popular': 'Most Popular',
                         'nearest': 'Nearest First',
-                      }.entries.map((e) {
-                        final selected = _sortBy == e.key;
-                        return ChoiceChip(
-                          label: Text(e.value),
-                          selected: selected,
-                          onSelected: (_) => setState(() => _sortBy = e.key),
-                          selectedColor: AppColors.primaryMedium,
-                          labelStyle: TextStyle(
-                            color: selected ? Colors.white : AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                          showCheckmark: false,
-                        );
-                      }).toList(),
+                      }.entries.map((e) => _ChoiceChip(
+                            label: e.value,
+                            selected: _sortBy == e.key,
+                            onTap: () => setState(() => _sortBy = e.key),
+                          )).toList(),
                     ),
-                    const SizedBox(height: 20),
-                    // Category
-                    const _SectionLabel(label: 'Category'),
+                    const SizedBox(height: AppSizes.s5),
+                    Text('Category', style: AppTextStyles.h5),
+                    const SizedBox(height: AppSizes.s2),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _categories.map((c) {
-                        final selected = (_category ?? 'All') == c;
-                        return ChoiceChip(
-                          label: Text(c),
-                          selected: selected,
-                          onSelected: (_) => setState(() => _category = c),
-                          selectedColor: AppColors.primaryMedium,
-                          labelStyle: TextStyle(
-                            color: selected ? Colors.white : AppColors.textPrimary,
-                            fontWeight: FontWeight.w500,
-                            fontSize: 13,
-                          ),
-                          showCheckmark: false,
-                        );
-                      }).toList(),
+                      spacing: AppSizes.s2,
+                      runSpacing: AppSizes.s2,
+                      children: _categories
+                          .map((c) => _ChoiceChip(
+                                label: c,
+                                selected: (_category ?? 'All') == c,
+                                onTap: () => setState(() => _category = c),
+                              ))
+                          .toList(),
                     ),
-                    const SizedBox(height: 20),
-                    // Price range
+                    const SizedBox(height: AppSizes.s5),
                     Row(
                       children: [
-                        const _SectionLabel(label: 'Price Range (NPR)'),
+                        Text('Price Range (NPR)', style: AppTextStyles.h5),
                         const Spacer(),
                         Text(
-                          '${_priceRange.start.toInt()} – ${_priceRange.end >= _maxPriceValue ? 'Any' : _priceRange.end.toInt()}',
-                          style: AppTextStyles.caption.copyWith(color: AppColors.primaryMedium),
+                          '${_priceRange.start.toInt()} – '
+                          '${_priceRange.end >= _maxPriceValue ? 'Any' : _priceRange.end.toInt()}',
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.primaryMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -865,18 +960,21 @@ class _FilterSheetState extends State<_FilterSheet> {
                       min: 0,
                       max: _maxPriceValue,
                       divisions: 50,
-                      activeColor: AppColors.primaryMedium,
                       onChanged: (v) => setState(() => _priceRange = v),
                     ),
-                    const SizedBox(height: 16),
-                    // Max distance
+                    const SizedBox(height: AppSizes.s3),
                     Row(
                       children: [
-                        const _SectionLabel(label: 'Max Distance'),
+                        Text('Max Distance', style: AppTextStyles.h5),
                         const Spacer(),
                         Text(
-                          _maxDistance >= _maxDistanceValue ? 'Any' : '${_maxDistance.toInt()} km',
-                          style: AppTextStyles.caption.copyWith(color: AppColors.primaryMedium),
+                          _maxDistance >= _maxDistanceValue
+                              ? 'Any'
+                              : '${_maxDistance.toInt()} km',
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.primaryMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
@@ -885,81 +983,59 @@ class _FilterSheetState extends State<_FilterSheet> {
                       min: 1,
                       max: _maxDistanceValue,
                       divisions: 49,
-                      activeColor: AppColors.primaryMedium,
                       onChanged: (v) => setState(() => _maxDistance = v),
                     ),
-                    const SizedBox(height: 16),
-                    // Min rating
+                    const SizedBox(height: AppSizes.s3),
                     Row(
                       children: [
-                        const _SectionLabel(label: 'Vendor Rating'),
+                        Text('Vendor Rating', style: AppTextStyles.h5),
                         const Spacer(),
                         Text(
-                          _minRating == 0 ? 'Any' : '${_minRating.toStringAsFixed(1)}+',
-                          style: AppTextStyles.caption.copyWith(color: AppColors.primaryMedium),
+                          _minRating == 0
+                              ? 'Any'
+                              : '${_minRating.toStringAsFixed(1)}+',
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.primaryMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ],
                     ),
-                    Row(
-                      children: [0.0, 3.0, 3.5, 4.0, 4.5].map((r) {
-                        final selected = _minRating == r;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _minRating = r),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: selected ? AppColors.primaryMedium : Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: selected ? AppColors.primaryMedium : const Color(0xFFDDDDDD),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  if (r > 0)
-                                    Icon(Icons.star, size: 12,
-                                        color: selected ? Colors.white : AppColors.accentAmber),
-                                  if (r > 0) const SizedBox(width: 2),
-                                  Text(
-                                    r == 0 ? 'Any' : r.toStringAsFixed(1),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: selected ? Colors.white : AppColors.textPrimary,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      }).toList(),
+                    const SizedBox(height: AppSizes.s2),
+                    Wrap(
+                      spacing: AppSizes.s2,
+                      children: [0.0, 3.0, 3.5, 4.0, 4.5]
+                          .map((r) => _ChoiceChip(
+                                label: r == 0
+                                    ? 'Any'
+                                    : '⭐ ${r.toStringAsFixed(1)}+',
+                                selected: _minRating == r,
+                                onTap: () => setState(() => _minRating = r),
+                              ))
+                          .toList(),
                     ),
-                    const SizedBox(height: 16),
-                    // Availability
+                    const SizedBox(height: AppSizes.s5),
                     Row(
                       children: [
-                        const _SectionLabel(label: 'Availability'),
+                        Text('In-stock only', style: AppTextStyles.h5),
                         const Spacer(),
                         Switch(
                           value: _onlyAvailable,
-                          onChanged: (v) => setState(() => _onlyAvailable = v),
-                          activeThumbColor: AppColors.primaryMedium,
-                          activeTrackColor: AppColors.primaryLight,
+                          onChanged: (v) =>
+                              setState(() => _onlyAvailable = v),
                         ),
                       ],
                     ),
-                    Text('Only show in-stock listings', style: AppTextStyles.caption),
-                    const SizedBox(height: 24),
-                    // Apply button
+                    const SizedBox(height: AppSizes.s6),
                     SizedBox(
                       width: double.infinity,
+                      height: AppSizes.buttonHeight,
                       child: ElevatedButton(
                         onPressed: () {
                           Navigator.pop(context);
-                          final cat = (_category == null || _category == 'All') ? null : _category;
+                          final cat = (_category == null || _category == 'All')
+                              ? null
+                              : _category;
                           widget.onApply(ListingsFilter(
                             category: cat,
                             sortBy: _sortBy,
@@ -969,24 +1045,14 @@ class _FilterSheetState extends State<_FilterSheet> {
                             maxPrice: _priceRange.end < _maxPriceValue
                                 ? (_priceRange.end * 100).toInt()
                                 : null,
-                            maxDistance: _maxDistance < _maxDistanceValue ? _maxDistance : null,
+                            maxDistance: _maxDistance < _maxDistanceValue
+                                ? _maxDistance
+                                : null,
                             minRating: _minRating > 0 ? _minRating : null,
                             onlyAvailable: _onlyAvailable,
                           ));
                         },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primaryMedium,
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text(
-                          'Apply Filters',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        child: const Text('Apply Filters'),
                       ),
                     ),
                   ],
@@ -1000,17 +1066,40 @@ class _FilterSheetState extends State<_FilterSheet> {
   }
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
+class _ChoiceChip extends StatelessWidget {
+  const _ChoiceChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
   final String label;
+  final bool selected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        label,
-        style: AppTextStyles.h6.copyWith(color: AppColors.textSecondary),
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s3,
+          vertical: 6,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primaryMedium : AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+          border: Border.all(
+            color: selected ? AppColors.primaryMedium : AppColors.border,
+          ),
+        ),
+        child: Text(
+          label,
+          style: AppTextStyles.label.copyWith(
+            color: selected ? Colors.white : AppColors.textSecondary,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
       ),
     );
   }
@@ -1033,9 +1122,21 @@ class _SearchOverlay extends ConsumerStatefulWidget {
 }
 
 class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
-  String _tab = 'food'; // 'food' | 'vendors'
+  String _tab = 'food';
   List<VendorEntity> _vendorResults = [];
   bool _loading = false;
+
+  static const _cats = [
+    'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
+  ];
+  static const _catIcons = [
+    Icons.bakery_dining_rounded,
+    Icons.restaurant_rounded,
+    Icons.coffee_rounded,
+    Icons.shopping_basket_rounded,
+    Icons.cake_rounded,
+    Icons.fastfood_rounded,
+  ];
 
   @override
   void initState() {
@@ -1064,11 +1165,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
 
   Future<void> _doSearch(String q) async {
     setState(() => _loading = true);
-
-    // Food search via listingsProvider
     ref.read(listingsProvider.notifier).search(q);
-
-    // Vendor search from cached publicVendorsProvider data
     final allVendors = ref.read(publicVendorsProvider).value ?? [];
     final lower = q.toLowerCase();
     setState(() {
@@ -1083,16 +1180,6 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
     });
   }
 
-  static const _cats = ['Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other'];
-  static const _catIcons = [
-    Icons.bakery_dining,
-    Icons.restaurant,
-    Icons.coffee,
-    Icons.shopping_basket,
-    Icons.cake,
-    Icons.fastfood,
-  ];
-
   @override
   Widget build(BuildContext context) {
     final listingsAsync = ref.watch(listingsProvider);
@@ -1100,17 +1187,23 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
     final hasQuery = query.isNotEmpty;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surfaceLight,
       body: SafeArea(
         child: Column(
           children: [
-            // Search input row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 8, 16, 8),
+            Container(
+              padding: const EdgeInsets.fromLTRB(
+                AppSizes.s2, AppSizes.s2, AppSizes.s4, AppSizes.s2,
+              ),
+              decoration: const BoxDecoration(
+                color: AppColors.surfaceLight,
+                border: Border(bottom: BorderSide(color: AppColors.border)),
+              ),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    color: AppColors.textPrimary,
                     onPressed: widget.onBack,
                   ),
                   Expanded(
@@ -1122,19 +1215,44 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
                         hintText: 'Search food, vendors, categories…',
                         hintStyle: AppTextStyles.bodySmall,
                         border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
+                          borderRadius:
+                              BorderRadius.circular(AppSizes.radiusFull),
+                          borderSide:
+                              const BorderSide(color: AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppSizes.radiusFull),
+                          borderSide:
+                              const BorderSide(color: AppColors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius:
+                              BorderRadius.circular(AppSizes.radiusFull),
+                          borderSide: const BorderSide(
+                            color: AppColors.borderFocus,
+                            width: 1.5,
+                          ),
                         ),
                         filled: true,
-                        fillColor: AppColors.primarySurface,
-                        prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary, size: 20),
+                        fillColor: AppColors.neutral50,
+                        prefixIcon: const Icon(
+                          Icons.search_rounded,
+                          color: AppColors.textSecondary,
+                          size: 20,
+                        ),
                         suffixIcon: hasQuery
                             ? IconButton(
-                                icon: const Icon(Icons.close, size: 18),
+                                icon: const Icon(
+                                  Icons.close_rounded,
+                                  size: 18,
+                                ),
+                                color: AppColors.textSecondary,
                                 onPressed: () => widget.controller.clear(),
                               )
                             : null,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 10),
                         isDense: true,
                       ),
                     ),
@@ -1143,11 +1261,8 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
               ),
             ),
             if (hasQuery)
-              // Tab bar: Food / Vendors
               Container(
-                decoration: const BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE))),
-                ),
+                color: AppColors.surfaceLight,
                 child: Row(
                   children: [
                     _buildTab('food', 'Food', Icons.fastfood_outlined),
@@ -1174,7 +1289,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
       child: GestureDetector(
         onTap: () => setState(() => _tab = id),
         child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: AppSizes.s3),
           decoration: BoxDecoration(
             border: Border(
               bottom: BorderSide(
@@ -1186,13 +1301,22 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: selected ? AppColors.primaryMedium : AppColors.textSecondary),
-              const SizedBox(width: 4),
+              Icon(
+                icon,
+                size: 16,
+                color: selected
+                    ? AppColors.primaryMedium
+                    : AppColors.textSecondary,
+              ),
+              const SizedBox(width: AppSizes.s1),
               Text(
                 label,
-                style: AppTextStyles.bodySmall.copyWith(
-                  color: selected ? AppColors.primaryMedium : AppColors.textSecondary,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+                style: AppTextStyles.label.copyWith(
+                  color: selected
+                      ? AppColors.primaryMedium
+                      : AppColors.textSecondary,
+                  fontWeight:
+                      selected ? FontWeight.w700 : FontWeight.w500,
                 ),
               ),
             ],
@@ -1206,10 +1330,23 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
     return listingsAsync.when(
       data: (listings) {
         if (listings.isEmpty) {
-          return const Center(
+          return Center(
             child: Padding(
-              padding: EdgeInsets.all(32),
-              child: Text('No food listings found'),
+              padding: const EdgeInsets.all(AppSizes.s8),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.search_off_rounded,
+                    size: 48,
+                    color: AppColors.neutral300,
+                  ),
+                  const SizedBox(height: AppSizes.s3),
+                  Text('No results found', style: AppTextStyles.h5),
+                  const SizedBox(height: AppSizes.s1),
+                  Text('Try different keywords', style: AppTextStyles.bodySmall),
+                ],
+              ),
             ),
           );
         }
@@ -1227,23 +1364,42 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
       loading: () => ListView.builder(
         itemCount: 3,
         itemBuilder: (_, __) => const Padding(
-          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          padding: EdgeInsets.symmetric(
+            horizontal: AppSizes.s4,
+            vertical: AppSizes.s1,
+          ),
           child: ShimmerCard(height: 90),
         ),
       ),
-      error: (e, _) => Center(child: Text(e.toString())),
+      error: (e, _) => ErrorView(
+        error: e,
+        onRetry: () => ref.invalidate(listingsProvider),
+      ),
     );
   }
 
   Widget _buildVendorResults() {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.primaryMedium));
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryMedium),
+      );
     }
     if (_vendorResults.isEmpty) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(32),
-          child: Text('No vendors found'),
+          padding: const EdgeInsets.all(AppSizes.s8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.store_mall_directory_outlined,
+                size: 48,
+                color: AppColors.neutral300,
+              ),
+              const SizedBox(height: AppSizes.s3),
+              Text('No vendors found', style: AppTextStyles.h5),
+            ],
+          ),
         ),
       );
     }
@@ -1252,20 +1408,44 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
       itemBuilder: (_, i) {
         final v = _vendorResults[i];
         return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: AppColors.primarySurface,
-            backgroundImage:
-                v.logoUrl != null ? CachedNetworkImageProvider(v.logoUrl!) : null,
-            child: v.logoUrl == null
-                ? const Icon(Icons.store, color: AppColors.primaryLight)
-                : null,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.s4,
+            vertical: AppSizes.s1,
+          ),
+          leading: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.primarySurface,
+              border: Border.all(color: AppColors.border),
+            ),
+            child: ClipOval(
+              child: v.logoUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: v.logoUrl!,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => const Icon(
+                        Icons.store_rounded,
+                        color: AppColors.primaryLight,
+                      ),
+                    )
+                  : const Icon(
+                      Icons.store_rounded,
+                      color: AppColors.primaryLight,
+                    ),
+            ),
           ),
           title: Text(v.businessName, style: AppTextStyles.h6),
           subtitle: Text(v.businessType, style: AppTextStyles.caption),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.star, size: 13, color: AppColors.accentAmber),
+              const Icon(
+                Icons.star_rounded,
+                size: 13,
+                color: AppColors.accentAmber,
+              ),
               const SizedBox(width: 2),
               Text(v.avgRating.toStringAsFixed(1), style: AppTextStyles.caption),
             ],
@@ -1278,20 +1458,20 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
 
   Widget _buildSuggestionsGrid() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppSizes.s4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Browse Categories', style: AppTextStyles.h5),
-          const SizedBox(height: 12),
+          Text('Browse by Category', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s3),
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             itemCount: _cats.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: Responsive.gridColumns(context, mobile: 3, tablet: 5),
+              mainAxisSpacing: AppSizes.s3,
+              crossAxisSpacing: AppSizes.s3,
               childAspectRatio: 1.1,
             ),
             itemBuilder: (_, i) => GestureDetector(
@@ -1299,14 +1479,26 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
               child: Container(
                 decoration: BoxDecoration(
                   color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius:
+                      BorderRadius.circular(AppSizes.radiusLg),
+                  border: Border.all(color: AppColors.primarySurfaceDim),
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(_catIcons[i], color: AppColors.primaryMedium, size: 28),
-                    const SizedBox(height: 6),
-                    Text(_cats[i], style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600)),
+                    Icon(
+                      _catIcons[i],
+                      color: AppColors.primaryMedium,
+                      size: 28,
+                    ),
+                    const SizedBox(height: AppSizes.s1),
+                    Text(
+                      _cats[i],
+                      style: AppTextStyles.caption.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryMedium,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1318,7 +1510,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
   }
 }
 
-// ─── Listing Card (public, reused) ─────────────────────────────────────────
+// ─── Listing Card (public, reused across the app) ──────────────────────────
 
 class ListingCard extends StatelessWidget {
   const ListingCard({super.key, required this.listing, required this.onTap});
@@ -1328,152 +1520,160 @@ class ListingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isLowStock = listing.availableQty > 0 && listing.availableQty <= 3;
+    final isSoldOut = listing.availableQty == 0;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(
+        horizontal: AppSizes.s4,
+        vertical: AppSizes.s1,
+      ),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+        boxShadow: AppShadows.card,
       ),
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+        borderRadius: BorderRadius.circular(AppSizes.radiusCard),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(AppSizes.cardRadius),
+          borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+          splashColor: AppColors.primarySurface,
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(AppSizes.s3),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Stack(
                   children: [
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius:
+                          BorderRadius.circular(AppSizes.radiusMd),
                       child: listing.imageUrls.isNotEmpty
                           ? CachedNetworkImage(
                               imageUrl: listing.imageUrls.first,
-                              width: 80,
-                              height: 80,
+                              width: 88,
+                              height: 88,
                               fit: BoxFit.cover,
                               placeholder: (_, __) => Container(
+                                width: 88,
+                                height: 88,
                                 color: AppColors.primarySurface,
-                                width: 80,
-                                height: 80,
                               ),
-                              errorWidget: (_, __, ___) => Container(
-                                color: AppColors.primarySurface,
-                                width: 80,
-                                height: 80,
-                                child: const Icon(Icons.fastfood, color: AppColors.primaryLight),
-                              ),
+                              errorWidget: (_, __, ___) => _placeholder(),
                             )
-                          : Container(
-                              width: 80,
-                              height: 80,
-                              decoration: BoxDecoration(
-                                color: AppColors.primarySurface,
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Icon(Icons.fastfood, color: AppColors.primaryLight, size: 32),
-                            ),
+                          : _placeholder(),
                     ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: DiscountBadge(percent: listing.discountPercent),
-                    ),
+                    if (listing.discountPercent > 0)
+                      Positioned(
+                        top: AppSizes.s1,
+                        left: AppSizes.s1,
+                        child: DiscountBadge(
+                            percent: listing.discountPercent),
+                      ),
                   ],
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSizes.s3),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        listing.name,
-                        style: AppTextStyles.h5,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (listing.vendor != null)
-                        Text(listing.vendor!.businessName, style: AppTextStyles.bodySmall),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.star, size: 13, color: AppColors.accentAmber),
-                          const SizedBox(width: 2),
+                  child: SizedBox(
+                    height: 88,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          listing.name,
+                          style: AppTextStyles.h5,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (listing.vendor != null)
                           Text(
-                            listing.vendor?.avgRating.toStringAsFixed(1) ?? '0.0',
+                            listing.vendor!.businessName,
                             style: AppTextStyles.caption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 8),
-                          const Icon(Icons.location_on, size: 13, color: AppColors.textSecondary),
-                          const SizedBox(width: 2),
-                          Text(
-                            listing.distance != null
-                                ? '${listing.distance!.toStringAsFixed(1)} km'
-                                : 'Nearby',
-                            style: AppTextStyles.caption,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Text(
-                            Formatters.formatNPR(listing.originalPrice),
-                            style: AppTextStyles.caption.copyWith(
-                              decoration: TextDecoration.lineThrough,
-                              color: AppColors.textSecondary,
+                        const Spacer(),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 12,
+                              color: AppColors.accentAmber,
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            Formatters.formatNPR(listing.discountedPrice),
-                            style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          const Icon(Icons.access_time, size: 13, color: AppColors.textSecondary),
-                          const SizedBox(width: 2),
-                          Expanded(
-                            child: Text(
-                              Formatters.formatPickupTime(listing.pickupStart, listing.pickupEnd),
+                            const SizedBox(width: 2),
+                            Text(
+                              listing.vendor?.avgRating.toStringAsFixed(1) ??
+                                  '—',
                               style: AppTextStyles.caption,
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: listing.availableQty > 0
-                                  ? AppColors.primarySurface
-                                  : Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(10),
+                            const SizedBox(width: AppSizes.s2),
+                            const Icon(
+                              Icons.location_on_rounded,
+                              size: 12,
+                              color: AppColors.textTertiary,
                             ),
-                            child: Text(
-                              '${listing.availableQty} left',
-                              style: AppTextStyles.caption.copyWith(
-                                color: listing.availableQty > 0
-                                    ? AppColors.primaryMedium
-                                    : AppColors.error,
-                                fontWeight: FontWeight.w600,
+                            const SizedBox(width: 2),
+                            Text(
+                              listing.distance != null
+                                  ? '${listing.distance!.toStringAsFixed(1)} km'
+                                  : 'Nearby',
+                              style: AppTextStyles.caption,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              Formatters.formatNPR(listing.discountedPrice),
+                              style: AppTextStyles.h6.copyWith(
+                                color: AppColors.primaryMedium,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                    ],
+                            const SizedBox(width: AppSizes.s1),
+                            Text(
+                              Formatters.formatNPR(listing.originalPrice),
+                              style: AppTextStyles.caption.copyWith(
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: isSoldOut
+                                    ? AppColors.errorSurface
+                                    : isLowStock
+                                        ? AppColors.warningSurface
+                                        : AppColors.primarySurface,
+                                borderRadius: BorderRadius.circular(
+                                  AppSizes.radiusFull,
+                                ),
+                              ),
+                              child: Text(
+                                isSoldOut
+                                    ? 'Sold out'
+                                    : '${listing.availableQty} left',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: isSoldOut
+                                      ? AppColors.error
+                                      : isLowStock
+                                          ? AppColors.warning
+                                          : AppColors.primaryMedium,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -1483,5 +1683,15 @@ class ListingCard extends StatelessWidget {
       ),
     );
   }
-}
 
+  Widget _placeholder() => Container(
+        width: 88,
+        height: 88,
+        color: AppColors.primarySurface,
+        child: const Icon(
+          Icons.fastfood_rounded,
+          color: AppColors.primaryLight,
+          size: 32,
+        ),
+      );
+}

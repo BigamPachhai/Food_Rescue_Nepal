@@ -52,8 +52,12 @@ class _MapScreenState extends ConsumerState<MapScreen> {
             .toList();
         _loading = false;
       });
-    } catch (_) {
+    } catch (e) {
+      if (!mounted) return;
       setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load vendors: ${e.toString()}')),
+      );
     }
   }
 

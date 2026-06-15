@@ -7,6 +7,7 @@ import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/extensions.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../auth/domain/auth_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
@@ -19,13 +20,16 @@ class CustomerProfileScreen extends ConsumerWidget {
     final user = authState is AuthAuthenticated ? authState.user : null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       body: SingleChildScrollView(
         child: Column(
           children: [
             _buildHeader(context, ref, user),
             const SizedBox(height: 20),
-            Padding(
+            Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
+                child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSizes.lg),
               child: Column(
                 children: [
@@ -100,6 +104,8 @@ class CustomerProfileScreen extends ConsumerWidget {
                 ],
               ),
             ),
+                ),
+              ),
           ],
         ),
       ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:latlong2/latlong.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/extensions.dart';
 import '../../../../core/utils/validators.dart';
 import '../../../../core/widgets/app_button.dart';
@@ -12,6 +14,8 @@ import '../../../../core/widgets/app_text_field.dart';
 import '../../data/auth_models.dart';
 import '../../domain/auth_state.dart';
 import '../providers/auth_provider.dart';
+import '../../../../core/utils/responsive.dart';
+import '../../../../main.dart' show registerFcmToken;
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key, required this.role});
@@ -34,7 +38,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _businessType = 'Restaurant';
   LatLng _markerPosition = const LatLng(27.7172, 85.3240);
 
-  final _businessTypes = ['Restaurant', 'Cafe', 'Bakery', 'Grocery', 'Sweets', 'Other'];
+  static const _businessTypes = [
+    'Restaurant', 'Cafe', 'Bakery', 'Grocery', 'Sweets', 'Other',
+  ];
+
+  bool get isVendor => widget.role == 'VENDOR';
 
   @override
   void dispose() {
@@ -47,8 +55,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _addressCtrl.dispose();
     super.dispose();
   }
-
-  bool get isVendor => widget.role == 'VENDOR';
 
   Future<void> _register() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
@@ -65,7 +71,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       lng: isVendor ? _markerPosition.longitude : null,
     );
     await ref.read(authProvider.notifier).register(request);
-    // Router refreshListenable handles redirect
   }
 
   @override
@@ -76,67 +81,101 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     ref.listen<AuthState>(authProvider, (_, next) {
       if (next is AuthError) {
         context.showErrorSnackBar(next.message);
+      } else if (next is AuthAuthenticated) {
+        registerFcmToken(ref.read(dioClientProvider));
+        final user = next.user;
+        if (user.isAdmin) {
+          context.go('/admin/dashboard');
+        } else if (user.isVendor) {
+          context.go('/vendor/dashboard');
+        } else {
+          context.go('/customer/home');
+        }
       }
     });
 
     return Scaffold(
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: Text(isVendor ? 'Register Business' : 'Create Account'),
+        backgroundColor: AppColors.surfaceLight,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSizes.lg),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
+          child: SingleChildScrollView(
+        padding: const EdgeInsets.all(AppSizes.s4),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              const SizedBox(height: AppSizes.s2),
+              // Section: personal info
+              const _SectionLabel(
+                icon: Icons.person_outline_rounded,
+                label: 'Personal Information',
+              ),
+              const SizedBox(height: AppSizes.s3),
               AppTextField(
                 label: 'Full Name',
                 controller: _nameCtrl,
-                prefixIcon: Icons.person_outline,
+                prefixIcon: Icons.person_outline_rounded,
                 validator: (v) => Validators.required(v, fieldName: 'Name'),
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: AppSizes.lg),
+              const SizedBox(height: AppSizes.s3),
               AppTextField(
-                label: 'Email',
+                label: 'Email address',
+                hint: 'you@example.com',
                 controller: _emailCtrl,
                 keyboardType: TextInputType.emailAddress,
                 prefixIcon: Icons.email_outlined,
                 validator: Validators.email,
                 textInputAction: TextInputAction.next,
               ),
-              const SizedBox(height: AppSizes.lg),
+              const SizedBox(height: AppSizes.s3),
               AppTextField(
-                label: 'Password',
-                controller: _passwordCtrl,
-                isPassword: true,
-                prefixIcon: Icons.lock_outline,
-                validator: Validators.password,
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSizes.lg),
-              AppTextField(
-                label: 'Confirm Password',
-                controller: _confirmPasswordCtrl,
-                isPassword: true,
-                prefixIcon: Icons.lock_outline,
-                validator: (v) => Validators.confirmPassword(v, _passwordCtrl.text),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: AppSizes.lg),
-              AppTextField(
-                label: 'Phone (optional)',
+                label: 'Phone number (optional)',
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone_outlined,
                 validator: Validators.phone,
+                textInputAction: isVendor ? TextInputAction.next : TextInputAction.next,
+              ),
+              const SizedBox(height: AppSizes.s6),
+              // Section: security
+              const _SectionLabel(
+                icon: Icons.lock_outline_rounded,
+                label: 'Security',
+              ),
+              const SizedBox(height: AppSizes.s3),
+              AppTextField(
+                label: 'Password',
+                controller: _passwordCtrl,
+                isPassword: true,
+                prefixIcon: Icons.lock_outline_rounded,
+                validator: Validators.password,
+                helperText: 'Minimum 8 characters',
+                textInputAction: TextInputAction.next,
+              ),
+              const SizedBox(height: AppSizes.s3),
+              AppTextField(
+                label: 'Confirm Password',
+                controller: _confirmPasswordCtrl,
+                isPassword: true,
+                prefixIcon: Icons.lock_outline_rounded,
+                validator: (v) => Validators.confirmPassword(v, _passwordCtrl.text),
                 textInputAction: isVendor ? TextInputAction.next : TextInputAction.done,
               ),
               if (isVendor) ...[
-                const SizedBox(height: AppSizes.xxl),
-                Text('Business Info', style: AppTextStyles.h5.copyWith(color: AppColors.primaryMedium)),
-                const SizedBox(height: AppSizes.lg),
+                const SizedBox(height: AppSizes.s6),
+                // Section: business info
+                const _SectionLabel(
+                  icon: Icons.store_outlined,
+                  label: 'Business Information',
+                ),
+                const SizedBox(height: AppSizes.s3),
                 AppTextField(
                   label: 'Business Name',
                   controller: _businessNameCtrl,
@@ -144,25 +183,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: (v) => Validators.required(v, fieldName: 'Business name'),
                   textInputAction: TextInputAction.next,
                 ),
-                const SizedBox(height: AppSizes.lg),
+                const SizedBox(height: AppSizes.s3),
                 DropdownButtonFormField<String>(
                   initialValue: _businessType,
                   decoration: InputDecoration(
                     labelText: 'Business Type',
                     filled: true,
-                    fillColor: AppColors.primarySurface,
+                    fillColor: AppColors.neutral50,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
+                      borderRadius: BorderRadius.circular(AppSizes.radiusInput),
+                      borderSide: const BorderSide(color: AppColors.border),
                     ),
-                    prefixIcon: const Icon(Icons.category_outlined, color: AppColors.textSecondary),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusInput),
+                      borderSide: const BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusInput),
+                      borderSide: const BorderSide(
+                        color: AppColors.borderFocus,
+                        width: 1.5,
+                      ),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.category_outlined,
+                      color: AppColors.textSecondary,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 15,
+                    ),
                   ),
                   items: _businessTypes
                       .map((t) => DropdownMenuItem(value: t, child: Text(t)))
                       .toList(),
                   onChanged: (v) => setState(() => _businessType = v!),
                 ),
-                const SizedBox(height: AppSizes.lg),
+                const SizedBox(height: AppSizes.s3),
                 AppTextField(
                   label: 'Business Address',
                   controller: _addressCtrl,
@@ -170,61 +227,123 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: (v) => Validators.required(v, fieldName: 'Address'),
                   textInputAction: TextInputAction.done,
                 ),
-                const SizedBox(height: AppSizes.lg),
-                Text('Pin your location', style: AppTextStyles.bodySmall),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    height: 200,
-                    child: FlutterMap(
-                      options: MapOptions(
-                        initialCenter: _markerPosition,
-                        initialZoom: 13,
-                        onTap: (_, point) {
-                          setState(() => _markerPosition = point);
-                        },
-                      ),
-                      children: [
-                        TileLayer(
-                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                          userAgentPackageName: 'com.foodrescue.nepal',
+                const SizedBox(height: AppSizes.s4),
+                // Map picker
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Pin your location on the map', style: AppTextStyles.h5),
+                    const SizedBox(height: AppSizes.s1),
+                    Text(
+                      'Tap anywhere on the map to place a marker',
+                      style: AppTextStyles.caption,
+                    ),
+                    const SizedBox(height: AppSizes.s3),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                      child: Container(
+                        height: 220,
+                        decoration: BoxDecoration(
+                          border: Border.all(color: AppColors.border),
+                          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
                         ),
-                        MarkerLayer(
-                          markers: [
-                            Marker(
-                              point: _markerPosition,
-                              width: 40,
-                              height: 40,
-                              child: const Icon(
-                                Icons.location_pin,
-                                color: AppColors.primaryMedium,
-                                size: 40,
-                              ),
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: _markerPosition,
+                            initialZoom: 13,
+                            onTap: (_, point) {
+                              setState(() => _markerPosition = point);
+                            },
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.foodrescue.nepal',
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: _markerPosition,
+                                  width: 40,
+                                  height: 40,
+                                  child: const Icon(
+                                    Icons.location_pin,
+                                    color: AppColors.primaryMedium,
+                                    size: 40,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tap on map to move marker',
-                  style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                  ],
                 ),
               ],
-              const SizedBox(height: 32),
+              const SizedBox(height: AppSizes.s8),
               AppButton(
                 label: isVendor ? 'Register Business' : 'Create Account',
                 onPressed: isLoading ? null : _register,
                 isLoading: isLoading,
+                icon: isVendor ? Icons.store_rounded : Icons.person_add_rounded,
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSizes.s4),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text('Already have an account?', style: AppTextStyles.bodySmall),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2),
+                    ),
+                    child: Text(
+                      'Sign In',
+                      style: AppTextStyles.bodySmall.copyWith(
+                        color: AppColors.primaryMedium,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSizes.s4),
             ],
           ),
         ),
       ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 28,
+          height: 28,
+          decoration: const BoxDecoration(
+            color: AppColors.primarySurface,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, size: 14, color: AppColors.primaryMedium),
+        ),
+        const SizedBox(width: AppSizes.s2),
+        Text(
+          label,
+          style: AppTextStyles.h5.copyWith(color: AppColors.primaryMedium),
+        ),
+      ],
     );
   }
 }

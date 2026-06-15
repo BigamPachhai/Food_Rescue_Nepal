@@ -43,7 +43,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
     final vendorCount = vendorFavAsync.value?.length ?? 0;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7F5),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         title: const Text('Favorites'),
         bottom: TabBar(
@@ -101,7 +101,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
               ),
             ),
             error: (e, _) => ErrorView(
-              message: e.toString(),
+              error: e,
               onRetry: () => ref.read(favoritesProvider.notifier).fetch(),
             ),
           ),
@@ -149,7 +149,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
               ),
             ),
             error: (e, _) => ErrorView(
-              message: e.toString(),
+              error: e,
               onRetry: () =>
                   ref.read(vendorFavoritesProvider.notifier).fetch(),
             ),

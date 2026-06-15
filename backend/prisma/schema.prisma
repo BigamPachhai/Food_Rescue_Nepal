@@ -16,10 +16,12 @@ enum Role {
 
 enum OrderStatus {
   PENDING
-  CONFIRMED
+  ACCEPTED
   READY
-  PICKED_UP
+  COMPLETED
   CANCELLED
+  REJECTED
+  EXPIRED
 }
 
 enum ListingCategory {

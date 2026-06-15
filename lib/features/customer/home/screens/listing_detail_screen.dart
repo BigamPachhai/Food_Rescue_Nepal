@@ -5,14 +5,17 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/extensions.dart';
 import '../../../../core/utils/formatters.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/discount_badge.dart';
 import '../../../../core/widgets/error_view.dart';
+import '../../../../core/widgets/shimmer_card.dart';
 import '../../favorites/providers/favorites_provider.dart';
 import '../providers/listings_provider.dart';
 
@@ -21,7 +24,8 @@ class ListingDetailScreen extends ConsumerStatefulWidget {
   final String listingId;
 
   @override
-  ConsumerState<ListingDetailScreen> createState() => _ListingDetailScreenState();
+  ConsumerState<ListingDetailScreen> createState() =>
+      _ListingDetailScreenState();
 }
 
 class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
@@ -86,12 +90,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     return listingAsync.when(
       data: (listing) {
         final isFav = favorites.any((f) => f.id == listing.id);
-        final isUrgent = listing.availableQty > 0 && listing.availableQty <= 3;
+        final isUrgent =
+            listing.availableQty > 0 && listing.availableQty <= 3;
         final isSoldOut = listing.availableQty == 0;
-        final savings = (listing.originalPrice - listing.discountedPrice) * _quantity;
+        final savings =
+            (listing.originalPrice - listing.discountedPrice) * _quantity;
 
         return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor: AppColors.backgroundLight,
           body: Stack(
             children: [
               RefreshIndicator(
@@ -99,117 +105,91 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     ref.invalidate(listingDetailProvider(widget.listingId)),
                 child: CustomScrollView(
                   slivers: [
-                  // Hero image area
-                  SliverToBoxAdapter(child: _buildImageGallery(listing, isFav)),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Title + discount
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(listing.name, style: AppTextStyles.h3),
-                              ),
-                              const SizedBox(width: 8),
-                              DiscountBadge(percent: listing.discountPercent),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          // Category + status chips
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 6,
-                            children: [
-                              _InfoChip(
-                                icon: Icons.category_outlined,
-                                label: listing.category
-                                    .replaceAll('_', ' ')
-                                    .toLowerCase()
-                                    .split(' ')
-                                    .map((w) => w.isEmpty
-                                        ? w
-                                        : '${w[0].toUpperCase()}${w.substring(1)}')
-                                    .join(' '),
-                                color: AppColors.primaryMedium,
-                              ),
-                              if (isSoldOut)
-                                const _InfoChip(
-                                  icon: Icons.block,
-                                  label: 'Sold Out',
-                                  color: AppColors.error,
-                                  bgColor: Color(0xFFFFEBEE),
-                                )
-                              else if (isUrgent)
+                    SliverToBoxAdapter(
+                        child: _buildImageGallery(listing, isFav)),
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                            AppSizes.s4, AppSizes.s4, AppSizes.s4, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Text(listing.name,
+                                      style: AppTextStyles.h3),
+                                ),
+                                const SizedBox(width: AppSizes.s2),
+                                DiscountBadge(
+                                    percent: listing.discountPercent,
+                                    large: true),
+                              ],
+                            ),
+                            const SizedBox(height: AppSizes.s2),
+                            Wrap(
+                              spacing: AppSizes.s2,
+                              runSpacing: 6,
+                              children: [
                                 _InfoChip(
-                                  icon: Icons.local_fire_department,
-                                  label: 'Only ${listing.availableQty} left!',
-                                  color: Colors.orange.shade700,
-                                  bgColor: Colors.orange.shade50,
+                                  icon: Icons.category_rounded,
+                                  label: listing.category
+                                      .replaceAll('_', ' ')
+                                      .toLowerCase()
+                                      .split(' ')
+                                      .map((w) => w.isEmpty
+                                          ? w
+                                          : '${w[0].toUpperCase()}${w.substring(1)}')
+                                      .join(' '),
+                                  color: AppColors.primaryMedium,
+                                  bgColor: AppColors.primarySurface,
                                 ),
+                                if (isSoldOut)
+                                  const _InfoChip(
+                                    icon: Icons.block_rounded,
+                                    label: 'Sold Out',
+                                    color: AppColors.error,
+                                    bgColor: AppColors.errorSurface,
+                                  )
+                                else if (isUrgent)
+                                  _InfoChip(
+                                    icon: Icons.local_fire_department_rounded,
+                                    label:
+                                        'Only ${listing.availableQty} left!',
+                                    color: AppColors.accentAmber,
+                                    bgColor: AppColors.warningSurface,
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: AppSizes.s4),
+                            _buildPriceRow(listing),
+                            const Divider(height: AppSizes.s6),
+                            _buildStatsRow(listing),
+                            const Divider(height: AppSizes.s6),
+                            _buildPickupSection(listing),
+                            const Divider(height: AppSizes.s6),
+                            _buildVendorCard(listing),
+                            if (listing.description != null &&
+                                listing.description!.isNotEmpty) ...[
+                              const Divider(height: AppSizes.s6),
+                              _buildDescription(listing),
                             ],
-                          ),
-                          const SizedBox(height: 16),
-                          // Price row
-                          _buildPriceRow(listing),
-                          const Divider(height: 28),
-                          // Stock + distance row
-                          _buildStatsRow(listing),
-                          const Divider(height: 28),
-                          // Pickup window
-                          _buildPickupSection(listing),
-                          const Divider(height: 28),
-                          // Vendor card
-                          _buildVendorCard(listing),
-                          const Divider(height: 28),
-                          // Description
-                          if (listing.description != null &&
-                              listing.description!.isNotEmpty) ...[
-                            _buildDescription(listing),
-                            const Divider(height: 28),
+                            if (!isSoldOut) ...[
+                              const Divider(height: AppSizes.s6),
+                              _buildQuantitySection(listing),
+                              const SizedBox(height: AppSizes.s2),
+                              if (savings > 0)
+                                _SavingsBanner(savings: savings),
+                            ],
+                            const SizedBox(height: 110),
                           ],
-                          // Quantity stepper
-                          if (!isSoldOut) ...[
-                            _buildQuantitySection(listing),
-                            const SizedBox(height: 8),
-                            // Savings callout
-                            if (savings > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 10),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF1F8E9),
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                      color: AppColors.primaryLight.withValues(alpha: 0.4)),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Text('🌿', style: TextStyle(fontSize: 18)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'You save ${Formatters.formatNPR(savings)} and help reduce food waste!',
-                                        style: AppTextStyles.bodySmall.copyWith(
-                                            color: AppColors.primaryMedium),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                          ],
-                          const SizedBox(height: 110),
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
                 ),
               ),
-              // Bottom bar
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -220,32 +200,27 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
           ),
         );
       },
-      loading: () => const Scaffold(
-        body: Center(
-            child: CircularProgressIndicator(color: AppColors.primaryMedium)),
-      ),
+      loading: () => const Scaffold(body: ShimmerListingDetail()),
       error: (e, _) => Scaffold(
         appBar: AppBar(title: const Text('Listing')),
         body: ErrorView(
-          message: e.toString(),
-          onRetry: () => ref.invalidate(listingDetailProvider(widget.listingId)),
+          error: e,
+          onRetry: () =>
+              ref.invalidate(listingDetailProvider(widget.listingId)),
         ),
       ),
     );
   }
-
-  // ── Image gallery ──────────────────────────────────────────────────────────
 
   Widget _buildImageGallery(ListingEntity listing, bool isFav) {
     final images = listing.imageUrls;
     final hasImages = images.isNotEmpty;
 
     return SizedBox(
-      height: 300,
+      height: Responsive.galleryHeight(context),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Images
           if (hasImages && images.length > 1)
             PageView.builder(
               controller: _pageCtrl,
@@ -259,10 +234,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             Container(
               color: AppColors.primarySurface,
               child: const Center(
-                child: Icon(Icons.fastfood, size: 80, color: AppColors.primaryLight),
+                child: Icon(Icons.fastfood_rounded,
+                    size: 80, color: AppColors.primaryLight),
               ),
             ),
-          // Gradient overlay at top for buttons
           Positioned(
             top: 0,
             left: 0,
@@ -281,38 +256,37 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               ),
             ),
           ),
-          // Back button
           Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 8,
+            top: MediaQuery.of(context).padding.top + AppSizes.s2,
+            left: AppSizes.s2,
             child: _CircleIconButton(
-              icon: Icons.arrow_back,
+              icon: Icons.arrow_back_rounded,
               onTap: () => context.pop(),
             ),
           ),
-          // Action buttons (favorite + share)
           Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            right: 8,
+            top: MediaQuery.of(context).padding.top + AppSizes.s2,
+            right: AppSizes.s2,
             child: Row(
               children: [
                 _CircleIconButton(
-                  icon: isFav ? Icons.favorite : Icons.favorite_border,
-                  iconColor: isFav ? Colors.red : Colors.white,
+                  icon: isFav
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  iconColor: isFav ? Colors.red.shade400 : Colors.white,
                   onTap: () => _toggleFavorite(listing.id),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: AppSizes.s2),
                 _CircleIconButton(
-                  icon: Icons.share_outlined,
+                  icon: Icons.share_rounded,
                   onTap: () => _share(listing),
                 ),
               ],
             ),
           ),
-          // Page indicator dots
           if (images.length > 1)
             Positioned(
-              bottom: 12,
+              bottom: AppSizes.s3,
               left: 0,
               right: 0,
               child: Row(
@@ -326,22 +300,24 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     height: 8,
                     decoration: BoxDecoration(
                       color: i == _imageIndex ? Colors.white : Colors.white54,
-                      borderRadius: BorderRadius.circular(4),
+                      borderRadius:
+                          BorderRadius.circular(AppSizes.radiusFull),
                     ),
                   ),
                 ),
               ),
             ),
-          // Image counter badge
           if (images.length > 1)
             Positioned(
-              bottom: 12,
-              right: 12,
+              bottom: AppSizes.s3,
+              right: AppSizes.s3,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.s2, vertical: AppSizes.s1),
                 decoration: BoxDecoration(
                   color: Colors.black54,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius:
+                      BorderRadius.circular(AppSizes.radiusFull),
                 ),
                 child: Text(
                   '${_imageIndex + 1}/${images.length}',
@@ -354,8 +330,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  // ── Price row ─────────────────────────────────────────────────────────────
-
   Widget _buildPriceRow(ListingEntity listing) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
@@ -364,28 +338,29 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
           Formatters.formatNPR(listing.discountedPrice),
           style: AppTextStyles.h2.copyWith(color: AppColors.primaryMedium),
         ),
-        const SizedBox(width: 8),
+        const SizedBox(width: AppSizes.s2),
         Padding(
           padding: const EdgeInsets.only(bottom: 2),
           child: Text(
             Formatters.formatNPR(listing.originalPrice),
             style: AppTextStyles.bodyMedium.copyWith(
               decoration: TextDecoration.lineThrough,
-              color: AppColors.textSecondary,
+              color: AppColors.textTertiary,
             ),
           ),
         ),
         const Spacer(),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.s3, vertical: AppSizes.s1),
           decoration: BoxDecoration(
-            color: AppColors.accentAmber.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.warningSurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
           ),
           child: Text(
             'Save ${Formatters.formatNPR(listing.originalPrice - listing.discountedPrice)}',
             style: AppTextStyles.caption.copyWith(
-              color: Colors.orange.shade800,
+              color: AppColors.accentAmber,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -394,27 +369,27 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  // ── Stats row ──────────────────────────────────────────────────────────────
-
   Widget _buildStatsRow(ListingEntity listing) {
+    final qtyColor = listing.availableQty == 0
+        ? AppColors.error
+        : listing.availableQty <= 3
+            ? AppColors.accentAmber
+            : AppColors.primaryMedium;
+
     return Row(
       children: [
         Expanded(
           child: _StatTile(
-            icon: Icons.inventory_2_outlined,
+            icon: Icons.inventory_2_rounded,
             label: 'Available',
-            value: '${listing.availableQty} portions',
-            valueColor: listing.availableQty <= 3 && listing.availableQty > 0
-                ? Colors.orange.shade700
-                : listing.availableQty == 0
-                    ? AppColors.error
-                    : AppColors.primaryMedium,
+            value: '${listing.availableQty} left',
+            valueColor: qtyColor,
           ),
         ),
-        _verticalDivider(),
+        Container(width: 1, height: 44, color: AppColors.border),
         Expanded(
           child: _StatTile(
-            icon: Icons.star,
+            icon: Icons.star_rounded,
             label: 'Vendor Rating',
             value: listing.vendor != null
                 ? '${listing.vendor!.avgRating.toStringAsFixed(1)} / 5'
@@ -422,10 +397,10 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             valueColor: AppColors.accentAmber,
           ),
         ),
-        _verticalDivider(),
+        Container(width: 1, height: 44, color: AppColors.border),
         Expanded(
           child: _StatTile(
-            icon: Icons.location_on_outlined,
+            icon: Icons.location_on_rounded,
             label: 'Distance',
             value: listing.distance != null
                 ? '${listing.distance!.toStringAsFixed(1)} km'
@@ -437,77 +412,83 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  Widget _verticalDivider() {
-    return Container(width: 1, height: 44, color: const Color(0xFFEEEEEE));
-  }
-
-  // ── Pickup section ────────────────────────────────────────────────────────
-
   Widget _buildPickupSection(ListingEntity listing) {
     final now = DateTime.now();
     final pickupToday = listing.pickupStart.day == now.day &&
         listing.pickupStart.month == now.month &&
         listing.pickupStart.year == now.year;
-    final pickupTomorrow = listing.pickupStart.day == now.add(const Duration(days: 1)).day;
+    final pickupTomorrow = listing.pickupStart.day ==
+        now.add(const Duration(days: 1)).day;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Pickup Window', style: AppTextStyles.h5),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.access_time, color: AppColors.primaryMedium),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    Formatters.formatPickupTime(listing.pickupStart, listing.pickupEnd),
-                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                  Text(
-                    pickupToday
-                        ? 'Today'
-                        : pickupTomorrow
-                            ? 'Tomorrow'
-                            : Formatters.formatDate(listing.pickupStart),
-                    style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-            if (pickupToday)
+        Text('Pickup Window', style: AppTextStyles.h4),
+        const SizedBox(height: AppSizes.s3),
+        Container(
+          padding: const EdgeInsets.all(AppSizes.s3),
+          decoration: BoxDecoration(
+            color: AppColors.primarySurface,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(
+                color: AppColors.primaryMedium.withValues(alpha: 0.15)),
+          ),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(20),
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
                 ),
-                child: Text(
-                  'Today',
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.primaryMedium,
-                    fontWeight: FontWeight.w700,
-                  ),
+                child: const Icon(Icons.schedule_rounded,
+                    color: AppColors.primaryMedium, size: AppSizes.iconMd),
+              ),
+              const SizedBox(width: AppSizes.s3),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      Formatters.formatPickupTime(
+                          listing.pickupStart, listing.pickupEnd),
+                      style: AppTextStyles.h6,
+                    ),
+                    Text(
+                      pickupToday
+                          ? 'Today'
+                          : pickupTomorrow
+                              ? 'Tomorrow'
+                              : Formatters.formatDate(listing.pickupStart),
+                      style: AppTextStyles.caption,
+                    ),
+                  ],
                 ),
               ),
-          ],
+              if (pickupToday)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSizes.s2, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryMedium,
+                    borderRadius:
+                        BorderRadius.circular(AppSizes.radiusFull),
+                  ),
+                  child: Text(
+                    'Today',
+                    style: AppTextStyles.caption.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ],
     );
   }
-
-  // ── Vendor card ───────────────────────────────────────────────────────────
 
   Widget _buildVendorCard(ListingEntity listing) {
     final vendor = listing.vendor;
@@ -516,14 +497,15 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Vendor', style: AppTextStyles.h5),
-        const SizedBox(height: 10),
+        Text('Vendor', style: AppTextStyles.h4),
+        const SizedBox(height: AppSizes.s3),
         Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(AppSizes.s3),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FBF8),
-            borderRadius: BorderRadius.circular(AppSizes.cardRadius),
-            border: Border.all(color: const Color(0xFFE0E8E0)),
+            color: AppColors.surfaceLight,
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(color: AppColors.border),
+            boxShadow: AppShadows.xs,
           ),
           child: Column(
             children: [
@@ -536,10 +518,11 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                         ? CachedNetworkImageProvider(vendor.logoUrl!)
                         : null,
                     child: vendor.logoUrl == null
-                        ? const Icon(Icons.store, size: 22, color: AppColors.primaryLight)
+                        ? const Icon(Icons.store_rounded,
+                            size: 22, color: AppColors.primaryLight)
                         : null,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: AppSizes.s3),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -547,18 +530,19 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                         Text(vendor.businessName, style: AppTextStyles.h5),
                         Text(
                           vendor.businessType.replaceAll('_', ' '),
-                          style: AppTextStyles.caption.copyWith(
-                              color: AppColors.textSecondary),
+                          style: AppTextStyles.caption,
                         ),
                       ],
                     ),
                   ),
-                  // Rating badge
                   Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 16, color: AppColors.accentAmber),
+                          const Icon(Icons.star_rounded,
+                              size: AppSizes.iconSm,
+                              color: AppColors.accentAmber),
                           const SizedBox(width: 3),
                           Text(
                             vendor.avgRating.toStringAsFixed(1),
@@ -568,30 +552,36 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                       ),
                       Text(
                         '${vendor.totalReviews} reviews',
-                        style: AppTextStyles.caption.copyWith(
-                            color: AppColors.textSecondary),
+                        style: AppTextStyles.caption,
                       ),
                     ],
                   ),
                 ],
               ),
               if (vendor.address != null && vendor.address!.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSizes.s3),
                 const Divider(height: 1),
-                const SizedBox(height: 10),
+                const SizedBox(height: AppSizes.s3),
                 Row(
                   children: [
-                    const Icon(Icons.location_on, size: 16, color: AppColors.primaryMedium),
-                    const SizedBox(width: 6),
+                    const Icon(Icons.location_on_rounded,
+                        size: AppSizes.iconSm,
+                        color: AppColors.primaryMedium),
+                    const SizedBox(width: AppSizes.s2),
                     Expanded(
-                      child: Text(vendor.address!, style: AppTextStyles.bodySmall),
+                      child: Text(vendor.address!,
+                          style: AppTextStyles.bodySmall),
                     ),
-                    if (listing.distance != null)
+                    if (listing.distance != null) ...[
+                      const SizedBox(width: AppSizes.s2),
                       Text(
-                        '${listing.distance!.toStringAsFixed(1)} km away',
-                        style: AppTextStyles.caption
-                            .copyWith(color: AppColors.primaryMedium, fontWeight: FontWeight.w600),
+                        '${listing.distance!.toStringAsFixed(1)} km',
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.primaryMedium,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                    ],
                   ],
                 ),
               ],
@@ -602,14 +592,12 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  // ── Description ───────────────────────────────────────────────────────────
-
   Widget _buildDescription(ListingEntity listing) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('About this listing', style: AppTextStyles.h5),
-        const SizedBox(height: 8),
+        Text('About this listing', style: AppTextStyles.h4),
+        const SizedBox(height: AppSizes.s2),
         AnimatedCrossFade(
           firstChild: Text(
             listing.description!,
@@ -617,27 +605,28 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
-          secondChild: Text(listing.description!, style: AppTextStyles.bodySmall),
-          crossFadeState:
-              _descExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          secondChild:
+              Text(listing.description!, style: AppTextStyles.bodySmall),
+          crossFadeState: _descExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
           duration: const Duration(milliseconds: 200),
         ),
         if (listing.description!.length > 120)
           GestureDetector(
             onTap: () => setState(() => _descExpanded = !_descExpanded),
             child: Padding(
-              padding: const EdgeInsets.only(top: 4),
+              padding: const EdgeInsets.only(top: AppSizes.s1),
               child: Text(
                 _descExpanded ? 'Show less ↑' : 'Read more ↓',
-                style: AppTextStyles.bodySmall.copyWith(color: AppColors.primaryMedium),
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.primaryMedium),
               ),
             ),
           ),
       ],
     );
   }
-
-  // ── Quantity stepper ──────────────────────────────────────────────────────
 
   Widget _buildQuantitySection(ListingEntity listing) {
     final total = listing.discountedPrice * _quantity;
@@ -646,7 +635,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       children: [
         Row(
           children: [
-            Text('Quantity', style: AppTextStyles.h5),
+            Text('Quantity', style: AppTextStyles.h4),
             const Spacer(),
             _QuantityStepper(
               value: _quantity,
@@ -655,20 +644,21 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: AppSizes.s2),
         Row(
           children: [
             Text('Total:', style: AppTextStyles.bodyMedium),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSizes.s2),
             Text(
               Formatters.formatNPR(total),
-              style: AppTextStyles.h4.copyWith(color: AppColors.primaryMedium),
+              style:
+                  AppTextStyles.h4.copyWith(color: AppColors.primaryMedium),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: AppSizes.s2),
             Text(
               Formatters.formatNPR(listing.originalPrice * _quantity),
-              style: AppTextStyles.caption.copyWith(
-                  decoration: TextDecoration.lineThrough, color: AppColors.textSecondary),
+              style: AppTextStyles.caption
+                  .copyWith(decoration: TextDecoration.lineThrough),
             ),
           ],
         ),
@@ -676,60 +666,59 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  // ── Bottom bar ────────────────────────────────────────────────────────────
-
   Widget _buildBottomBar(ListingEntity listing, bool isSoldOut) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, -4),
-          ),
-        ],
+        color: AppColors.surfaceLight,
+        boxShadow: AppShadows.bottomBar,
       ),
       padding: EdgeInsets.fromLTRB(
-          16, 12, 16, MediaQuery.of(context).padding.bottom + 12),
+          AppSizes.s4,
+          AppSizes.s3,
+          AppSizes.s4,
+          MediaQuery.of(context).padding.bottom + AppSizes.s3),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (isSoldOut)
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.block),
-                label: const Text('Sold Out'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.error),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
-                ),
+            OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.block_rounded),
+              label: const Text('Sold Out'),
+              style: OutlinedButton.styleFrom(
+                minimumSize:
+                    const Size(double.infinity, AppSizes.buttonHeight),
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error),
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppSizes.radiusButton)),
               ),
             )
           else
             AppButton(
-              label: 'Reserve Now — ${Formatters.formatNPR(listing.discountedPrice * _quantity)}',
+              label:
+                  'Reserve Now — ${Formatters.formatNPR(listing.discountedPrice * _quantity)}',
               onPressed: !_isReserving ? () => _reserve(listing) : null,
               isLoading: _isReserving,
             ),
-          const SizedBox(height: 6),
+          const SizedBox(height: AppSizes.s2),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.payments_outlined, size: 14, color: AppColors.textSecondary),
-              SizedBox(width: 4),
+              Icon(Icons.payments_outlined,
+                  size: AppSizes.iconXs, color: AppColors.textSecondary),
+              SizedBox(width: AppSizes.s1),
               Text('Cash on Pickup',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              SizedBox(width: 16),
-              Icon(Icons.verified_outlined, size: 14, color: AppColors.textSecondary),
-              SizedBox(width: 4),
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              SizedBox(width: AppSizes.s4),
+              Icon(Icons.verified_outlined,
+                  size: AppSizes.iconXs, color: AppColors.textSecondary),
+              SizedBox(width: AppSizes.s1),
               Text('Free cancellation',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  style:
+                      TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ],
           ),
         ],
@@ -739,6 +728,39 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 }
 
 // ─── Sub-widgets ───────────────────────────────────────────────────────────
+
+class _SavingsBanner extends StatelessWidget {
+  const _SavingsBanner({required this.savings});
+  final int savings;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s3, vertical: AppSizes.s2),
+      decoration: BoxDecoration(
+        color: AppColors.successSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border:
+            Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.eco_rounded,
+              color: AppColors.success, size: AppSizes.iconMd),
+          const SizedBox(width: AppSizes.s2),
+          Expanded(
+            child: Text(
+              'You save ${Formatters.formatNPR(savings)} and help reduce food waste!',
+              style: AppTextStyles.bodySmall
+                  .copyWith(color: AppColors.success),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _NetworkImage extends StatelessWidget {
   const _NetworkImage({required this.url});
@@ -751,11 +773,14 @@ class _NetworkImage extends StatelessWidget {
       fit: BoxFit.cover,
       width: double.infinity,
       height: double.infinity,
+      memCacheWidth: 800,
+      memCacheHeight: 600,
       placeholder: (_, __) => Container(color: AppColors.primarySurface),
       errorWidget: (_, __, ___) => Container(
         color: AppColors.primarySurface,
         child: const Center(
-          child: Icon(Icons.fastfood, size: 64, color: AppColors.primaryLight),
+          child: Icon(Icons.fastfood_rounded,
+              size: 64, color: AppColors.primaryLight),
         ),
       ),
     );
@@ -783,7 +808,7 @@ class _CircleIconButton extends StatelessWidget {
           color: Colors.black45,
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: iconColor, size: 20),
+        child: Icon(icon, color: iconColor, size: AppSizes.iconMd),
       ),
     );
   }
@@ -794,27 +819,29 @@ class _InfoChip extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.color,
-    this.bgColor,
+    required this.bgColor,
   });
   final IconData icon;
   final String label;
   final Color color;
-  final Color? bgColor;
+  final Color bgColor;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSizes.s2, vertical: 5),
       decoration: BoxDecoration(
-        color: bgColor ?? AppColors.primarySurface,
-        borderRadius: BorderRadius.circular(20),
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: AppTextStyles.caption.copyWith(color: color)),
+          Icon(icon, size: AppSizes.iconXs, color: color),
+          const SizedBox(width: AppSizes.s1),
+          Text(label,
+              style: AppTextStyles.caption.copyWith(color: color)),
         ],
       ),
     );
@@ -837,14 +864,18 @@ class _StatTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        Icon(icon, color: valueColor, size: 22),
-        const SizedBox(height: 4),
-        Text(value,
-            style: AppTextStyles.h6.copyWith(color: valueColor),
-            textAlign: TextAlign.center),
-        Text(label,
-            style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
-            textAlign: TextAlign.center),
+        Icon(icon, color: valueColor, size: AppSizes.iconLg),
+        const SizedBox(height: AppSizes.s1),
+        Text(
+          value,
+          style: AppTextStyles.h6.copyWith(color: valueColor),
+          textAlign: TextAlign.center,
+        ),
+        Text(
+          label,
+          style: AppTextStyles.caption,
+          textAlign: TextAlign.center,
+        ),
       ],
     );
   }
@@ -862,16 +893,17 @@ class _QuantityStepper extends StatelessWidget {
     return Row(
       children: [
         _StepBtn(
-          icon: Icons.remove,
+          icon: Icons.remove_rounded,
           enabled: value > 1,
           onTap: () => onChanged(value - 1),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding:
+              const EdgeInsets.symmetric(horizontal: AppSizes.s4),
           child: Text('$value', style: AppTextStyles.h4),
         ),
         _StepBtn(
-          icon: Icons.add,
+          icon: Icons.add_rounded,
           enabled: value < max,
           onTap: () => onChanged(value + 1),
         ),
@@ -881,7 +913,8 @@ class _QuantityStepper extends StatelessWidget {
 }
 
 class _StepBtn extends StatelessWidget {
-  const _StepBtn({required this.icon, required this.enabled, required this.onTap});
+  const _StepBtn(
+      {required this.icon, required this.enabled, required this.onTap});
   final IconData icon;
   final bool enabled;
   final VoidCallback onTap;
@@ -891,23 +924,24 @@ class _StepBtn extends StatelessWidget {
     return GestureDetector(
       onTap: enabled ? onTap : null,
       child: Container(
-        width: 34,
-        height: 34,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
-          color: enabled ? AppColors.primarySurface : const Color(0xFFF0F0F0),
-          borderRadius: BorderRadius.circular(10),
+          color: enabled ? AppColors.primarySurface : AppColors.neutral100,
+          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
         ),
         child: Icon(
           icon,
-          size: 18,
-          color: enabled ? AppColors.primaryMedium : AppColors.textSecondary,
+          size: AppSizes.iconMd,
+          color:
+              enabled ? AppColors.primaryMedium : AppColors.textTertiary,
         ),
       ),
     );
   }
 }
 
-// ─── Reserve confirmation sheet ────────────────────────────────────────────
+// ─── Reserve confirmation sheet ─────────────────────────────────────────────
 
 class _ReserveSheet extends StatelessWidget {
   const _ReserveSheet({required this.listing, required this.quantity});
@@ -917,15 +951,20 @@ class _ReserveSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final total = listing.discountedPrice * quantity;
-    final savings = (listing.originalPrice - listing.discountedPrice) * quantity;
+    final savings =
+        (listing.originalPrice - listing.discountedPrice) * quantity;
 
     return Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.vertical(
+            top: Radius.circular(AppSizes.radiusBottomSheet)),
       ),
       padding: EdgeInsets.fromLTRB(
-          24, 24, 24, MediaQuery.of(context).padding.bottom + 24),
+          AppSizes.s5,
+          AppSizes.s4,
+          AppSizes.s5,
+          MediaQuery.of(context).padding.bottom + AppSizes.s5),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,74 +974,93 @@ class _ReserveSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                  color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+                color: AppColors.neutral200,
+                borderRadius:
+                    BorderRadius.circular(AppSizes.radiusFull),
+              ),
             ),
           ),
-          const SizedBox(height: 16),
-          Text('Confirm Reservation', style: AppTextStyles.h4),
-          const SizedBox(height: 16),
-          _Row(icon: Icons.fastfood_outlined, text: listing.name),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSizes.s4),
+          Text('Confirm Reservation', style: AppTextStyles.h3),
+          const SizedBox(height: AppSizes.s4),
+          _SheetRow(icon: Icons.fastfood_rounded, text: listing.name),
+          const SizedBox(height: AppSizes.s2),
           if (listing.vendor != null)
-            _Row(icon: Icons.store_outlined, text: listing.vendor!.businessName),
-          const SizedBox(height: 8),
-          _Row(icon: Icons.shopping_bag_outlined, text: '$quantity portion${quantity > 1 ? 's' : ''}'),
-          const SizedBox(height: 8),
-          _Row(
-            icon: Icons.access_time,
-            text: Formatters.formatPickupTime(listing.pickupStart, listing.pickupEnd),
+            _SheetRow(
+                icon: Icons.store_rounded,
+                text: listing.vendor!.businessName),
+          const SizedBox(height: AppSizes.s2),
+          _SheetRow(
+            icon: Icons.shopping_bag_rounded,
+            text: '$quantity portion${quantity > 1 ? 's' : ''}',
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSizes.s2),
+          _SheetRow(
+            icon: Icons.schedule_rounded,
+            text: Formatters.formatPickupTime(
+                listing.pickupStart, listing.pickupEnd),
+          ),
+          const SizedBox(height: AppSizes.s3),
           const Divider(),
-          const SizedBox(height: 12),
+          const SizedBox(height: AppSizes.s3),
           Row(
             children: [
-              const Icon(Icons.payments_outlined, color: AppColors.primaryMedium, size: 20),
-              const SizedBox(width: 8),
+              const Icon(Icons.payments_rounded,
+                  color: AppColors.primaryMedium, size: AppSizes.iconMd),
+              const SizedBox(width: AppSizes.s2),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(Formatters.formatNPR(total),
-                      style: AppTextStyles.h4.copyWith(color: AppColors.primaryMedium)),
+                  Text(
+                    Formatters.formatNPR(total),
+                    style: AppTextStyles.h4
+                        .copyWith(color: AppColors.primaryMedium),
+                  ),
                   if (savings > 0)
-                    Text('You save ${Formatters.formatNPR(savings)}',
-                        style: AppTextStyles.caption
-                            .copyWith(color: Colors.green.shade700)),
+                    Text(
+                      'You save ${Formatters.formatNPR(savings)}',
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.success),
+                    ),
                 ],
               ),
               const Spacer(),
-              const Text('Cash on Pickup',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              Text('Cash on Pickup', style: AppTextStyles.caption),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: AppSizes.s5),
           Row(
             children: [
               Expanded(
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context, false),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    minimumSize: const Size(
+                        double.infinity, AppSizes.buttonHeight),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusButton)),
+                    side: const BorderSide(color: AppColors.border),
                   ),
                   child: const Text('Cancel'),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: AppSizes.s3),
               Expanded(
                 flex: 2,
                 child: ElevatedButton(
                   onPressed: () => Navigator.pop(context, true),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryMedium,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    minimumSize: const Size(
+                        double.infinity, AppSizes.buttonHeight),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusButton)),
                   ),
-                  child: const Text('Confirm & Reserve',
-                      style: TextStyle(fontWeight: FontWeight.w600)),
+                  child: const Text(
+                    'Confirm & Reserve',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             ],
@@ -1013,8 +1071,8 @@ class _ReserveSheet extends StatelessWidget {
   }
 }
 
-class _Row extends StatelessWidget {
-  const _Row({required this.icon, required this.text});
+class _SheetRow extends StatelessWidget {
+  const _SheetRow({required this.icon, required this.text});
   final IconData icon;
   final String text;
 
@@ -1022,8 +1080,8 @@ class _Row extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: AppColors.primaryMedium),
-        const SizedBox(width: 8),
+        Icon(icon, size: AppSizes.iconMd, color: AppColors.primaryMedium),
+        const SizedBox(width: AppSizes.s2),
         Expanded(child: Text(text, style: AppTextStyles.bodyMedium)),
       ],
     );

@@ -22,8 +22,11 @@ class AuthRemoteDataSource {
     return AuthResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<void> logout() async {
-    await _dio.post(ApiEndpoints.logout);
+  Future<void> logout({String? refreshToken}) async {
+    await _dio.post(
+      ApiEndpoints.logout,
+      data: refreshToken != null ? {'refreshToken': refreshToken} : null,
+    );
   }
 
   Future<UserModel> getMe() async {
