@@ -60,3 +60,4 @@ build/
 *.freezed.dart
 .claude/worktrees/agent-a8359bbc52c7350ea
 .claude/worktrees/agent-a8359bbc52c7350ea
+dart_defines.env

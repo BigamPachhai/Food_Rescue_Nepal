@@ -43,11 +43,14 @@ void _onLocalNotificationTap(NotificationResponse response) {
   } catch (_) {}
 }
 
+bool _firebaseInitialized = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   try {
     await Firebase.initializeApp();
+    _firebaseInitialized = true;
     final messaging = FirebaseMessaging.instance;
     await messaging.requestPermission(alert: true, badge: true, sound: true);
 
@@ -126,6 +129,7 @@ class _FoodRescueAppState extends ConsumerState<FoodRescueApp> {
     super.initState();
 
     // Handle notification tap from terminated state (cold start).
+    if (!_firebaseInitialized) return;
     FirebaseMessaging.instance.getInitialMessage().then((message) {
       if (message != null) {
         // Wait until the first frame so the router is fully initialised.
