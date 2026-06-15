@@ -1,4 +1,4 @@
-package com.example.food_rescue_nepal
+package com.foodrescuenepal.app
 
 import io.flutter.embedding.android.FlutterActivity
 
