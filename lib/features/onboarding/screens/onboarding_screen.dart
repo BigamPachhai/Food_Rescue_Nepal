@@ -103,6 +103,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 ElevatedButton(
                   onPressed: _next,
                   style: ElevatedButton.styleFrom(
+                    minimumSize: Size.zero,
                     padding: const EdgeInsets.symmetric(
                         horizontal: AppSizes.s5, vertical: AppSizes.s3),
                     shape: RoundedRectangleBorder(
