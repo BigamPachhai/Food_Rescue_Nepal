@@ -9,6 +9,7 @@ class VendorEntity {
   final String businessName;
   final String businessType;
   final String? address;
+  final String? phone;
   final double? lat;
   final double? lng;
   final String? logoUrl;
@@ -22,6 +23,7 @@ class VendorEntity {
     required this.businessName,
     required this.businessType,
     this.address,
+    this.phone,
     this.lat,
     this.lng,
     this.logoUrl,
@@ -36,6 +38,7 @@ class VendorEntity {
         businessName: json['businessName'] as String? ?? '',
         businessType: json['businessType'] as String? ?? '',
         address: json['address'] as String?,
+        phone: json['phone'] as String?,
         lat: (json['lat'] as num?)?.toDouble(),
         lng: (json['lng'] as num?)?.toDouble(),
         logoUrl: json['logoUrl'] as String?,
@@ -185,21 +188,28 @@ class ListingsNotifier extends StateNotifier<AsyncValue<List<ListingEntity>>> {
   final Dio _dio;
   int _page = 1;
   bool _hasMore = true;
+  bool _isFetching = false;
   final List<ListingEntity> _items = [];
   ListingsFilter _filter = const ListingsFilter();
+  CancelToken? _cancelToken;
 
   ListingsFilter get currentFilter => _filter;
   bool get hasMore => _hasMore;
 
   Future<void> fetch({bool refresh = false}) async {
+    if (!_hasMore && !refresh) return;
+    if (_isFetching && !refresh) return;
+
     if (refresh) {
+      _cancelToken?.cancel('New request');
       _page = 1;
       _hasMore = true;
       _items.clear();
       state = const AsyncValue.loading();
     }
-    if (!_hasMore && !refresh) return;
 
+    _cancelToken = CancelToken();
+    _isFetching = true;
     try {
       final params = <String, dynamic>{'page': _page, 'limit': 20};
       if (_filter.category != null && _filter.category != 'All') {
@@ -215,7 +225,11 @@ class ListingsNotifier extends StateNotifier<AsyncValue<List<ListingEntity>>> {
       if (_filter.userLng != null) params['lng'] = _filter.userLng;
       if (_filter.maxDistance != null) params['radius'] = _filter.maxDistance;
 
-      final response = await _dio.get(ApiEndpoints.listings, queryParameters: params);
+      final response = await _dio.get(
+        ApiEndpoints.listings,
+        queryParameters: params,
+        cancelToken: _cancelToken,
+      );
       final body = response.data;
 
       List<dynamic> items = [];
@@ -252,8 +266,13 @@ class ListingsNotifier extends StateNotifier<AsyncValue<List<ListingEntity>>> {
       }
 
       state = AsyncValue.data(List<ListingEntity>.from(_items));
+    } on DioException catch (e, st) {
+      if (CancelToken.isCancel(e)) return;
+      if (_items.isEmpty) state = AsyncValue.error(e, st);
     } catch (e, st) {
       if (_items.isEmpty) state = AsyncValue.error(e, st);
+    } finally {
+      _isFetching = false;
     }
   }
 
@@ -290,6 +309,7 @@ final listingsProvider =
 
 // Featured listings — top discounts, no pagination needed
 final featuredListingsProvider = FutureProvider<List<ListingEntity>>((ref) async {
+  ref.keepAlive();
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(
     ApiEndpoints.listings,
@@ -307,6 +327,7 @@ final featuredListingsProvider = FutureProvider<List<ListingEntity>>((ref) async
 
 // Public vendor list for "Popular Vendors" section — backend filters to APPROVED only
 final publicVendorsProvider = FutureProvider<List<VendorEntity>>((ref) async {
+  ref.keepAlive();
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(
     ApiEndpoints.vendors,

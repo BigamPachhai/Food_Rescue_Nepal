@@ -28,6 +28,9 @@ class OrderEntity {
   final String? pickupCode;
   final String? notes;
   final DateTime createdAt;
+  final DateTime? acceptedAt;
+  final DateTime? readyAt;
+  final DateTime? completedAt;
   final ListingEntity? listing;
   final VendorEntity? vendor;
   final UserMinimal? customer;
@@ -43,6 +46,9 @@ class OrderEntity {
     this.pickupCode,
     this.notes,
     required this.createdAt,
+    this.acceptedAt,
+    this.readyAt,
+    this.completedAt,
     this.listing,
     this.vendor,
     this.customer,
@@ -59,6 +65,15 @@ class OrderEntity {
         pickupCode: json['pickupCode'] as String?,
         notes: json['notes'] as String?,
         createdAt: DateTime.parse(json['createdAt'] as String),
+        acceptedAt: json['acceptedAt'] != null
+            ? DateTime.tryParse(json['acceptedAt'] as String)
+            : null,
+        readyAt: json['readyAt'] != null
+            ? DateTime.tryParse(json['readyAt'] as String)
+            : null,
+        completedAt: json['completedAt'] != null
+            ? DateTime.tryParse(json['completedAt'] as String)
+            : null,
         listing: json['listing'] != null
             ? ListingEntity.fromJson(json['listing'] as Map<String, dynamic>)
             : null,

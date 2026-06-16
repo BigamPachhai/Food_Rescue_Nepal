@@ -26,6 +26,9 @@ class VendorDashboardScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final vendorProfileAsync = ref.watch(vendorProfileProvider);
 
+    final vendorStatus = vendorProfileAsync.value?.status;
+    final isPendingVendor = vendorStatus == 'PENDING';
+
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
       body: RefreshIndicator(
@@ -34,17 +37,22 @@ class VendorDashboardScreen extends ConsumerWidget {
           ref.invalidate(vendorStatsProvider);
           ref.invalidate(vendorOrdersProvider);
           ref.invalidate(vendorListingsProvider);
+          ref.invalidate(vendorProfileProvider);
         },
         child: CustomScrollView(
           slivers: [
             SliverToBoxAdapter(child: _buildHeader(context, authState)),
-            SliverToBoxAdapter(
-              child: vendorProfileAsync.whenOrNull(
-                    data: (vendor) => _buildStatusBanner(vendor.status),
-                  ) ??
-                  const SizedBox.shrink(),
-            ),
-            SliverToBoxAdapter(
+            if (isPendingVendor) ...[
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: _VendorPendingState(
+                  onRefresh: () => ref.invalidate(vendorProfileProvider),
+                ),
+              ),
+            ] else ...[
+              if (vendorStatus == 'SUSPENDED')
+                SliverToBoxAdapter(child: _buildSuspendedBanner()),
+              SliverToBoxAdapter(
               child: statsAsync.when(
                 data: (stats) => _StatsPanel(stats: stats),
                 loading: () => const Padding(
@@ -197,21 +205,24 @@ class VendorDashboardScreen extends ConsumerWidget {
                   ) ??
                   const SizedBox.shrink(),
             ),
-            SliverToBoxAdapter(
-              child:
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 88),
-            ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                    height: MediaQuery.of(context).padding.bottom + 88),
+              ),
+            ], // end else
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/vendor/listings/add'),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text(
-          'New Listing',
-          style: TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
+      floatingActionButton: isPendingVendor
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () => context.push('/vendor/listings/add'),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text(
+                'New Listing',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+            ),
     );
   }
 
@@ -271,49 +282,258 @@ class VendorDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatusBanner(String status) {
-    if (status == 'APPROVED') return const SizedBox.shrink();
-    final isPending = status == 'PENDING';
-    final color = isPending ? AppColors.warning : AppColors.error;
-    final surfaceColor =
-        isPending ? AppColors.warningSurface : AppColors.errorSurface;
-
+  Widget _buildSuspendedBanner() {
     return Container(
       margin:
           const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
       padding: const EdgeInsets.all(AppSizes.s3),
       decoration: BoxDecoration(
-        color: surfaceColor,
+        color: AppColors.errorSurface,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(
-            isPending ? Icons.hourglass_top_rounded : Icons.block_rounded,
-            color: color,
-            size: AppSizes.iconMd,
-          ),
+          const Icon(Icons.block_rounded,
+              color: AppColors.error, size: AppSizes.iconMd),
           const SizedBox(width: AppSizes.s2),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  isPending
-                      ? 'Account Pending Approval'
-                      : 'Account Suspended',
-                  style: AppTextStyles.h6.copyWith(color: color),
-                ),
+                Text('Account Suspended',
+                    style: AppTextStyles.h6.copyWith(color: AppColors.error)),
                 const SizedBox(height: 2),
                 Text(
-                  isPending
-                      ? 'Your business is under review. Listings won\'t be visible until approved.'
-                      : 'Your account has been suspended. Please contact support.',
-                  style: AppTextStyles.caption,
+                    'Your account has been suspended. Please contact support.',
+                    style: AppTextStyles.caption),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Vendor pending state ─────────────────────────────────────────────────
+
+class _VendorPendingState extends StatelessWidget {
+  const _VendorPendingState({required this.onRefresh});
+  final VoidCallback onRefresh;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(AppSizes.s4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: AppSizes.s4),
+          // Hero status card
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSizes.s5),
+            decoration: BoxDecoration(
+              color: AppColors.warningSurface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+              border: Border.all(
+                  color: AppColors.warning.withValues(alpha: 0.3)),
+            ),
+            child: Column(
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.hourglass_top_rounded,
+                      size: 36, color: AppColors.warning),
+                ),
+                const SizedBox(height: AppSizes.s3),
+                Text('Application Under Review',
+                    style: AppTextStyles.h3
+                        .copyWith(color: AppColors.warning),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: AppSizes.s2),
+                Text(
+                  'Our team is verifying your business details. This usually takes 1–2 business days.',
+                  style: AppTextStyles.bodySmall.copyWith(
+                      color: AppColors.textSecondary),
+                  textAlign: TextAlign.center,
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: AppSizes.s5),
+          Text('What happens next?', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s3),
+          const _PendingStep(
+            step: 1,
+            title: 'Application submitted',
+            subtitle: 'Your details are in our system',
+            isDone: true,
+          ),
+          const _PendingStep(
+            step: 2,
+            title: 'Business verification',
+            subtitle: 'We verify your business information',
+            isDone: false,
+            isCurrent: true,
+          ),
+          const _PendingStep(
+            step: 3,
+            title: 'Account activation',
+            subtitle: 'Your listings go live to customers',
+            isDone: false,
+          ),
+          const SizedBox(height: AppSizes.s5),
+          Text('While you wait', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s3),
+          const _TipCard(
+            icon: Icons.photo_camera_rounded,
+            text: 'Prepare high-quality photos of your food — listings with photos get 3× more clicks.',
+          ),
+          const SizedBox(height: AppSizes.s2),
+          const _TipCard(
+            icon: Icons.schedule_rounded,
+            text: 'Plan your pickup windows. Customers prefer specific 30–60 minute slots.',
+          ),
+          const SizedBox(height: AppSizes.s5),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Check approval status'),
+              style: OutlinedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(vertical: AppSizes.s3),
+                foregroundColor: AppColors.primaryMedium,
+                side: const BorderSide(color: AppColors.primaryMedium),
+                shape: RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.circular(AppSizes.radiusButton)),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSizes.s2),
+          Center(
+            child: TextButton(
+              onPressed: () {},
+              child: Text(
+                'Need help? Contact support',
+                style: AppTextStyles.bodySmall.copyWith(
+                    color: AppColors.primaryMedium),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingStep extends StatelessWidget {
+  const _PendingStep({
+    required this.step,
+    required this.title,
+    required this.subtitle,
+    required this.isDone,
+    this.isCurrent = false,
+  });
+  final int step;
+  final String title;
+  final String subtitle;
+  final bool isDone;
+  final bool isCurrent;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = isDone
+        ? AppColors.success
+        : isCurrent
+            ? AppColors.warning
+            : AppColors.neutral300;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSizes.s3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isDone
+                  ? AppColors.success
+                  : isCurrent
+                      ? AppColors.warning
+                      : AppColors.neutral100,
+            ),
+            child: Center(
+              child: isDone
+                  ? const Icon(Icons.check_rounded,
+                      size: 16, color: Colors.white)
+                  : Text(
+                      '$step',
+                      style: TextStyle(
+                        color: isCurrent ? Colors.white : AppColors.neutral400,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: AppSizes.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      color: isCurrent || isDone
+                          ? AppColors.textPrimary
+                          : AppColors.textTertiary,
+                      fontWeight: FontWeight.w600,
+                    )),
+                Text(subtitle,
+                    style: AppTextStyles.caption
+                        .copyWith(color: color)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TipCard extends StatelessWidget {
+  const _TipCard({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.s3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLight,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: AppColors.primaryMedium),
+          const SizedBox(width: AppSizes.s2),
+          Expanded(
+            child: Text(text,
+                style: AppTextStyles.bodySmall
+                    .copyWith(color: AppColors.textSecondary)),
           ),
         ],
       ),

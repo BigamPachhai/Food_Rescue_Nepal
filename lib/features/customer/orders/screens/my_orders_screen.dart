@@ -88,12 +88,28 @@ class _OrderList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (orders.isEmpty) {
-      return EmptyStateView(
-        icon: Icons.receipt_long_outlined,
-        title: isActive ? 'No active reservations' : 'No reservation history',
-        subtitle: isActive
-            ? 'Reserve food from the home screen.'
-            : 'Your completed reservations appear here.',
+      return RefreshIndicator(
+        color: AppColors.primaryMedium,
+        onRefresh: () => ref.read(customerOrdersProvider.notifier).fetch(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: EmptyStateView(
+              icon: isActive
+                  ? Icons.shopping_bag_outlined
+                  : Icons.receipt_long_outlined,
+              title: isActive
+                  ? 'No active reservations'
+                  : 'No reservation history',
+              subtitle: isActive
+                  ? 'Browse deals nearby and reserve your first item!'
+                  : 'Your completed and cancelled reservations appear here.',
+              ctaLabel: isActive ? 'Browse Food' : null,
+              onCtaTap: isActive ? () => context.go('/customer/home') : null,
+            ),
+          ),
+        ),
       );
     }
     return RefreshIndicator(

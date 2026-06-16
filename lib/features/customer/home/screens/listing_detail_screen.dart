@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_shadows.dart';
@@ -42,6 +44,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Future<void> _reserve(ListingEntity listing) async {
+    HapticFeedback.mediumImpact();
     final confirm = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -50,6 +53,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
     if (confirm != true || !mounted) return;
 
+    HapticFeedback.heavyImpact();
     setState(() => _isReserving = true);
     try {
       final dio = ref.read(dioClientProvider);
@@ -67,9 +71,13 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   }
 
   Future<void> _toggleFavorite(String listingId) async {
+    HapticFeedback.lightImpact();
     try {
-      await ref.read(favoritesProvider.notifier).toggle(listingId);
-      if (mounted) context.showSnackBar('Favorites updated');
+      final added = await ref.read(favoritesProvider.notifier).toggle(listingId);
+      if (!mounted) return;
+      context.showSnackBar(
+        added ? 'Added to favorites ❤️' : 'Removed from favorites',
+      );
     } catch (_) {}
   }
 
@@ -584,6 +592,89 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     ],
                   ],
                 ),
+                const SizedBox(height: AppSizes.s3),
+                Row(
+                  children: [
+                    // Get Directions button (Issue 7)
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final uri = (vendor.lat != null && vendor.lng != null)
+                              ? Uri.parse(
+                                  'https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}')
+                              : Uri.parse(
+                                  'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}');
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri,
+                                mode: LaunchMode.externalApplication);
+                          }
+                        },
+                        icon: const Icon(Icons.directions_rounded, size: 16),
+                        label: const Text('Directions'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primaryMedium,
+                          side: const BorderSide(color: AppColors.primaryMedium),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusSm),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSizes.s2, vertical: AppSizes.s2),
+                          textStyle: AppTextStyles.caption
+                              .copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    // Phone call button (Issue 5)
+                    if (vendor.phone != null && vendor.phone!.isNotEmpty) ...[
+                      const SizedBox(width: AppSizes.s2),
+                      OutlinedButton.icon(
+                        onPressed: () async {
+                          final uri = Uri(scheme: 'tel', path: vendor.phone);
+                          if (await canLaunchUrl(uri)) {
+                            await launchUrl(uri);
+                          }
+                        },
+                        icon: const Icon(Icons.call_rounded, size: 16),
+                        label: const Text('Call'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.success,
+                          side: const BorderSide(color: AppColors.success),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusSm),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSizes.s2, vertical: AppSizes.s2),
+                          textStyle: AppTextStyles.caption
+                              .copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                      const SizedBox(width: AppSizes.s2),
+                      OutlinedButton.icon(
+                        onPressed: () {
+                          Clipboard.setData(
+                              ClipboardData(text: vendor.phone!));
+                          context.showSnackBar('Phone number copied');
+                        },
+                        icon: const Icon(Icons.copy_rounded, size: 16),
+                        label: const Text('Copy'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.textSecondary,
+                          side: const BorderSide(color: AppColors.border),
+                          shape: RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusSm),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: AppSizes.s2, vertical: AppSizes.s2),
+                          textStyle: AppTextStyles.caption
+                              .copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ],
             ],
           ),
@@ -716,7 +807,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               Icon(Icons.verified_outlined,
                   size: AppSizes.iconXs, color: AppColors.textSecondary),
               SizedBox(width: AppSizes.s1),
-              Text('Free cancellation',
+              Text('Cancel anytime before pickup',
                   style:
                       TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ],
@@ -922,7 +1013,12 @@ class _StepBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: enabled ? onTap : null,
+      onTap: enabled
+          ? () {
+              HapticFeedback.selectionClick();
+              onTap();
+            }
+          : null,
       child: Container(
         width: 36,
         height: 36,

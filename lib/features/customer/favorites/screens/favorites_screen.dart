@@ -66,10 +66,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
           favAsync.when(
             data: (favs) {
               if (favs.isEmpty) {
-                return const EmptyStateView(
+                return EmptyStateView(
                   icon: Icons.favorite_border,
                   title: 'No food favorites yet',
-                  subtitle: 'Tap the heart on any listing to save it here.',
+                  subtitle:
+                      'Tap the ♥ on any listing card to save it here for quick access.',
+                  ctaLabel: 'Explore Deals',
+                  onCtaTap: () => context.go('/customer/home'),
                 );
               }
               return RefreshIndicator(
@@ -110,11 +113,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
           vendorFavAsync.when(
             data: (vendors) {
               if (vendors.isEmpty) {
-                return const EmptyStateView(
+                return EmptyStateView(
                   icon: Icons.store_outlined,
                   title: 'No vendor favorites yet',
                   subtitle:
                       'Save vendors you love to quickly browse their listings.',
+                  ctaLabel: 'Find Vendors',
+                  onCtaTap: () => context.go('/customer/home'),
                 );
               }
               return RefreshIndicator(
@@ -205,16 +210,29 @@ class _VendorFavCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            CircleAvatar(
-              radius: 26,
-              backgroundColor: AppColors.primarySurface,
-              backgroundImage: vendor.logoUrl != null
-                  ? CachedNetworkImageProvider(vendor.logoUrl as String)
-                  : null,
-              child: vendor.logoUrl == null
-                  ? const Icon(Icons.store,
-                      color: AppColors.primaryLight, size: 24)
-                  : null,
+            Container(
+              width: 52,
+              height: 52,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primarySurface,
+              ),
+              child: ClipOval(
+                child: vendor.logoUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: vendor.logoUrl as String,
+                        fit: BoxFit.cover,
+                        memCacheWidth: 104,
+                        memCacheHeight: 104,
+                        errorWidget: (_, __, ___) => const Icon(
+                          Icons.store,
+                          color: AppColors.primaryLight,
+                          size: 24,
+                        ),
+                      )
+                    : const Icon(Icons.store,
+                        color: AppColors.primaryLight, size: 24),
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(

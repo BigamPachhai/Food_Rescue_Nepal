@@ -28,12 +28,23 @@ class FavoritesNotifier extends StateNotifier<AsyncValue<List<ListingEntity>>> {
   }
 
   Future<bool> toggle(String listingId) async {
+    final snapshot = state.value ?? [];
+    final wasInFavorites = snapshot.any((f) => f.id == listingId);
+
+    // Optimistic removal — instant UI update with no waiting for the network
+    if (wasInFavorites) {
+      state = AsyncValue.data(snapshot.where((f) => f.id != listingId).toList());
+    }
+
     try {
       final response = await _dio.post(ApiEndpoints.toggleFavorite(listingId));
       final favorited = (response.data as Map<String, dynamic>)['data']['favorited'] as bool? ?? false;
-      await fetch();
+      // When adding we need the full entity from server; removal is already applied above
+      if (favorited) await fetch();
       return favorited;
     } catch (_) {
+      // Revert optimistic change on error
+      if (wasInFavorites) state = AsyncValue.data(snapshot);
       return false;
     }
   }
@@ -68,12 +79,21 @@ class VendorFavoritesNotifier extends StateNotifier<AsyncValue<List<VendorEntity
   }
 
   Future<bool> toggle(String vendorId) async {
+    final snapshot = state.value ?? [];
+    final wasInFavorites = snapshot.any((v) => v.id == vendorId);
+
+    // Optimistic removal
+    if (wasInFavorites) {
+      state = AsyncValue.data(snapshot.where((v) => v.id != vendorId).toList());
+    }
+
     try {
       final response = await _dio.post(ApiEndpoints.toggleVendorFavorite(vendorId));
       final favorited = (response.data as Map<String, dynamic>)['data']['favorited'] as bool? ?? false;
-      await fetch();
+      if (favorited) await fetch();
       return favorited;
     } catch (_) {
+      if (wasInFavorites) state = AsyncValue.data(snapshot);
       return false;
     }
   }

@@ -25,13 +25,13 @@ class RoleSelectScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Top hero
+            // ── Hero ──────────────────────────────────────────────────
             Container(
               padding: EdgeInsets.fromLTRB(
                 AppSizes.s4,
                 MediaQuery.of(context).padding.top + AppSizes.s8,
                 AppSizes.s4,
-                AppSizes.s8,
+                AppSizes.s6,
               ),
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -50,11 +50,30 @@ class RoleSelectScreen extends StatelessWidget {
                   Text('Join Food Rescue Nepal', style: AppTextStyles.h2OnPrimary),
                   const SizedBox(height: AppSizes.s2),
                   Text(
-                    'Save food. Save money. Save the planet.',
+                    'Great food at up to 70% off — and you\'re helping reduce waste.',
                     style: AppTextStyles.bodySmallOnPrimary.copyWith(
                       color: Colors.white.withValues(alpha: 0.8),
                     ),
                     textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: AppSizes.s5),
+                  // Step indicator
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _StepDot(filled: true, label: '1', done: false),
+                      _StepLine(),
+                      _StepDot(filled: false, label: '2', done: false),
+                      _StepLine(),
+                      _StepDot(filled: false, label: '3', done: false),
+                    ],
+                  ),
+                  const SizedBox(height: AppSizes.s2),
+                  Text(
+                    'Step 1 of 3 — Choose your role',
+                    style: AppTextStyles.caption.copyWith(
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
                   ),
                 ],
               ),
@@ -66,20 +85,27 @@ class RoleSelectScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: AppSizes.s4),
-                    Text('How would you like to use the app?', style: AppTextStyles.h4),
+                    Text('How would you like to use the app?',
+                        style: AppTextStyles.h4),
                     const SizedBox(height: AppSizes.s1),
                     Text(
-                      'Choose your role to get started',
-                      style: AppTextStyles.bodySmall,
+                      'You can switch roles later in Settings.',
+                      style: AppTextStyles.bodySmall
+                          .copyWith(color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: AppSizes.s5),
                     _RoleCard(
                       emoji: '🛒',
                       bgColor: AppColors.primarySurface,
                       accentColor: AppColors.primaryMedium,
-                      title: 'I\'m a Customer',
-                      subtitle: 'Discover discounted food near you and rescue it from waste.',
-                      benefits: const ['Browse nearby deals', 'Save up to 70%', 'Reserve & pickup'],
+                      title: "I'm a Customer",
+                      subtitle:
+                          'Discover discounted food near you and rescue it from waste.',
+                      benefits: const [
+                        'Browse nearby deals',
+                        'Save up to 70%',
+                        'Reserve & pickup',
+                      ],
                       onTap: () => context.push('/register/customer'),
                     ),
                     const SizedBox(height: AppSizes.s3),
@@ -87,20 +113,27 @@ class RoleSelectScreen extends StatelessWidget {
                       emoji: '🏪',
                       bgColor: AppColors.warningSurface,
                       accentColor: AppColors.warning,
-                      title: 'I\'m a Vendor',
-                      subtitle: 'List your surplus food, reduce waste, and reach more customers.',
-                      benefits: const ['List surplus food', 'Earn extra revenue', 'Reduce waste'],
+                      title: "I'm a Vendor",
+                      subtitle:
+                          'List your surplus food, reduce waste, and reach more customers.',
+                      benefits: const [
+                        'List surplus food',
+                        'Earn extra revenue',
+                        'Reduce waste',
+                      ],
                       onTap: () => context.push('/register/vendor'),
                     ),
                     const Spacer(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('Already have an account?', style: AppTextStyles.bodySmall),
+                        Text('Already have an account?',
+                            style: AppTextStyles.bodySmall),
                         TextButton(
                           onPressed: () => context.pop(),
                           style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: AppSizes.s2),
                           ),
                           child: Text(
                             'Sign In',
@@ -119,6 +152,56 @@ class RoleSelectScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ─── Step indicator helpers ────────────────────────────────────────────────
+
+class _StepDot extends StatelessWidget {
+  const _StepDot({required this.filled, required this.label, required this.done});
+  final bool filled;
+  final String label;
+  final bool done;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: filled
+            ? Colors.white
+            : Colors.white.withValues(alpha: 0.25),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: filled ? 1.0 : 0.4),
+          width: 1.5,
+        ),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            color: filled ? AppColors.primaryMedium : Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StepLine extends StatelessWidget {
+  const _StepLine();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 1.5,
+      color: Colors.white.withValues(alpha: 0.3),
     );
   }
 }

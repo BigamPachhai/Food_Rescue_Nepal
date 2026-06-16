@@ -48,15 +48,39 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
   }
 
   Future<void> _cancelOrder() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        ),
+        title: const Text('Cancel Reservation?'),
+        content: const Text(
+          'Your reservation will be released and the slot returned to the vendor. You can always reserve again if it\'s still available.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Keep it'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Yes, cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isCancelling = true);
     try {
       await ref
           .read(dioClientProvider)
           .patch(ApiEndpoints.orderCancel(widget.orderId));
-      if (mounted) {
-        context.showSnackBar('Reservation cancelled');
-        ref.invalidate(orderDetailProvider(widget.orderId));
-      }
+      if (!mounted) return;
+      context.showSnackBar('Reservation cancelled');
+      ref.invalidate(orderDetailProvider(widget.orderId));
     } catch (e) {
       if (mounted) context.showErrorSnackBar(e.toString());
     }
@@ -76,7 +100,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildStatusTimeline(order.status),
+              _buildStatusTimeline(order),
               const SizedBox(height: AppSizes.s4),
               if (order.listing != null) ...[
                 const _SectionLabel(label: 'Item'),
@@ -140,9 +164,16 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
     );
   }
 
-  Widget _buildStatusTimeline(String currentStatus) {
+  Widget _buildStatusTimeline(OrderEntity order) {
+    final currentStatus = order.status;
     const steps = ['PENDING', 'ACCEPTED', 'READY', 'COMPLETED'];
     const labels = ['Placed', 'Accepted', 'Ready', 'Picked Up'];
+    final timestamps = [
+      order.createdAt,
+      order.acceptedAt,
+      order.readyAt,
+      order.completedAt,
+    ];
     final currentIndex = steps.indexOf(currentStatus);
     final isCancelled = currentStatus == 'CANCELLED';
 
@@ -274,6 +305,14 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                         fontSize: 10,
                       ),
                     ),
+                    if (timestamps[stepIndex] != null)
+                      Text(
+                        Formatters.formatTime(timestamps[stepIndex]!),
+                        style: AppTextStyles.caption.copyWith(
+                          color: AppColors.textTertiary,
+                          fontSize: 9,
+                        ),
+                      ),
                   ],
                 );
               }),
@@ -462,7 +501,7 @@ class _ReviewButton extends ConsumerWidget {
     final reviewAsync = ref.watch(orderReviewProvider(order.id));
     return reviewAsync.when(
       data: (existing) => AppButton(
-        label: existing != null ? 'Edit Your Review' : 'Rate This Order',
+        label: existing != null ? 'Edit Your Review' : 'Rate This Pickup',
         onPressed: () => context.push(
           '/customer/orders/${order.id}/review',
           extra: {

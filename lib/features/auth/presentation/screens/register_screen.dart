@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -16,6 +17,7 @@ import '../../domain/auth_state.dart';
 import '../providers/auth_provider.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../../main.dart' show registerFcmToken;
+import 'package:geocoding/geocoding.dart' as geo;
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key, required this.role});
@@ -37,6 +39,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   String _businessType = 'Restaurant';
   LatLng _markerPosition = const LatLng(27.7172, 85.3240);
+  bool _isGeocoding = false;
 
   static const _businessTypes = [
     'Restaurant', 'Cafe', 'Bakery', 'Grocery', 'Sweets', 'Other',
@@ -54,6 +57,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _businessNameCtrl.dispose();
     _addressCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _geocodeAddress() async {
+    final address = _addressCtrl.text.trim();
+    if (address.isEmpty) return;
+    setState(() => _isGeocoding = true);
+    try {
+      final results = await geo.locationFromAddress(address);
+      if (results.isNotEmpty && mounted) {
+        setState(() {
+          _markerPosition = LatLng(results.first.latitude, results.first.longitude);
+        });
+        context.showSnackBar('Location found on map');
+      }
+    } catch (_) {
+      if (mounted) context.showErrorSnackBar('Could not find that address. Try being more specific.');
+    } finally {
+      if (mounted) setState(() => _isGeocoding = false);
+    }
   }
 
   Future<void> _register() async {
@@ -243,6 +265,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   prefixIcon: Icons.location_on_outlined,
                   validator: (v) => Validators.required(v, fieldName: 'Address'),
                   textInputAction: TextInputAction.done,
+                  suffixIcon: _isGeocoding
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton(
+                          icon: const Icon(Icons.search_rounded,
+                              color: AppColors.primaryMedium),
+                          tooltip: 'Find on map',
+                          onPressed: _geocodeAddress,
+                        ),
                 ),
                 const SizedBox(height: AppSizes.s4),
                 // Map picker
@@ -252,7 +289,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     Text('Pin your location on the map', style: AppTextStyles.h5),
                     const SizedBox(height: AppSizes.s1),
                     Text(
-                      'Tap anywhere on the map to place a marker',
+                      'Tap the 🔍 to auto-locate your address, or tap the map to place the pin manually.',
                       style: AppTextStyles.caption,
                     ),
                     const SizedBox(height: AppSizes.s3),
@@ -326,6 +363,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                 ],
               ),
+              _legalConsentText(context),
               const SizedBox(height: AppSizes.s4),
             ],
           ),
@@ -336,6 +374,43 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       ), // PopScope
     );
   }
+}
+
+Widget _legalConsentText(BuildContext context) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 4),
+    child: RichText(
+      textAlign: TextAlign.center,
+      text: TextSpan(
+        style: const TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.6),
+        children: [
+          const TextSpan(text: 'By registering, you agree to our '),
+          TextSpan(
+            text: 'Terms & Conditions',
+            style: const TextStyle(
+              color: Color(0xFF2d8c57),
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => context.push('/legal/terms'),
+          ),
+          const TextSpan(text: ' and '),
+          TextSpan(
+            text: 'Privacy Policy',
+            style: const TextStyle(
+              color: Color(0xFF2d8c57),
+              fontWeight: FontWeight.w600,
+              decoration: TextDecoration.underline,
+            ),
+            recognizer: TapGestureRecognizer()
+              ..onTap = () => context.push('/legal/privacy'),
+          ),
+          const TextSpan(text: '.'),
+        ],
+      ),
+    ),
+  );
 }
 
 class _SectionLabel extends StatelessWidget {

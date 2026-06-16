@@ -64,7 +64,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   Future<void> _goToMyLocation() async {
     await ref.read(locationProvider.notifier).getCurrentLocation();
     final posState = ref.read(locationProvider);
-    posState.when(
+    posState.position.when(
       data: (pos) {
         if (pos != null) {
           setState(() => _userPosition = pos);

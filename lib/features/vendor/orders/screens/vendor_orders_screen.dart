@@ -101,14 +101,26 @@ class _ReservationList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (reservations.isEmpty) {
-      return EmptyStateView(
-        icon: isActive
-            ? Icons.pending_actions_outlined
-            : Icons.receipt_long_outlined,
-        title: isActive ? 'No active reservations' : 'No reservation history',
-        subtitle: isActive
-            ? 'New customer reservations will appear here.'
-            : 'Completed, cancelled and rejected reservations appear here.',
+      return RefreshIndicator(
+        color: AppColors.primaryMedium,
+        onRefresh: () => ref.read(vendorOrdersProvider.notifier).fetch(),
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: SizedBox(
+            height: MediaQuery.of(context).size.height * 0.6,
+            child: EmptyStateView(
+              icon: isActive
+                  ? Icons.pending_actions_outlined
+                  : Icons.receipt_long_outlined,
+              title: isActive
+                  ? 'No active reservations'
+                  : 'No reservation history',
+              subtitle: isActive
+                  ? 'Pull down to refresh. New customer reservations appear here.'
+                  : 'Completed, cancelled and rejected reservations appear here.',
+            ),
+          ),
+        ),
       );
     }
     return RefreshIndicator(

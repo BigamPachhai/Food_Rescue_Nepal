@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -129,6 +130,12 @@ class SettingsScreen extends ConsumerWidget {
           // ── About ───────────────────────────────────────────────────────
           const _SectionHeader('About'),
           _Card(children: [
+            _NavTile(
+              icon: Icons.help_outline_rounded,
+              label: 'How It Works',
+              onTap: () => context.push('/how-it-works'),
+            ),
+            const Divider(height: 1),
             _NavTile(
               icon: Icons.info_outline,
               label: 'About Food Rescue Nepal',
@@ -393,11 +400,20 @@ class _AboutScreen extends ConsumerWidget {
               width: 90,
               height: 90,
               decoration: BoxDecoration(
-                color: AppColors.primarySurface,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.eco_rounded,
-                  size: 52, color: AppColors.primaryMedium),
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: SvgPicture.asset('assets/images/logo.svg'),
+              ),
             ),
             const SizedBox(height: 16),
             Text('Food Rescue Nepal', style: AppTextStyles.h3),

@@ -146,7 +146,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                               ),
                               const SizedBox(height: 8),
                               Text(
-                                'Save Food. Save Money. Save the Planet.',
+                                'Save up to 70% on food near you.',
                                 style: AppTextStyles.bodySmallOnPrimary.copyWith(
                                   color: Colors.white.withValues(alpha: 0.75),
                                   height: 1.5,
@@ -171,22 +171,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ),
-            // Version at bottom
-            Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + 20,
-              left: 0,
-              right: 0,
-              child: FadeTransition(
-                opacity: _fadeAnim,
-                child: Text(
-                  'v1.0.0',
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.caption.copyWith(
-                    color: Colors.white.withValues(alpha: 0.4),
                   ),
                 ),
               ),

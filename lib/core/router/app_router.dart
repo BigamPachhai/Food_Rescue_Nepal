@@ -41,6 +41,9 @@ import '../../features/support/screens/support_screen.dart';
 import '../../features/settings/screens/settings_screen.dart';
 import '../../features/legal/screens/privacy_policy_screen.dart';
 import '../../features/legal/screens/terms_screen.dart';
+import '../../features/onboarding/screens/onboarding_screen.dart';
+import '../../features/onboarding/providers/onboarding_provider.dart';
+import '../../features/how_it_works/screens/how_it_works_screen.dart';
 
 // Shell widgets
 class CustomerShell extends StatelessWidget {
@@ -163,6 +166,7 @@ class AdminShell extends StatelessWidget {
 class _AuthNotifier extends ChangeNotifier {
   _AuthNotifier(this._ref) {
     _ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+    _ref.listen(onboardingProvider, (_, __) => notifyListeners());
   }
   final Ref _ref;
 }
@@ -178,16 +182,33 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoading = authState is AuthInitial || authState is AuthLoading;
       if (isLoading) return null;
 
+      final onboardingState = ref.read(onboardingProvider);
+      if (onboardingState.isLoading) return null;
+      final onboardingDone = onboardingState.value ?? true;
+
       final isAuthenticated = authState is AuthAuthenticated;
-      final isLoginRoute = state.matchedLocation == '/login';
-      final isRegisterRoute = state.matchedLocation.startsWith('/register');
-      final isRootRoute = state.matchedLocation == '/';
+      final loc = state.matchedLocation;
+      final isLoginRoute = loc == '/login';
+      final isRegisterRoute = loc.startsWith('/register');
+      final isRootRoute = loc == '/';
+      final isOnboardingRoute = loc == '/onboarding';
       final isPublicRoute = isLoginRoute ||
           isRegisterRoute ||
-          state.matchedLocation == '/forgot-password' ||
-          state.matchedLocation == '/reset-password' ||
-          state.matchedLocation == '/legal/privacy' ||
-          state.matchedLocation == '/legal/terms';
+          isOnboardingRoute ||
+          loc == '/forgot-password' ||
+          loc == '/reset-password' ||
+          loc == '/legal/privacy' ||
+          loc == '/legal/terms' ||
+          loc == '/how-it-works';
+
+      // First-run: show onboarding before login
+      if (!isAuthenticated && isRootRoute && !onboardingDone) {
+        return '/onboarding';
+      }
+      // After onboarding completes, go to login
+      if (!isAuthenticated && isOnboardingRoute && onboardingDone) {
+        return '/login';
+      }
 
       if (!isAuthenticated && !isPublicRoute) {
         return '/login';
@@ -195,10 +216,9 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (isAuthenticated) {
         final user = authState.user;
-        final path = state.matchedLocation;
 
-        // Redirect away from auth/root routes
-        if (isLoginRoute || isRegisterRoute || isRootRoute) {
+        // Redirect away from auth/root/onboarding routes
+        if (isLoginRoute || isRegisterRoute || isRootRoute || isOnboardingRoute) {
           if (user.isCustomer) return '/customer/home';
           if (user.isVendor) return '/vendor/dashboard';
           if (user.isAdmin) return '/admin/dashboard';
@@ -206,15 +226,15 @@ final routerProvider = Provider<GoRouter>((ref) {
 
         // Block cross-role access
         if (user.isCustomer &&
-            (path.startsWith('/vendor/') || path.startsWith('/admin/'))) {
+            (loc.startsWith('/vendor/') || loc.startsWith('/admin/'))) {
           return '/customer/home';
         }
         if (user.isVendor &&
-            (path.startsWith('/customer/') || path.startsWith('/admin/'))) {
+            (loc.startsWith('/customer/') || loc.startsWith('/admin/'))) {
           return '/vendor/dashboard';
         }
         if (user.isAdmin &&
-            (path.startsWith('/customer/') || path.startsWith('/vendor/'))) {
+            (loc.startsWith('/customer/') || loc.startsWith('/vendor/'))) {
           return '/admin/dashboard';
         }
       }
@@ -223,6 +243,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     },
     routes: [
       GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
+      GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
+      GoRoute(path: '/how-it-works', builder: (_, __) => const HowItWorksScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/register', builder: (_, __) => const RoleSelectScreen()),
       GoRoute(
