@@ -3,6 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -47,8 +48,19 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
   final List<String> _imageUrls = [];
   final List<File> _pendingImages = [];
   bool _isLoading = false;
+  final Set<String> _dietaryTags = {};
+
+  static const _allDietaryTags = [
+    ('VEGAN', 'Vegan', Icons.eco_rounded),
+    ('VEGETARIAN', 'Vegetarian', Icons.grass_rounded),
+    ('HALAL', 'Halal', Icons.verified_rounded),
+    ('GLUTEN_FREE', 'Gluten Free', Icons.no_meals_rounded),
+    ('DAIRY_FREE', 'Dairy Free', Icons.no_drinks_rounded),
+    ('ORGANIC', 'Organic', Icons.nature_rounded),
+  ];
 
   final _categories = [
+    'Surprise Bag',
     'Restaurant',
     'Cafe',
     'Bakery',
@@ -57,9 +69,32 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
     'Other',
   ];
 
+  static const _categoryEnumMap = {
+    'Surprise Bag': 'SURPRISE_BAG',
+    'Restaurant': 'RESTAURANT',
+    'Cafe': 'CAFE',
+    'Bakery': 'BAKERY',
+    'Grocery': 'GROCERY',
+    'Sweets': 'SWEETS',
+    'Other': 'OTHER',
+  };
+
+  static const _enumToCategoryMap = {
+    'SURPRISE_BAG': 'Surprise Bag',
+    'RESTAURANT': 'Restaurant',
+    'CAFE': 'Cafe',
+    'BAKERY': 'Bakery',
+    'GROCERY': 'Grocery',
+    'SWEETS': 'Sweets',
+    'OTHER': 'Other',
+  };
+
   String _normalizeCategory(String cat) {
-    final lower = cat.toLowerCase();
-    return lower[0].toUpperCase() + lower.substring(1);
+    return _enumToCategoryMap[cat.toUpperCase()] ?? 'Other';
+  }
+
+  String _categoryToEnum(String displayCategory) {
+    return _categoryEnumMap[displayCategory] ?? 'OTHER';
   }
 
   int get _discountPercent {
@@ -94,6 +129,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       _pickupEnd = listing.pickupEnd;
       _expiryTime = listing.expiryTime;
       _imageUrls.addAll(listing.imageUrls);
+      _dietaryTags.addAll(listing.dietaryTags);
     });
   }
 
@@ -160,6 +196,20 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       context.showSnackBar('Please add at least one image');
       return;
     }
+    final origVal = int.tryParse(_originalPriceCtrl.text) ?? 0;
+    final discVal = int.tryParse(_discountedPriceCtrl.text) ?? 0;
+    if (discVal >= origVal) {
+      context.showSnackBar('Discounted price must be less than original price');
+      return;
+    }
+    if (!_pickupEnd.isAfter(_pickupStart)) {
+      context.showSnackBar('Pickup end time must be after pickup start time');
+      return;
+    }
+    if (_expiryTime != null && _expiryTime!.isBefore(_pickupEnd)) {
+      context.showSnackBar('Expiry time must be after pickup end time');
+      return;
+    }
     setState(() => _isLoading = true);
     try {
       final newUrls = await _uploadPendingImages();
@@ -173,7 +223,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       final payload = {
         'name': _nameCtrl.text.trim(),
         'description': _descCtrl.text.trim(),
-        'category': _category,
+        'category': _categoryToEnum(_category),
         'originalPrice': originalPaisa,
         'discountedPrice': discountedPaisa,
         'quantity': int.parse(_qtyCtrl.text),
@@ -183,6 +233,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         if (_conditionCtrl.text.trim().isNotEmpty)
           'conditionNotes': _conditionCtrl.text.trim(),
         if (_expiryTime != null) 'expiryTime': _expiryTime!.toIso8601String(),
+        if (_dietaryTags.isNotEmpty) 'dietaryTags': _dietaryTags.toList(),
       };
 
       final dio = ref.read(dioClientProvider);
@@ -195,12 +246,12 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         );
       }
 
-      ref.read(vendorListingsProvider.notifier).fetch();
+      ref.invalidate(vendorListingsProvider);
       if (mounted) {
         context.showSnackBar(widget.mode == ListingFormMode.add
             ? 'Listing created!'
             : 'Listing updated!');
-        Navigator.of(context).pop();
+        context.pop();
       }
     } catch (e) {
       if (mounted) context.showErrorSnackBar(e.toString());
@@ -287,17 +338,113 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
                   prefixIcon: Icon(Icons.category_outlined,
                       color: AppColors.textSecondary),
                 ),
-                items: _categories
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                    .toList(),
+                items: _categories.map((c) => DropdownMenuItem(
+                  value: c,
+                  child: Row(
+                    children: [
+                      Icon(
+                        c == 'Surprise Bag' ? Icons.card_giftcard_rounded : Icons.fastfood_rounded,
+                        size: 16,
+                        color: c == 'Surprise Bag' ? AppColors.accentAmber : AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(c),
+                    ],
+                  ),
+                )).toList(),
                 onChanged: (v) => setState(() => _category = v!),
               ),
+              // Surprise Bag hint banner
+              if (_category == 'Surprise Bag') ...[
+                const SizedBox(height: AppSizes.md),
+                Container(
+                  padding: const EdgeInsets.all(AppSizes.md),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningSurface,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                    border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.card_giftcard_rounded, size: 18, color: AppColors.accentAmber),
+                      const SizedBox(width: AppSizes.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Surprise Bag selected', style: AppTextStyles.label.copyWith(color: AppColors.accentAmber, fontWeight: FontWeight.w700)),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Customers won\'t know exactly what\'s inside — just the category and value. Surprise Bags build excitement and sell out fast!',
+                              style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: AppSizes.lg),
               AppTextField(
                 label: 'Description',
                 controller: _descCtrl,
                 maxLines: 3,
+                maxLength: 500,
+                counterText: '',
                 textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${_descCtrl.text.length}/500',
+                  style: AppTextStyles.caption.copyWith(
+                    color: _descCtrl.text.length > 450 ? AppColors.warning : AppColors.textTertiary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: AppSizes.lg),
+              // Dietary tags
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Dietary Tags', style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _allDietaryTags.map((tag) {
+                  final selected = _dietaryTags.contains(tag.$1);
+                  return FilterChip(
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(tag.$3, size: 14, color: selected ? Colors.white : AppColors.textSecondary),
+                        const SizedBox(width: 4),
+                        Text(tag.$2),
+                      ],
+                    ),
+                    selected: selected,
+                    onSelected: (_) => setState(() {
+                      if (selected) {
+                        _dietaryTags.remove(tag.$1);
+                      } else {
+                        _dietaryTags.add(tag.$1);
+                      }
+                    }),
+                    selectedColor: AppColors.primaryMedium,
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : AppColors.textPrimary,
+                      fontSize: 12,
+                    ),
+                    showCheckmark: false,
+                    side: BorderSide(color: selected ? AppColors.primaryMedium : AppColors.border),
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  );
+                }).toList(),
               ),
               const SizedBox(height: AppSizes.lg),
               Row(
@@ -333,20 +480,27 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
                           color: AppColors.primaryMedium,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           '$_discountPercent% OFF',
-                          style: AppTextStyles.caption.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                          style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      Builder(builder: (context) {
+                        final orig = int.tryParse(_originalPriceCtrl.text) ?? 0;
+                        final disc = int.tryParse(_discountedPriceCtrl.text) ?? 0;
+                        final saved = orig - disc;
+                        if (saved <= 0) return const SizedBox.shrink();
+                        return Text(
+                          'Customer saves NPR $saved',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.success),
+                        );
+                      }),
                     ],
                   ),
                 ),

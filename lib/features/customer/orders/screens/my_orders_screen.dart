@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +28,10 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 2, vsync: this);
+    // Always fetch fresh orders when this screen mounts
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(customerOrdersProvider);
+    });
   }
 
   @override
@@ -55,11 +60,17 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
         data: (orders) {
           final active = orders.where((o) => o.isActive).toList();
           final history = orders.where((o) => !o.isActive).toList();
+          final totalSaved = history
+              .where((o) => o.status == 'COMPLETED')
+              .fold<int>(0, (sum, o) {
+                final orig = (o.listing?.originalPrice ?? 0) * o.quantity;
+                return sum + (orig - o.totalAmount).clamp(0, orig);
+              });
           return TabBarView(
             controller: _tabCtrl,
             children: [
               _OrderList(orders: active, isActive: true),
-              _OrderList(orders: history, isActive: false),
+              _OrderList(orders: history, isActive: false, totalSaved: totalSaved),
             ],
           );
         },
@@ -81,9 +92,10 @@ class _MyOrdersScreenState extends ConsumerState<MyOrdersScreen>
 }
 
 class _OrderList extends ConsumerWidget {
-  const _OrderList({required this.orders, required this.isActive});
+  const _OrderList({required this.orders, required this.isActive, this.totalSaved = 0});
   final List<OrderEntity> orders;
   final bool isActive;
+  final int totalSaved;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -116,10 +128,47 @@ class _OrderList extends ConsumerWidget {
       color: AppColors.primaryMedium,
       onRefresh: () => ref.read(customerOrdersProvider.notifier).fetch(),
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(
-            AppSizes.s4, AppSizes.s3, AppSizes.s4, AppSizes.s4),
-        itemCount: orders.length,
-        itemBuilder: (_, i) => _OrderCard(order: orders[i]),
+        padding: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, AppSizes.s4),
+        itemCount: orders.length + (!isActive && totalSaved > 0 ? 1 : 0),
+        itemBuilder: (_, i) {
+          if (!isActive && totalSaved > 0 && i == 0) {
+            return Container(
+              margin: const EdgeInsets.only(bottom: AppSizes.s3),
+              padding: const EdgeInsets.all(AppSizes.s3),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1B5E20), AppColors.primaryMedium],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.savings_rounded, color: Colors.white, size: 28),
+                  const SizedBox(width: AppSizes.s3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Total saved: ${Formatters.formatNPR(totalSaved)}',
+                          style: AppTextStyles.h5.copyWith(color: Colors.white),
+                        ),
+                        Text(
+                          'Across ${orders.where((o) => o.status == 'COMPLETED').length} completed rescues',
+                          style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final idx = (!isActive && totalSaved > 0) ? i - 1 : i;
+          return _OrderCard(order: orders[idx]);
+        },
       ),
     );
   }
@@ -129,85 +178,166 @@ class _OrderCard extends StatelessWidget {
   const _OrderCard({required this.order});
   final OrderEntity order;
 
+  double _pickupProgress() {
+    final listing = order.listing;
+    if (listing == null || !order.isActive) return 0;
+    final now = DateTime.now();
+    final total = listing.pickupEnd.difference(listing.pickupStart).inSeconds;
+    if (total <= 0) return 1;
+    final elapsed = now.difference(listing.pickupStart).inSeconds;
+    return (elapsed / total).clamp(0.0, 1.0);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final progress = _pickupProgress();
+    final isUrgent = order.isActive &&
+        order.listing != null &&
+        order.listing!.pickupEnd.difference(DateTime.now()).inMinutes <= 30;
+
     return GestureDetector(
       onTap: () => context.push('/customer/orders/${order.id}'),
       child: Container(
         margin: const EdgeInsets.only(bottom: AppSizes.s2),
-        padding: const EdgeInsets.all(AppSizes.s3),
         decoration: BoxDecoration(
           color: AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(AppSizes.radiusCard),
           boxShadow: AppShadows.card,
         ),
-        child: Row(
+        child: Column(
           children: [
-            Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.primarySurface,
-                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              ),
-              child: const Icon(
-                Icons.fastfood_rounded,
-                color: AppColors.primaryLight,
-                size: AppSizes.iconLg,
-              ),
-            ),
-            const SizedBox(width: AppSizes.s3),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: const EdgeInsets.all(AppSizes.s3),
+              child: Row(
                 children: [
-                  Text(
-                    order.listing?.name ??
-                        'Order #${order.id.substring(0, 6)}',
-                    style: AppTextStyles.h6,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                    child: order.listing?.imageUrls.isNotEmpty == true
+                        ? CachedNetworkImage(
+                            imageUrl: order.listing!.imageUrls.first,
+                            width: 52,
+                            height: 52,
+                            fit: BoxFit.cover,
+                            memCacheWidth: 104,
+                            memCacheHeight: 104,
+                            errorWidget: (_, __, ___) => _thumbnail(),
+                          )
+                        : _thumbnail(),
                   ),
-                  if (order.vendor?.businessName != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      order.vendor!.businessName,
-                      style: AppTextStyles.caption,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                  const SizedBox(width: AppSizes.s3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          order.listing?.name ?? 'Order #${order.id.substring(0, 6)}',
+                          style: AppTextStyles.h6,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (order.vendor?.businessName != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            order.vendor!.businessName,
+                            style: AppTextStyles.caption,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                        if (order.isActive && order.listing != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            'Pickup: ${Formatters.formatPickupTime(order.listing!.pickupStart, order.listing!.pickupEnd)}',
+                            style: AppTextStyles.caption.copyWith(
+                              color: isUrgent ? AppColors.error : AppColors.primaryMedium,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 2),
+                          Text(Formatters.formatDateTime(order.createdAt), style: AppTextStyles.caption),
+                        ],
+                      ],
                     ),
-                  ],
-                  const SizedBox(height: 2),
-                  Text(
-                    Formatters.formatDateTime(order.createdAt),
-                    style: AppTextStyles.caption,
                   ),
+                  const SizedBox(width: AppSizes.s2),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      StatusBadge(status: order.status, compact: true),
+                      const SizedBox(height: AppSizes.s1),
+                      Text(
+                        Formatters.formatNPR(order.totalAmount),
+                        style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: AppSizes.s1),
+                  const Icon(Icons.chevron_right_rounded, color: AppColors.neutral400, size: AppSizes.iconMd),
                 ],
               ),
             ),
-            const SizedBox(width: AppSizes.s2),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                StatusBadge(status: order.status, compact: true),
-                const SizedBox(height: AppSizes.s1),
-                Text(
-                  Formatters.formatNPR(order.totalAmount),
-                  style: AppTextStyles.h6.copyWith(
-                    color: AppColors.primaryMedium,
+            // Quick actions row
+            if (order.isActive)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSizes.s3, 0, AppSizes.s3, AppSizes.s2),
+                child: OutlinedButton.icon(
+                  onPressed: () => context.push('/customer/qr/${order.id}'),
+                  icon: const Icon(Icons.qr_code_rounded, size: 14),
+                  label: const Text('Show QR'),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 36),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    foregroundColor: AppColors.primaryMedium,
+                    side: const BorderSide(color: AppColors.primaryMedium),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusSm)),
+                    textStyle: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(width: AppSizes.s1),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: AppColors.neutral400,
-              size: AppSizes.iconMd,
-            ),
+              ),
+            // Reorder button on completed orders
+            if (order.status == 'COMPLETED' && order.listing != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSizes.s3, 0, AppSizes.s3, AppSizes.s2),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push('/customer/listing/${order.listing!.id}'),
+                    icon: const Icon(Icons.repeat_rounded, size: 14),
+                    label: const Text('Order again'),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      foregroundColor: AppColors.primaryMedium,
+                      side: const BorderSide(color: AppColors.primaryMedium),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusSm)),
+                      textStyle: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ),
+            // Pickup window progress bar for active orders
+            if (order.isActive && order.listing != null)
+              ClipRRect(
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppSizes.radiusCard)),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 3,
+                  backgroundColor: AppColors.neutral100,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    isUrgent ? AppColors.error : AppColors.primaryMedium,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+
+  Widget _thumbnail() => Container(
+        width: 52,
+        height: 52,
+        color: AppColors.primarySurface,
+        child: const Icon(Icons.fastfood_rounded, color: AppColors.primaryLight, size: AppSizes.iconLg),
+      );
 }

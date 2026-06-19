@@ -7,6 +7,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../customer/orders/providers/customer_orders_provider.dart';
 import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -34,6 +35,8 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   int _quantity = 1;
   bool _isReserving = false;
   bool _descExpanded = false;
+  bool _allergenExpanded = false;
+  bool _howToCollectExpanded = false;
   int _imageIndex = 0;
   final _pageCtrl = PageController();
 
@@ -45,13 +48,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 
   Future<void> _reserve(ListingEntity listing) async {
     HapticFeedback.mediumImpact();
-    final confirm = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) => _ReserveSheet(listing: listing, quantity: _quantity),
     );
-    if (confirm != true || !mounted) return;
+    if (result == null || result['confirmed'] != true || !mounted) return;
+    final notes = result['notes'] as String?;
 
     HapticFeedback.heavyImpact();
     setState(() => _isReserving = true);
@@ -60,10 +64,14 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       final response = await dio.post(ApiEndpoints.orders, data: {
         'listingId': listing.id,
         'quantity': _quantity,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
       });
       final body = response.data as Map<String, dynamic>;
       final orderId = (body['data'] ?? body)['id'] as String;
-      if (mounted) context.go('/customer/orders/$orderId');
+      // Refresh the orders list so "My Reservations" shows the new order immediately
+      ref.invalidate(customerOrdersProvider);
+      ref.invalidate(listingDetailProvider(widget.listingId));
+      if (mounted) context.push('/customer/orders/$orderId');
     } catch (e) {
       if (mounted) context.showErrorSnackBar(e.toString());
     }
@@ -182,6 +190,21 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                                 listing.description!.isNotEmpty) ...[
                               const Divider(height: AppSizes.s6),
                               _buildDescription(listing),
+                            ],
+                            const Divider(height: AppSizes.s6),
+                            _buildCarbonSection(listing),
+                            if (listing.dietaryTags.isNotEmpty ||
+                                listing.conditionNotes != null) ...[
+                              const Divider(height: AppSizes.s6),
+                              _buildDietarySection(listing),
+                            ],
+                            const Divider(height: AppSizes.s6),
+                            _buildHowToCollect(listing),
+                            const Divider(height: AppSizes.s6),
+                            _buildAllergenDisclaimer(),
+                            if (isSoldOut) ...[
+                              const Divider(height: AppSizes.s6),
+                              _buildSoldOutAlternatives(),
                             ],
                             if (!isSoldOut) ...[
                               const Divider(height: AppSizes.s6),
@@ -474,23 +497,24 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                   ],
                 ),
               ),
-              if (pickupToday)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.s2, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryMedium,
-                    borderRadius:
-                        BorderRadius.circular(AppSizes.radiusFull),
-                  ),
-                  child: Text(
-                    'Today',
-                    style: AppTextStyles.caption.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  if (pickupToday)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryMedium,
+                        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                      ),
+                      child: Text('Today', style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
                     ),
-                  ),
-                ),
+                  if (pickupToday && listing.pickupEnd.isAfter(DateTime.now())) ...[
+                    const SizedBox(height: 4),
+                    _DetailCountdown(pickupEnd: listing.pickupEnd),
+                  ],
+                ],
+              ),
             ],
           ),
         ),
@@ -507,7 +531,9 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
       children: [
         Text('Vendor', style: AppTextStyles.h4),
         const SizedBox(height: AppSizes.s3),
-        Container(
+        GestureDetector(
+          onTap: () => context.push('/customer/vendor/${vendor.id}'),
+          child: Container(
           padding: const EdgeInsets.all(AppSizes.s3),
           decoration: BoxDecoration(
             color: AppColors.surfaceLight,
@@ -599,12 +625,18 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () async {
-                          final uri = (vendor.lat != null && vendor.lng != null)
-                              ? Uri.parse(
-                                  'https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}')
-                              : Uri.parse(
-                                  'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}');
-                          if (await canLaunchUrl(uri)) {
+                          final Uri? uri;
+                          if (vendor.lat != null && vendor.lng != null) {
+                            uri = Uri.parse(
+                                'https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}');
+                          } else if (vendor.address != null &&
+                              vendor.address!.isNotEmpty) {
+                            uri = Uri.parse(
+                                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}');
+                          } else {
+                            uri = null;
+                          }
+                          if (uri != null && await canLaunchUrl(uri)) {
                             await launchUrl(uri,
                                 mode: LaunchMode.externalApplication);
                           }
@@ -679,6 +711,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             ],
           ),
         ),
+      ),
       ],
     );
   }
@@ -716,6 +749,326 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildCarbonSection(ListingEntity listing) {
+    final savedAmount = listing.originalPrice - listing.discountedPrice;
+    final co2Saved = (savedAmount / 10000 * 2.5).clamp(0.1, 99.9);
+    final mealsRescued = listing.quantity;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Environmental Impact', style: AppTextStyles.h4),
+        const SizedBox(height: AppSizes.s3),
+        Container(
+          padding: const EdgeInsets.all(AppSizes.s3),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFE8F5E9), Color(0xFFF1F8E9)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _ImpactStat(
+                  icon: Icons.cloud_off_rounded,
+                  value: '~${co2Saved.toStringAsFixed(1)} kg',
+                  label: 'CO₂ saved',
+                  color: AppColors.success,
+                ),
+              ),
+              Container(width: 1, height: 44, color: AppColors.success.withValues(alpha: 0.2)),
+              Expanded(
+                child: _ImpactStat(
+                  icon: Icons.restaurant_rounded,
+                  value: '$mealsRescued',
+                  label: 'meals rescued',
+                  color: AppColors.primaryMedium,
+                ),
+              ),
+              Container(width: 1, height: 44, color: AppColors.success.withValues(alpha: 0.2)),
+              Expanded(
+                child: _ImpactStat(
+                  icon: Icons.water_drop_rounded,
+                  value: '~${(mealsRescued * 1.2).toStringAsFixed(0)} L',
+                  label: 'water saved',
+                  color: Colors.blue.shade400,
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (listing.expiryTime != null) ...[
+          const SizedBox(height: AppSizes.s2),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3, vertical: AppSizes.s2),
+            decoration: BoxDecoration(
+              color: AppColors.warningSurface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.timer_outlined, size: 16, color: AppColors.accentAmber),
+                const SizedBox(width: AppSizes.s2),
+                Text(
+                  'Best before: ${Formatters.formatDateTime(listing.expiryTime!)}',
+                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.accentAmber),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildDietarySection(ListingEntity listing) {
+    const tagColors = {
+      'VEGAN': (Color(0xFF2E7D32), Color(0xFFE8F5E9)),
+      'VEGETARIAN': (Color(0xFF388E3C), Color(0xFFF1F8E9)),
+      'HALAL': (Color(0xFF1565C0), Color(0xFFE3F2FD)),
+      'GLUTEN_FREE': (Color(0xFFF57F17), Color(0xFFFFF8E1)),
+      'DAIRY_FREE': (Color(0xFF6A1B9A), Color(0xFFF3E5F5)),
+      'NUT_FREE': (Color(0xFFBF360C), Color(0xFFFBE9E7)),
+      'ORGANIC': (Color(0xFF33691E), Color(0xFFF9FBE7)),
+    };
+    const tagIcons = {
+      'VEGAN': Icons.eco_rounded,
+      'VEGETARIAN': Icons.grass_rounded,
+      'HALAL': Icons.verified_rounded,
+      'GLUTEN_FREE': Icons.no_meals_rounded,
+      'DAIRY_FREE': Icons.no_drinks_rounded,
+      'NUT_FREE': Icons.do_not_disturb_rounded,
+      'ORGANIC': Icons.nature_rounded,
+    };
+    const tagLabels = {
+      'VEGAN': 'Vegan',
+      'VEGETARIAN': 'Vegetarian',
+      'HALAL': 'Halal',
+      'GLUTEN_FREE': 'Gluten Free',
+      'DAIRY_FREE': 'Dairy Free',
+      'NUT_FREE': 'Nut Free',
+      'ORGANIC': 'Organic',
+    };
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (listing.dietaryTags.isNotEmpty) ...[
+          Text('Dietary Info', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s2),
+          Wrap(
+            spacing: AppSizes.s2,
+            runSpacing: AppSizes.s2,
+            children: listing.dietaryTags.map((tag) {
+              final colors = tagColors[tag] ?? (AppColors.primaryMedium, AppColors.primarySurface);
+              final icon = tagIcons[tag] ?? Icons.label_rounded;
+              final label = tagLabels[tag] ?? tag;
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2, vertical: 6),
+                decoration: BoxDecoration(
+                  color: colors.$2,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                  border: Border.all(color: colors.$1.withValues(alpha: 0.3)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 14, color: colors.$1),
+                    const SizedBox(width: 4),
+                    Text(label, style: AppTextStyles.caption.copyWith(color: colors.$1, fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+        if (listing.conditionNotes != null && listing.conditionNotes!.isNotEmpty) ...[
+          if (listing.dietaryTags.isNotEmpty) const SizedBox(height: AppSizes.s3),
+          Text('Condition Notes', style: AppTextStyles.h4),
+          const SizedBox(height: AppSizes.s2),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSizes.s3),
+            decoration: BoxDecoration(
+              color: AppColors.warningSurface,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.accentAmber),
+                const SizedBox(width: AppSizes.s2),
+                Expanded(
+                  child: Text(listing.conditionNotes!, style: AppTextStyles.bodySmall.copyWith(color: AppColors.accentAmber)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildHowToCollect(ListingEntity listing) {
+    const steps = [
+      (Icons.phone_android_rounded, 'Reserve in the app', 'Tap "Reserve Now" and confirm your order.'),
+      (Icons.directions_walk_rounded, 'Head to the vendor', 'Go to the pickup location within the time window.'),
+      (Icons.qr_code_scanner_rounded, 'Show your QR code', 'Present the QR code from your order to the staff.'),
+      (Icons.lunch_dining_rounded, 'Collect and enjoy!', 'Pick up your food and reduce waste together.'),
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _howToCollectExpanded = !_howToCollectExpanded),
+          child: Row(
+            children: [
+              Text('How to Collect', style: AppTextStyles.h4),
+              const Spacer(),
+              Icon(
+                _howToCollectExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                color: AppColors.primaryMedium,
+              ),
+            ],
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: Column(
+            children: [
+              const SizedBox(height: AppSizes.s3),
+              ...steps.asMap().entries.map((e) {
+                final i = e.key;
+                final s = e.value;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSizes.s3),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySurface,
+                          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                        ),
+                        child: Icon(s.$1, size: 18, color: AppColors.primaryMedium),
+                      ),
+                      const SizedBox(width: AppSizes.s3),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Container(
+                                width: 18, height: 18,
+                                decoration: const BoxDecoration(color: AppColors.primaryMedium, shape: BoxShape.circle),
+                                child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))),
+                              ),
+                              const SizedBox(width: AppSizes.s2),
+                              Text(s.$2, style: AppTextStyles.h6),
+                            ]),
+                            const SizedBox(height: 2),
+                            Padding(
+                              padding: const EdgeInsets.only(left: 26),
+                              child: Text(s.$3, style: AppTextStyles.caption),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+          crossFadeState: _howToCollectExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 250),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSoldOutAlternatives() {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.s3),
+      decoration: BoxDecoration(
+        color: AppColors.primarySurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.primaryMedium.withValues(alpha: 0.2)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.search_rounded, size: 16, color: AppColors.primaryMedium),
+              const SizedBox(width: AppSizes.s2),
+              Text('This item is sold out', style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium)),
+            ],
+          ),
+          const SizedBox(height: AppSizes.s2),
+          Text('Check out other deals nearby — new listings are added daily!',
+              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: AppSizes.s3),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () => context.go('/customer/home'),
+              icon: const Icon(Icons.fastfood_rounded, size: 16),
+              label: const Text('Browse more deals'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primaryMedium,
+                side: const BorderSide(color: AppColors.primaryMedium),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusButton)),
+                padding: const EdgeInsets.symmetric(vertical: AppSizes.s2),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAllergenDisclaimer() {
+    return GestureDetector(
+      onTap: () => setState(() => _allergenExpanded = !_allergenExpanded),
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.s3),
+        decoration: BoxDecoration(
+          color: AppColors.neutral50,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: AppSizes.s2),
+                Expanded(child: Text('Allergen Notice', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary))),
+                Icon(
+                  _allergenExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  size: 16, color: AppColors.textTertiary,
+                ),
+              ],
+            ),
+            if (_allergenExpanded) ...[
+              const SizedBox(height: AppSizes.s2),
+              Text(
+                'This food is prepared in a kitchen that may handle nuts, dairy, gluten, and other allergens. If you have severe allergies, please contact the vendor directly before reserving.',
+                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, height: 1.5),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -777,39 +1130,55 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               icon: const Icon(Icons.block_rounded),
               label: const Text('Sold Out'),
               style: OutlinedButton.styleFrom(
-                minimumSize:
-                    const Size(double.infinity, AppSizes.buttonHeight),
+                minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
                 foregroundColor: AppColors.error,
                 side: const BorderSide(color: AppColors.error),
-                shape: RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.circular(AppSizes.radiusButton)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusButton)),
               ),
             )
           else
-            AppButton(
-              label:
-                  'Reserve Now — ${Formatters.formatNPR(listing.discountedPrice * _quantity)}',
-              onPressed: !_isReserving ? () => _reserve(listing) : null,
-              isLoading: _isReserving,
+            Column(
+              children: [
+                // Savings highlight bar
+                if (listing.discountedPrice < listing.originalPrice)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: AppSizes.s2),
+                    margin: const EdgeInsets.only(bottom: AppSizes.s2),
+                    decoration: BoxDecoration(
+                      color: AppColors.successSurface,
+                      borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.savings_rounded, size: 14, color: AppColors.success),
+                        const SizedBox(width: 6),
+                        Text(
+                          'You save ${Formatters.formatNPR((listing.originalPrice - listing.discountedPrice) * _quantity)} on this order!',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                AppButton(
+                  label: 'Reserve Now — ${Formatters.formatNPR(listing.discountedPrice * _quantity)}',
+                  onPressed: !_isReserving ? () => _reserve(listing) : null,
+                  isLoading: _isReserving,
+                ),
+              ],
             ),
           const SizedBox(height: AppSizes.s2),
           const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.payments_outlined,
-                  size: AppSizes.iconXs, color: AppColors.textSecondary),
+              Icon(Icons.payments_outlined, size: AppSizes.iconXs, color: AppColors.textSecondary),
               SizedBox(width: AppSizes.s1),
-              Text('Cash on Pickup',
-                  style:
-                      TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              Text('Cash on Pickup', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
               SizedBox(width: AppSizes.s4),
-              Icon(Icons.verified_outlined,
-                  size: AppSizes.iconXs, color: AppColors.textSecondary),
+              Icon(Icons.verified_outlined, size: AppSizes.iconXs, color: AppColors.textSecondary),
               SizedBox(width: AppSizes.s1),
-              Text('Cancel anytime before pickup',
-                  style:
-                      TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              Text('Cancel before pickup', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
             ],
           ),
         ],
@@ -1039,129 +1408,184 @@ class _StepBtn extends StatelessWidget {
 
 // ─── Reserve confirmation sheet ─────────────────────────────────────────────
 
-class _ReserveSheet extends StatelessWidget {
+class _ReserveSheet extends StatefulWidget {
   const _ReserveSheet({required this.listing, required this.quantity});
   final ListingEntity listing;
   final int quantity;
 
   @override
-  Widget build(BuildContext context) {
-    final total = listing.discountedPrice * quantity;
-    final savings =
-        (listing.originalPrice - listing.discountedPrice) * quantity;
+  State<_ReserveSheet> createState() => _ReserveSheetState();
+}
 
-    return Container(
-      decoration: const BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppSizes.radiusBottomSheet)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-          AppSizes.s5,
-          AppSizes.s4,
-          AppSizes.s5,
-          MediaQuery.of(context).padding.bottom + AppSizes.s5),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.neutral200,
-                borderRadius:
-                    BorderRadius.circular(AppSizes.radiusFull),
+class _ReserveSheetState extends State<_ReserveSheet> {
+  final _notesCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final total = widget.listing.discountedPrice * widget.quantity;
+    final savings =
+        (widget.listing.originalPrice - widget.listing.discountedPrice) * widget.quantity;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.vertical(
+              top: Radius.circular(AppSizes.radiusBottomSheet)),
+        ),
+        padding: EdgeInsets.fromLTRB(
+            AppSizes.s5,
+            AppSizes.s4,
+            AppSizes.s5,
+            MediaQuery.of(context).padding.bottom + AppSizes.s5),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.neutral200,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: AppSizes.s4),
-          Text('Confirm Reservation', style: AppTextStyles.h3),
-          const SizedBox(height: AppSizes.s4),
-          _SheetRow(icon: Icons.fastfood_rounded, text: listing.name),
-          const SizedBox(height: AppSizes.s2),
-          if (listing.vendor != null)
+            const SizedBox(height: AppSizes.s4),
+            Text('Confirm Reservation', style: AppTextStyles.h3),
+            const SizedBox(height: AppSizes.s4),
+            _SheetRow(icon: Icons.fastfood_rounded, text: widget.listing.name),
+            const SizedBox(height: AppSizes.s2),
+            if (widget.listing.vendor != null)
+              _SheetRow(
+                  icon: Icons.store_rounded,
+                  text: widget.listing.vendor!.businessName),
+            const SizedBox(height: AppSizes.s2),
             _SheetRow(
-                icon: Icons.store_rounded,
-                text: listing.vendor!.businessName),
-          const SizedBox(height: AppSizes.s2),
-          _SheetRow(
-            icon: Icons.shopping_bag_rounded,
-            text: '$quantity portion${quantity > 1 ? 's' : ''}',
-          ),
-          const SizedBox(height: AppSizes.s2),
-          _SheetRow(
-            icon: Icons.schedule_rounded,
-            text: Formatters.formatPickupTime(
-                listing.pickupStart, listing.pickupEnd),
-          ),
-          const SizedBox(height: AppSizes.s3),
-          const Divider(),
-          const SizedBox(height: AppSizes.s3),
-          Row(
-            children: [
-              const Icon(Icons.payments_rounded,
-                  color: AppColors.primaryMedium, size: AppSizes.iconMd),
-              const SizedBox(width: AppSizes.s2),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    Formatters.formatNPR(total),
-                    style: AppTextStyles.h4
-                        .copyWith(color: AppColors.primaryMedium),
-                  ),
-                  if (savings > 0)
+              icon: Icons.shopping_bag_rounded,
+              text: '${widget.quantity} portion${widget.quantity > 1 ? 's' : ''}',
+            ),
+            const SizedBox(height: AppSizes.s2),
+            _SheetRow(
+              icon: Icons.schedule_rounded,
+              text: Formatters.formatPickupTime(
+                  widget.listing.pickupStart, widget.listing.pickupEnd),
+            ),
+            const SizedBox(height: AppSizes.s3),
+            const Divider(),
+            const SizedBox(height: AppSizes.s3),
+            // Order notes field
+            TextField(
+              controller: _notesCtrl,
+              maxLines: 2,
+              maxLength: 200,
+              decoration: InputDecoration(
+                hintText: 'Any special requests? (optional)',
+                hintStyle: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
+                prefixIcon: const Icon(Icons.note_outlined, size: 18, color: AppColors.textSecondary),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                  borderSide: const BorderSide(color: AppColors.border),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: AppSizes.s3, vertical: AppSizes.s2),
+                counterStyle: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
+              ),
+            ),
+            const SizedBox(height: AppSizes.s3),
+            Row(
+              children: [
+                const Icon(Icons.payments_rounded,
+                    color: AppColors.primaryMedium, size: AppSizes.iconMd),
+                const SizedBox(width: AppSizes.s2),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      'You save ${Formatters.formatNPR(savings)}',
-                      style: AppTextStyles.caption
-                          .copyWith(color: AppColors.success),
+                      Formatters.formatNPR(total),
+                      style: AppTextStyles.h4.copyWith(color: AppColors.primaryMedium),
                     ),
+                    if (savings > 0)
+                      Text(
+                        'You save ${Formatters.formatNPR(savings)}',
+                        style: AppTextStyles.caption.copyWith(color: AppColors.success),
+                      ),
+                  ],
+                ),
+                const Spacer(),
+                Text('Cash on Pickup', style: AppTextStyles.caption),
+              ],
+            ),
+            const SizedBox(height: AppSizes.s3),
+            Container(
+              padding: const EdgeInsets.all(AppSizes.s3),
+              decoration: BoxDecoration(
+                color: AppColors.successSurface,
+                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                border: Border.all(color: AppColors.success.withValues(alpha: 0.25)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.eco_rounded, color: AppColors.success, size: 18),
+                  const SizedBox(width: AppSizes.s2),
+                  Expanded(
+                    child: Text(
+                      'You\'re rescuing ${widget.quantity} meal${widget.quantity > 1 ? 's' : ''} from going to waste!',
+                      style: AppTextStyles.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
+                    ),
+                  ),
                 ],
               ),
-              const Spacer(),
-              Text('Cash on Pickup', style: AppTextStyles.caption),
-            ],
-          ),
-          const SizedBox(height: AppSizes.s5),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => Navigator.pop(context, false),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(
-                        double.infinity, AppSizes.buttonHeight),
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSizes.radiusButton)),
-                    side: const BorderSide(color: AppColors.border),
-                  ),
-                  child: const Text('Cancel'),
-                ),
-              ),
-              const SizedBox(width: AppSizes.s3),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context, true),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(
-                        double.infinity, AppSizes.buttonHeight),
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSizes.radiusButton)),
-                  ),
-                  child: const Text(
-                    'Confirm & Reserve',
-                    style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: AppSizes.s4),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, null),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppSizes.radiusButton)),
+                      side: const BorderSide(color: AppColors.border),
+                    ),
+                    child: const Text('Cancel'),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: AppSizes.s3),
+                Expanded(
+                  flex: 2,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context, {
+                      'confirmed': true,
+                      'notes': _notesCtrl.text.trim(),
+                    }),
+                    style: ElevatedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppSizes.radiusButton)),
+                    ),
+                    child: const Text(
+                      'Confirm & Reserve',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1180,6 +1604,82 @@ class _SheetRow extends StatelessWidget {
         const SizedBox(width: AppSizes.s2),
         Expanded(child: Text(text, style: AppTextStyles.bodyMedium)),
       ],
+    );
+  }
+}
+
+class _ImpactStat extends StatelessWidget {
+  const _ImpactStat({
+    required this.icon,
+    required this.value,
+    required this.label,
+    required this.color,
+  });
+  final IconData icon;
+  final String value;
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 22),
+        const SizedBox(height: 4),
+        Text(value, style: AppTextStyles.h6.copyWith(color: color), textAlign: TextAlign.center),
+        Text(label, style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+      ],
+    );
+  }
+}
+
+// ─── Detail page countdown timer ───────────────────────────────────────────
+
+class _DetailCountdown extends StatefulWidget {
+  const _DetailCountdown({required this.pickupEnd});
+  final DateTime pickupEnd;
+
+  @override
+  State<_DetailCountdown> createState() => _DetailCountdownState();
+}
+
+class _DetailCountdownState extends State<_DetailCountdown> {
+  late Duration _remaining;
+  late final _sub = Stream.periodic(const Duration(seconds: 1), (_) => null)
+      .listen((_) { if (mounted) setState(() => _remaining = _calc()); });
+
+  Duration _calc() {
+    final d = widget.pickupEnd.difference(DateTime.now());
+    return d.isNegative ? Duration.zero : d;
+  }
+
+  @override
+  void initState() { super.initState(); _remaining = _calc(); }
+
+  @override
+  void dispose() { _sub.cancel(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_remaining == Duration.zero) return const SizedBox.shrink();
+    final h = _remaining.inHours;
+    final m = _remaining.inMinutes % 60;
+    final s = _remaining.inSeconds % 60;
+    final isUrgent = _remaining.inMinutes <= 30;
+    final label = h > 0 ? '${h}h ${m}m remaining' : '${m}m ${s}s remaining';
+    final color = isUrgent ? AppColors.error : AppColors.accentAmber;
+    final bg = isUrgent ? AppColors.errorSurface : AppColors.warningSurface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppSizes.radiusFull)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_rounded, size: 11, color: color),
+          const SizedBox(width: 3),
+          Text(label, style: AppTextStyles.caption.copyWith(color: color, fontWeight: FontWeight.w700)),
+        ],
+      ),
     );
   }
 }

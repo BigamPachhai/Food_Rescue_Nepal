@@ -25,6 +25,7 @@ enum OrderStatus {
 }
 
 enum ListingCategory {
+  SURPRISE_BAG
   BAKERY
   RESTAURANT
   CAFE
@@ -37,6 +38,7 @@ enum VendorStatus {
   PENDING
   APPROVED
   SUSPENDED
+  REJECTED
 }
 
 model User {

@@ -49,4 +49,32 @@ class Validators {
     if (number <= 0) return '$fieldName must be greater than 0';
     return null;
   }
+
+  // Nepal phone: optional country code +977 then 10 digits starting with 98 or 97
+  static String? nepalPhone(String? value) {
+    if (value == null || value.trim().isEmpty) return null; // optional
+    final clean = value.trim().replaceAll(RegExp(r'[\s\-]'), '');
+    final withoutCode = clean.startsWith('+977')
+        ? clean.substring(4)
+        : clean.startsWith('977')
+            ? clean.substring(3)
+            : clean;
+    if (!RegExp(r'^(97|98)\d{8}$').hasMatch(withoutCode)) {
+      return 'Enter a valid Nepal phone number (e.g. 98XXXXXXXX)';
+    }
+    return null;
+  }
+
+  // Returns 0 (weak), 1 (fair), 2 (strong) for UI strength indicator
+  static int passwordStrengthScore(String value) {
+    if (value.length < 6) return 0;
+    int score = 0;
+    if (value.length >= 8) score++;
+    if (RegExp(r'[A-Z]').hasMatch(value)) score++;
+    if (RegExp(r'[0-9]').hasMatch(value)) score++;
+    if (RegExp(r'[!@#\$%^&*(),.?":{}|<>]').hasMatch(value)) score++;
+    if (score <= 1) return 0;
+    if (score <= 2) return 1;
+    return 2;
+  }
 }

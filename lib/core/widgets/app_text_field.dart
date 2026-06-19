@@ -26,6 +26,8 @@ class AppTextField extends StatefulWidget {
     this.enabled = true,
     this.autofocus = false,
     this.helperText,
+    this.maxLength,
+    this.counterText,
   });
 
   final String label;
@@ -47,6 +49,8 @@ class AppTextField extends StatefulWidget {
   final bool enabled;
   final bool autofocus;
   final String? helperText;
+  final int? maxLength;
+  final String? counterText;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -81,6 +85,7 @@ class _AppTextFieldState extends State<AppTextField> {
       obscureText: widget.isPassword && _obscureText,
       maxLines: widget.isPassword ? 1 : widget.maxLines,
       minLines: widget.minLines,
+      maxLength: widget.maxLength,
       onChanged: widget.onChanged,
       readOnly: widget.readOnly,
       onTap: widget.onTap,
@@ -95,6 +100,7 @@ class _AppTextFieldState extends State<AppTextField> {
         hintText: widget.hint,
         helperText: widget.helperText,
         helperStyle: AppTextStyles.caption,
+        counterText: widget.counterText,
         filled: true,
         fillColor: widget.enabled
             ? (_isFocused ? AppColors.surfaceLight : AppColors.neutral50)

@@ -174,6 +174,16 @@ export class AdminService {
     });
   }
 
+  async rejectVendor(id: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    return this.prisma.vendor.update({
+      where: { id },
+      data: { status: VendorStatus.REJECTED },
+    });
+  }
+
   async getListings(isActive?: boolean, vendorId?: string, category?: string) {
     const where: any = {
       ...(isActive !== undefined && { isActive }),

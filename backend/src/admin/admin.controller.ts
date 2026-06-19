@@ -93,6 +93,13 @@ export class AdminController {
     return { success: true, data: vendor, message: 'Vendor suspended' };
   }
 
+  @Patch('vendors/:id/reject')
+  @ApiOperation({ summary: 'Reject a vendor application (ADMIN only)' })
+  async rejectVendor(@Param('id') id: string) {
+    const vendor = await this.adminService.rejectVendor(id);
+    return { success: true, data: vendor, message: 'Vendor rejected' };
+  }
+
   // Listings
   @Get('listings')
   @ApiOperation({ summary: 'Get all listings (ADMIN only)' })

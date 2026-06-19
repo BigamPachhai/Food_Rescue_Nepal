@@ -176,10 +176,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               const SizedBox(height: AppSizes.s3),
               AppTextField(
                 label: 'Phone number (optional)',
+                hint: '+977 98XXXXXXXX',
                 controller: _phoneCtrl,
                 keyboardType: TextInputType.phone,
                 prefixIcon: Icons.phone_outlined,
-                validator: Validators.phone,
+                validator: Validators.nepalPhone,
                 textInputAction: isVendor ? TextInputAction.next : TextInputAction.next,
               ),
               const SizedBox(height: AppSizes.s6),
@@ -197,8 +198,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 validator: Validators.password,
                 helperText: 'Minimum 8 characters',
                 textInputAction: TextInputAction.next,
+                onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: AppSizes.s3),
+              const SizedBox(height: AppSizes.s2),
+              _PasswordStrengthBar(password: _passwordCtrl.text),
+              const SizedBox(height: AppSizes.s2),
               AppTextField(
                 label: 'Confirm Password',
                 controller: _confirmPasswordCtrl,
@@ -435,6 +439,44 @@ class _SectionLabel extends StatelessWidget {
         Text(
           label,
           style: AppTextStyles.h5.copyWith(color: AppColors.primaryMedium),
+        ),
+      ],
+    );
+  }
+}
+
+class _PasswordStrengthBar extends StatelessWidget {
+  const _PasswordStrengthBar({required this.password});
+  final String password;
+
+  static const _labels = ['Weak', 'Fair', 'Strong'];
+  static const _colors = [AppColors.error, AppColors.accentAmber, AppColors.success];
+
+  @override
+  Widget build(BuildContext context) {
+    if (password.isEmpty) return const SizedBox.shrink();
+    final score = Validators.passwordStrengthScore(password); // 0, 1, or 2
+    final color = _colors[score];
+    final label = _labels[score];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: List.generate(3, (i) => Expanded(
+            child: Container(
+              height: 4,
+              margin: EdgeInsets.only(right: i < 2 ? 4 : 0),
+              decoration: BoxDecoration(
+                color: i <= score ? color : AppColors.neutral200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          )),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'Password strength: $label',
+          style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.w500),
         ),
       ],
     );

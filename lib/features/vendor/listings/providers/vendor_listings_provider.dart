@@ -19,6 +19,7 @@ class VendorListing {
   final String? conditionNotes;
   final List<String> imageUrls;
   final bool isActive;
+  final List<String> dietaryTags;
 
   const VendorListing({
     required this.id,
@@ -36,20 +37,25 @@ class VendorListing {
     this.conditionNotes,
     required this.imageUrls,
     required this.isActive,
+    this.dietaryTags = const [],
   });
 
   factory VendorListing.fromJson(Map<String, dynamic> json) => VendorListing(
-        id: json['id'] as String,
-        vendorId: json['vendorId'] as String,
-        name: json['name'] as String,
+        id: json['id'] as String? ?? '',
+        vendorId: json['vendorId'] as String? ?? '',
+        name: json['name'] as String? ?? '',
         description: json['description'] as String?,
-        category: json['category'] as String,
-        originalPrice: json['originalPrice'] as int,
-        discountedPrice: json['discountedPrice'] as int,
-        quantity: json['quantity'] as int,
-        availableQty: json['availableQty'] as int? ?? json['quantity'] as int,
-        pickupStart: DateTime.parse(json['pickupStart'] as String),
-        pickupEnd: DateTime.parse(json['pickupEnd'] as String),
+        category: json['category'] as String? ?? 'Other',
+        originalPrice: (json['originalPrice'] as num?)?.toInt() ?? 0,
+        discountedPrice: (json['discountedPrice'] as num?)?.toInt() ?? 0,
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+        availableQty: (json['availableQty'] as num?)?.toInt() ?? (json['quantity'] as num?)?.toInt() ?? 0,
+        pickupStart: json['pickupStart'] != null
+            ? DateTime.parse(json['pickupStart'] as String)
+            : DateTime.now(),
+        pickupEnd: json['pickupEnd'] != null
+            ? DateTime.parse(json['pickupEnd'] as String)
+            : DateTime.now().add(const Duration(hours: 4)),
         expiryTime: json['expiryTime'] != null
             ? DateTime.parse(json['expiryTime'] as String)
             : null,
@@ -59,6 +65,10 @@ class VendorListing {
                 .toList() ??
             [],
         isActive: json['isActive'] as bool? ?? true,
+        dietaryTags: (json['dietaryTags'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
       );
 
   int get discountPercent {
@@ -128,6 +138,7 @@ class VendorListingsNotifier
       'pickupEnd': DateTime.now().add(const Duration(hours: 4)).toIso8601String(),
       'imageUrls': listing.imageUrls,
       if (listing.conditionNotes != null) 'conditionNotes': listing.conditionNotes,
+      if (listing.dietaryTags.isNotEmpty) 'dietaryTags': listing.dietaryTags,
     });
     await fetch();
   }

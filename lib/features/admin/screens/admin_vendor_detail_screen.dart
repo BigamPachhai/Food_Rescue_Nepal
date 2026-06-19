@@ -28,7 +28,7 @@ class _AdminVendorDetailScreenState
   Future<void> _action(String endpoint, String successMsg) async {
     setState(() => _isActing = true);
     try {
-      await ref.read(dioClientProvider).post(endpoint);
+      await ref.read(dioClientProvider).patch(endpoint);
       if (mounted) {
         context.showSnackBar(successMsg);
         ref.invalidate(adminVendorDetailProvider(widget.vendorId));

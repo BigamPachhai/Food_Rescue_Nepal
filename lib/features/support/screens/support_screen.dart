@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
@@ -111,12 +113,73 @@ class _FaqTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: _faqs.length,
-      itemBuilder: (_, i) => _FaqTile(
-        question: _faqs[i].$1,
-        answer: _faqs[i].$2,
+      children: [
+        _RateAppBanner(context),
+        ...List.generate(
+          _faqs.length,
+          (i) => _FaqTile(question: _faqs[i].$1, answer: _faqs[i].$2),
+        ),
+      ],
+    );
+  }
+}
+
+class _RateAppBanner extends StatelessWidget {
+  const _RateAppBanner(this.ctx);
+  final BuildContext ctx;
+
+  static const _storeUrl =
+      'https://play.google.com/store/apps/details?id=com.foodrescuenepal.app';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryMedium],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          const Text('⭐', style: TextStyle(fontSize: 32)),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Enjoying Food Rescue Nepal?',
+                    style: AppTextStyles.h6.copyWith(color: Colors.white)),
+                const SizedBox(height: 2),
+                Text('Rate us on the Play Store — it helps us grow!',
+                    style: AppTextStyles.caption.copyWith(color: Colors.white70)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 10),
+          ElevatedButton(
+            onPressed: () async {
+              final uri = Uri.parse(_storeUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: AppColors.primaryMedium,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+            child: const Text('Rate', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
       ),
     );
   }
@@ -268,10 +331,18 @@ class _ContactTabState extends ConsumerState<_ContactTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _ContactInfoCard(
+          _ContactInfoCard(
             icon: Icons.email_outlined,
             label: 'Email',
             value: 'support@foodrescuenepal.com',
+            trailing: IconButton(
+              icon: const Icon(Icons.copy_rounded, size: 18, color: AppColors.primaryMedium),
+              tooltip: 'Copy email',
+              onPressed: () {
+                Clipboard.setData(const ClipboardData(text: 'support@foodrescuenepal.com'));
+                context.showSnackBar('Email copied to clipboard');
+              },
+            ),
           ),
           const SizedBox(height: 8),
           const _ContactInfoCard(
@@ -342,11 +413,16 @@ class _ContactTabState extends ConsumerState<_ContactTab> {
 }
 
 class _ContactInfoCard extends StatelessWidget {
-  const _ContactInfoCard(
-      {required this.icon, required this.label, required this.value});
+  const _ContactInfoCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.trailing,
+  });
   final IconData icon;
   final String label;
   final String value;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -360,15 +436,18 @@ class _ContactInfoCard extends StatelessWidget {
         children: [
           Icon(icon, color: AppColors.primaryMedium, size: 20),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label,
-                  style: AppTextStyles.caption
-                      .copyWith(color: AppColors.textSecondary)),
-              Text(value, style: AppTextStyles.bodyMedium),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: AppTextStyles.caption
+                        .copyWith(color: AppColors.textSecondary)),
+                Text(value, style: AppTextStyles.bodyMedium),
+              ],
+            ),
           ),
+          if (trailing != null) trailing!,
         ],
       ),
     );

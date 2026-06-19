@@ -32,16 +32,18 @@ class VendorOrder {
   });
 
   factory VendorOrder.fromJson(Map<String, dynamic> json) => VendorOrder(
-        id: json['id'] as String,
-        customerId: json['customerId'] as String,
-        vendorId: json['vendorId'] as String,
-        listingId: json['listingId'] as String,
-        quantity: json['quantity'] as int,
-        totalAmount: json['totalAmount'] as int,
-        status: json['status'] as String,
+        id: json['id'] as String? ?? '',
+        customerId: json['customerId'] as String? ?? '',
+        vendorId: json['vendorId'] as String? ?? '',
+        listingId: json['listingId'] as String? ?? '',
+        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+        totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+        status: json['status'] as String? ?? 'PENDING',
         pickupCode: json['pickupCode'] as String?,
         notes: json['notes'] as String?,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: json['createdAt'] != null
+            ? DateTime.parse(json['createdAt'] as String)
+            : DateTime.now(),
         listing: json['listing'] != null
             ? ListingEntity.fromJson(json['listing'] as Map<String, dynamic>)
             : null,

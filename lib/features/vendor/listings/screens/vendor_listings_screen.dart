@@ -426,6 +426,14 @@ class _ListingCard extends StatelessWidget {
                   '${listing.availableQty}/${listing.quantity} left',
                   style: AppTextStyles.caption,
                 ),
+                const SizedBox(width: 8),
+                // Sold count
+                const Icon(Icons.check_circle_outline, size: 13, color: AppColors.success),
+                const SizedBox(width: 3),
+                Text(
+                  '${listing.soldCount} sold',
+                  style: AppTextStyles.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w600),
+                ),
                 const Spacer(),
                 // Pickup time
                 const Icon(Icons.schedule, size: 13, color: AppColors.textSecondary),
@@ -437,19 +445,27 @@ class _ListingCard extends StatelessWidget {
               ],
             ),
           ),
-          // Stock progress bar
-          ClipRRect(
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(16),
-              bottomRight: Radius.circular(16),
-            ),
-            child: LinearProgressIndicator(
-              value: listing.quantity > 0 ? listing.availableQty / listing.quantity : 0,
-              minHeight: 3,
-              backgroundColor: AppColors.primarySurface,
-              color: listing.isSoldOut ? AppColors.error : AppColors.primaryMedium,
-            ),
-          ),
+          // Stock progress bar with color-coded urgency
+          Builder(builder: (context) {
+            final ratio = listing.quantity > 0 ? listing.availableQty / listing.quantity : 0.0;
+            final barColor = listing.isSoldOut
+                ? AppColors.error
+                : ratio <= 0.25
+                    ? AppColors.warning
+                    : AppColors.success;
+            return ClipRRect(
+              borderRadius: const BorderRadius.only(
+                bottomLeft: Radius.circular(16),
+                bottomRight: Radius.circular(16),
+              ),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 4,
+                backgroundColor: barColor.withValues(alpha: 0.1),
+                valueColor: AlwaysStoppedAnimation<Color>(barColor),
+              ),
+            );
+          }),
         ],
       ),
     );

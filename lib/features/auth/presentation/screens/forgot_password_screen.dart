@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -32,20 +33,53 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     setState(() => _isLoading = true);
-    try {
-      final dio = ref.read(dioClientProvider);
-      await dio.post(
-        ApiEndpoints.forgotPassword,
-        data: {'email': _emailCtrl.text.trim()},
-      );
-      if (!mounted) return;
-      context.go(
-        '/reset-password',
-        extra: {'email': _emailCtrl.text.trim()},
-      );
-    } catch (e) {
-      if (mounted) context.showErrorSnackBar('Failed to send OTP. Please try again.');
+    final email = _emailCtrl.text.trim();
+    final dio = ref.read(dioClientProvider);
+
+    // Retry once on timeout — the server may be cold-starting (Render free tier).
+    for (int attempt = 0; attempt < 2; attempt++) {
+      try {
+        await dio.post(
+          ApiEndpoints.forgotPassword,
+          data: {'email': email},
+          options: Options(receiveTimeout: const Duration(seconds: 60)),
+        );
+        if (!mounted) return;
+        context.push('/reset-password', extra: {'email': email});
+        return;
+      } on DioException catch (e) {
+        final isTimeout = e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
+            e.type == DioExceptionType.sendTimeout;
+
+        if (isTimeout && attempt == 0) {
+          // First attempt timed out — server may be waking up, try once more.
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Server is starting up, retrying…'),
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+          continue;
+        }
+
+        if (mounted) {
+          final msg = e.error is AppException
+              ? (e.error! as AppException).message
+              : isTimeout
+                  ? 'Connection timed out. Please try again in a moment.'
+                  : 'Failed to send OTP. Please try again.';
+          context.showErrorSnackBar(msg);
+        }
+        break;
+      } catch (e) {
+        if (mounted) context.showErrorSnackBar('Failed to send OTP. Please try again.');
+        break;
+      }
     }
+
     if (mounted) setState(() => _isLoading = false);
   }
 

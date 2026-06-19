@@ -41,6 +41,7 @@ class ApiEndpoints {
 
   // User profile
   static const String customerProfile = '/users/profile';
+  static const String deleteAccount = '/users/account';
 
   // Vendor
   static const String vendorProfile = '/vendors/profile';
@@ -65,6 +66,7 @@ class ApiEndpoints {
   static const String adminListings = '/admin/listings';
   static String adminDeactivateListing(String id) => '/admin/listings/$id/deactivate';
   static const String adminOrders = '/admin/orders';
+  static String adminOrderById(String id) => '/admin/orders/$id';
 
   // Notifications
   static const String notifications = '/notifications';

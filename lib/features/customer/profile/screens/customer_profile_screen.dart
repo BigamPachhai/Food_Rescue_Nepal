@@ -1,13 +1,15 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/utils/extensions.dart';
+import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../auth/domain/auth_state.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -26,7 +28,7 @@ class CustomerProfileScreen extends ConsumerWidget {
         child: Column(
           children: [
             _buildHeader(context, ref, user),
-            const SizedBox(height: 20),
+            const SizedBox(height: 8),
             Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
@@ -80,6 +82,47 @@ class CustomerProfileScreen extends ConsumerWidget {
                         label: 'Notifications',
                         subtitle: 'Manage notification preferences',
                         onTap: () => context.push('/notifications'),
+                        showDivider: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SectionCard(
+                    title: 'Community',
+                    children: [
+                      _ProfileTile(
+                        icon: Icons.people_outline_rounded,
+                        iconColor: AppColors.success,
+                        label: 'Refer a Friend',
+                        subtitle: 'Invite friends to rescue food together',
+                        onTap: () {
+                          Share.share(
+                            '🌿 Join me on Food Rescue Nepal! Get discounted food and help reduce food waste across Nepal. Download the app now!',
+                            subject: 'Join Food Rescue Nepal',
+                          );
+                        },
+                      ),
+                      _ProfileTile(
+                        icon: Icons.leaderboard_outlined,
+                        iconColor: AppColors.accentAmber,
+                        label: 'Impact Leaderboard',
+                        subtitle: 'See top food rescuers in your area',
+                        onTap: () {
+                          showDialog<void>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                              title: const Text('Coming Soon'),
+                              content: const Text('The Impact Leaderboard is under development and will be available in a future update.'),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx),
+                                  child: const Text('Got it'),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
                         showDivider: false,
                       ),
                     ],
@@ -176,6 +219,20 @@ class CustomerProfileScreen extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(user!.phone!, style: AppTextStyles.bodySmallOnPrimary),
               ],
+              if (user?.createdAt != null) ...[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Member since ${Formatters.formatMonthYear(user!.createdAt!)}',
+                    style: AppTextStyles.caption.copyWith(color: Colors.white70, fontSize: 11),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -187,7 +244,25 @@ class CustomerProfileScreen extends ConsumerWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => ref.read(authProvider.notifier).logout(),
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Log out?'),
+              content: const Text('You\'ll need to sign in again to access your account.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  child: const Text('Log out'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) ref.read(authProvider.notifier).logout();
+        },
         icon: const Icon(Icons.logout, color: AppColors.primaryMedium),
         label: Text('Logout', style: AppTextStyles.bodyMedium.copyWith(color: AppColors.primaryMedium, fontWeight: FontWeight.w600)),
         style: OutlinedButton.styleFrom(
@@ -221,7 +296,7 @@ class CustomerProfileScreen extends ConsumerWidget {
         onConfirmed: () async {
           try {
             final dio = ref.read(dioClientProvider);
-            await dio.delete('/users/account');
+            await dio.delete(ApiEndpoints.deleteAccount);
           } catch (_) {}
           await ref.read(authProvider.notifier).logout();
           if (context.mounted) {

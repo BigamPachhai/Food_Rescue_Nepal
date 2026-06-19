@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
 import '../../../core/utils/formatters.dart';
@@ -119,6 +120,7 @@ class _AdminOrderTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      onTap: () => context.push('/admin/orders/${order.id}'),
       leading: const CircleAvatar(
         backgroundColor: AppColors.primarySurface,
         child: Icon(Icons.receipt_long,

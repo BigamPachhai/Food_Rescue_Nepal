@@ -9,11 +9,44 @@ import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/shimmer_card.dart';
 import '../providers/notifications_provider.dart';
 
-class NotificationsScreen extends ConsumerWidget {
+class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NotificationsScreen> createState() => _NotificationsScreenState();
+}
+
+class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
+  String _filter = 'All';
+
+  static bool _isOrder(NotificationEntity n) =>
+      n.type.startsWith('ORDER_') ||
+      n.type.startsWith('VENDOR_') ||
+      n.type == 'RESERVATION_ACCEPTED' ||
+      n.type == 'RESERVATION_REJECTED';
+
+  static bool _isDeal(NotificationEntity n) =>
+      n.type == 'NEARBY_FOOD' || n.type == 'LISTING_EXPIRING';
+
+  static bool _isAlert(NotificationEntity n) =>
+      n.type == 'PICKUP_REMINDER' || n.type == 'FOOD_SOLD_OUT';
+
+  List<NotificationEntity> _applyFilter(List<NotificationEntity> all) {
+    if (_filter == 'Orders') return all.where(_isOrder).toList();
+    if (_filter == 'Deals') return all.where(_isDeal).toList();
+    if (_filter == 'Alerts') return all.where(_isAlert).toList();
+    return all;
+  }
+
+  int _countForFilter(List<NotificationEntity> all, String f) {
+    if (f == 'All') return all.length;
+    if (f == 'Orders') return all.where(_isOrder).length;
+    if (f == 'Deals') return all.where(_isDeal).length;
+    return all.where(_isAlert).length;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final notifsAsync = ref.watch(notificationsProvider);
     final unread = ref.watch(unreadCountProvider);
 
@@ -60,23 +93,19 @@ class NotificationsScreen extends ConsumerWidget {
                       if (unread > 0)
                         const PopupMenuItem(
                           value: 'mark_all',
-                          child: Row(
-                            children: [
-                              Icon(Icons.done_all, size: 18, color: AppColors.primaryMedium),
-                              SizedBox(width: 8),
-                              Text('Mark all as read'),
-                            ],
-                          ),
+                          child: Row(children: [
+                            Icon(Icons.done_all, size: 18, color: AppColors.primaryMedium),
+                            SizedBox(width: 8),
+                            Text('Mark all as read'),
+                          ]),
                         ),
                       const PopupMenuItem(
                         value: 'delete_all',
-                        child: Row(
-                          children: [
-                            Icon(Icons.delete_sweep_outlined, size: 18, color: AppColors.error),
-                            SizedBox(width: 8),
-                            Text('Delete all', style: TextStyle(color: AppColors.error)),
-                          ],
-                        ),
+                        child: Row(children: [
+                          Icon(Icons.delete_sweep_outlined, size: 18, color: AppColors.error),
+                          SizedBox(width: 8),
+                          Text('Delete all', style: TextStyle(color: AppColors.error)),
+                        ]),
                       ),
                     ],
                   ),
@@ -94,51 +123,51 @@ class NotificationsScreen extends ConsumerWidget {
               subtitle: 'No notifications yet.',
             );
           }
-
-          final unreadList = notifs.where((n) => !n.isRead).toList();
-          final readList = notifs.where((n) => n.isRead).toList();
-
-          return RefreshIndicator(
-            color: AppColors.primaryMedium,
-            onRefresh: () => ref.read(notificationsProvider.notifier).fetch(),
-            child: ListView(
-              children: [
-                if (unreadList.isNotEmpty) ...[
-                  _SectionHeader(
-                    label: 'New (${unreadList.length})',
-                    action: TextButton(
-                      onPressed: () =>
-                          ref.read(notificationsProvider.notifier).markAllRead(),
-                      child: const Text('Mark all read',
-                          style: TextStyle(fontSize: 12, color: AppColors.primaryMedium)),
-                    ),
+          final filtered = _applyFilter(notifs);
+          return Column(
+            children: [
+              // Filter chips
+              SizedBox(
+                height: 48,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  children: ['All', 'Orders', 'Deals', 'Alerts'].map((f) {
+                    final sel = _filter == f;
+                    final count = _countForFilter(notifs, f);
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilterChip(
+                        label: Text('$f ($count)'),
+                        selected: sel,
+                        onSelected: (_) => setState(() => _filter = f),
+                        selectedColor: AppColors.primaryMedium,
+                        labelStyle: TextStyle(
+                          color: sel ? Colors.white : AppColors.textPrimary,
+                          fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                          fontSize: 12,
+                        ),
+                        showCheckmark: false,
+                        visualDensity: VisualDensity.compact,
+                        side: BorderSide(
+                          color: sel ? AppColors.primaryMedium : AppColors.neutral300,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+              if (filtered.isEmpty)
+                Expanded(
+                  child: EmptyStateView(
+                    icon: Icons.filter_list_off_rounded,
+                    title: 'No $_filter notifications',
+                    subtitle: 'Try a different filter.',
                   ),
-                  ...unreadList.map(
-                    (n) => _NotifTile(
-                      notification: n,
-                      onTap: () {
-                        ref.read(notificationsProvider.notifier).markRead(n.id);
-                        _navigate(context, n);
-                      },
-                      onDelete: () =>
-                          ref.read(notificationsProvider.notifier).delete(n.id),
-                    ),
-                  ),
-                ],
-                if (readList.isNotEmpty) ...[
-                  const _SectionHeader(label: 'Earlier'),
-                  ...readList.map(
-                    (n) => _NotifTile(
-                      notification: n,
-                      onTap: () => _navigate(context, n),
-                      onDelete: () =>
-                          ref.read(notificationsProvider.notifier).delete(n.id),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-              ],
-            ),
+                )
+              else
+                Expanded(child: _buildList(filtered)),
+            ],
           );
         },
         loading: () => ListView.builder(
@@ -156,7 +185,64 @@ class NotificationsScreen extends ConsumerWidget {
     );
   }
 
-  void _navigate(BuildContext context, NotificationEntity notif) {
+  Widget _buildList(List<NotificationEntity> notifs) {
+    final unreadList = notifs.where((n) => !n.isRead).toList();
+    final readList = notifs.where((n) => n.isRead).toList();
+
+    final now = DateTime.now();
+    final todayStart = DateTime(now.year, now.month, now.day);
+    final yesterdayStart = todayStart.subtract(const Duration(days: 1));
+
+    final todayRead = readList.where((n) => n.createdAt.isAfter(todayStart)).toList();
+    final yesterdayRead = readList
+        .where((n) => n.createdAt.isAfter(yesterdayStart) && !n.createdAt.isAfter(todayStart))
+        .toList();
+    final olderRead = readList.where((n) => !n.createdAt.isAfter(yesterdayStart)).toList();
+
+    Widget tile(NotificationEntity n, {bool markOnTap = false}) => _NotifTile(
+          notification: n,
+          onTap: () {
+            if (markOnTap) ref.read(notificationsProvider.notifier).markRead(n.id);
+            _navigate(n);
+          },
+          onDelete: () => ref.read(notificationsProvider.notifier).delete(n.id),
+        );
+
+    return RefreshIndicator(
+      color: AppColors.primaryMedium,
+      onRefresh: () => ref.read(notificationsProvider.notifier).fetch(),
+      child: ListView(
+        children: [
+          if (unreadList.isNotEmpty) ...[
+            _SectionHeader(
+              label: 'New (${unreadList.length})',
+              action: TextButton(
+                onPressed: () => ref.read(notificationsProvider.notifier).markAllRead(),
+                child: const Text('Mark all read',
+                    style: TextStyle(fontSize: 12, color: AppColors.primaryMedium)),
+              ),
+            ),
+            ...unreadList.map((n) => tile(n, markOnTap: true)),
+          ],
+          if (todayRead.isNotEmpty) ...[
+            const _SectionHeader(label: 'Today'),
+            ...todayRead.map(tile),
+          ],
+          if (yesterdayRead.isNotEmpty) ...[
+            const _SectionHeader(label: 'Yesterday'),
+            ...yesterdayRead.map(tile),
+          ],
+          if (olderRead.isNotEmpty) ...[
+            const _SectionHeader(label: 'Older'),
+            ...olderRead.map(tile),
+          ],
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  void _navigate(NotificationEntity notif) {
     final orderId = notif.data['orderId'] as String?;
     final listingId = notif.data['listingId'] as String?;
     if (orderId != null) {
@@ -314,8 +400,7 @@ class _NotifTile extends StatelessWidget {
                         const SizedBox(height: 6),
                         Text(
                           Formatters.timeAgo(notification.createdAt),
-                          style:
-                              AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
+                          style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
                         ),
                       ],
                     ),

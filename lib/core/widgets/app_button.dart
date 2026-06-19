@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import '../constants/app_colors.dart';
 import '../constants/app_sizes.dart';
 import '../constants/app_text_styles.dart';
@@ -33,6 +34,14 @@ class AppButton extends StatelessWidget {
   TextStyle get _labelStyle =>
       size == AppButtonSize.sm ? AppTextStyles.buttonSm : AppTextStyles.button;
   double get _iconSize => size == AppButtonSize.sm ? 16 : 18;
+
+  VoidCallback? _withHaptic(VoidCallback? cb) {
+    if (cb == null) return null;
+    return () {
+      HapticFeedback.mediumImpact();
+      cb();
+    };
+  }
 
   Widget _buildContent(Color textColor) {
     if (isLoading) {
@@ -73,7 +82,7 @@ class AppButton extends StatelessWidget {
           width: effectiveWidth,
           height: _height,
           child: ElevatedButton(
-            onPressed: isDisabled ? null : onPressed,
+            onPressed: isDisabled ? null : _withHaptic(onPressed),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryMedium,
               foregroundColor: AppColors.textOnPrimary,
@@ -96,7 +105,7 @@ class AppButton extends StatelessWidget {
           width: effectiveWidth,
           height: _height,
           child: OutlinedButton(
-            onPressed: isDisabled ? null : onPressed,
+            onPressed: isDisabled ? null : _withHaptic(onPressed),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primaryMedium,
               disabledForegroundColor: AppColors.neutral400,
@@ -119,7 +128,7 @@ class AppButton extends StatelessWidget {
           width: effectiveWidth,
           height: _height,
           child: ElevatedButton(
-            onPressed: isDisabled ? null : onPressed,
+            onPressed: isDisabled ? null : _withHaptic(onPressed),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.errorSurface,
               foregroundColor: AppColors.error,
@@ -141,7 +150,7 @@ class AppButton extends StatelessWidget {
           height: _height,
           width: effectiveWidth == double.infinity ? null : effectiveWidth,
           child: TextButton(
-            onPressed: isDisabled ? null : onPressed,
+            onPressed: isDisabled ? null : _withHaptic(onPressed),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primaryMedium,
               padding: EdgeInsets.symmetric(

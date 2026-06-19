@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/api_endpoints.dart';
@@ -28,6 +30,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _isCancelling = false;
+  Timer? _countdownTimer;
+  Duration _pickupTimeLeft = Duration.zero;
 
   @override
   void initState() {
@@ -39,36 +43,91 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
     _pulseAnimation = Tween(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    _startCountdown();
+  }
+
+  void _startCountdown() {
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final order = ref.read(orderDetailProvider(widget.orderId)).value;
+      if (order == null || !order.isActive) return;
+      final pickupEnd = order.listing?.pickupEnd;
+      if (pickupEnd == null) return;
+      final left = pickupEnd.difference(DateTime.now());
+      setState(() => _pickupTimeLeft = left.isNegative ? Duration.zero : left);
+    });
   }
 
   @override
   void dispose() {
+    _countdownTimer?.cancel();
     _pulseController.dispose();
     super.dispose();
   }
 
   Future<void> _cancelOrder() async {
+    String? selectedReason;
+    const reasons = [
+      'Changed my mind',
+      'Found a better option',
+      'Pickup time doesn\'t work',
+      'Ordered by mistake',
+      'Other',
+    ];
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        ),
-        title: const Text('Cancel Reservation?'),
-        content: const Text(
-          'Your reservation will be released and the slot returned to the vendor. You can always reserve again if it\'s still available.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Keep it'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Yes, cancel'),
+          title: const Text('Cancel Reservation?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Why are you cancelling?'),
+              const SizedBox(height: 12),
+              ...reasons.map((r) {
+                    final selected = selectedReason == r;
+                    return InkWell(
+                      onTap: () => setLocal(() => selectedReason = r),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: selected ? AppColors.primaryMedium : AppColors.neutral300,
+                                  width: selected ? 6 : 2,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(child: Text(r, style: AppTextStyles.bodySmall)),
+                          ],
+                        ),
+                      ),
+                    );
+                  }),
+            ],
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Keep it'),
+            ),
+            TextButton(
+              onPressed: selectedReason == null ? null : () => Navigator.pop(ctx, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Yes, cancel'),
+            ),
+          ],
+        ),
       ),
     );
     if (confirmed != true || !mounted) return;
@@ -81,6 +140,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
       if (!mounted) return;
       context.showSnackBar('Reservation cancelled');
       ref.invalidate(orderDetailProvider(widget.orderId));
+      ref.invalidate(customerOrdersProvider);
     } catch (e) {
       if (mounted) context.showErrorSnackBar(e.toString());
     }
@@ -93,7 +153,22 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(title: const Text('Reservation Details')),
+      appBar: AppBar(
+        title: const Text('Reservation Details'),
+        actions: [
+          orderAsync.whenOrNull(
+            data: (order) => IconButton(
+              icon: const Icon(Icons.copy_rounded),
+              tooltip: 'Copy order ID',
+              onPressed: () {
+                Clipboard.setData(ClipboardData(
+                    text: '#${order.id.substring(0, 8).toUpperCase()}'));
+                context.showSnackBar('Order ID copied');
+              },
+            ),
+          ) ?? const SizedBox.shrink(),
+        ],
+      ),
       body: orderAsync.when(
         data: (order) => SingleChildScrollView(
           padding: const EdgeInsets.all(AppSizes.s4),
@@ -101,6 +176,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildStatusTimeline(order),
+              if (order.isActive && order.listing != null) ...[
+                const SizedBox(height: AppSizes.s3),
+                _buildPickupCountdown(order),
+              ],
               const SizedBox(height: AppSizes.s4),
               if (order.listing != null) ...[
                 const _SectionLabel(label: 'Item'),
@@ -111,7 +190,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
               if (order.vendor != null) ...[
                 const _SectionLabel(label: 'Vendor'),
                 const SizedBox(height: AppSizes.s2),
-                _VendorCard(vendor: order.vendor!),
+                _VendorCard(vendor: order.vendor!, vendorId: order.vendorId),
               ],
               const SizedBox(height: AppSizes.s4),
               const _SectionLabel(label: 'Reservation Info'),
@@ -125,6 +204,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                   _InfoRowData(
                       'Total', Formatters.formatNPR(order.totalAmount)),
                   const _InfoRowData('Payment', 'Cash on Pickup'),
+                  if (order.notes != null && order.notes!.isNotEmpty)
+                    _InfoRowData('Your note', order.notes!),
                 ],
               ),
               const SizedBox(height: AppSizes.s5),
@@ -132,7 +213,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                 AppButton(
                   label: 'Show QR Code',
                   onPressed: () =>
-                      context.push('/customer/orders/${order.id}/qr'),
+                      context.push('/customer/qr/${order.id}'),
                   icon: Icons.qr_code_2_rounded,
                 ),
               if (order.canCancel) ...[
@@ -143,10 +224,36 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                   isLoading: _isCancelling,
                   variant: AppButtonVariant.secondary,
                 ),
+              ] else if (order.status == 'PENDING') ...[
+                const SizedBox(height: AppSizes.s2),
+                Container(
+                  padding: const EdgeInsets.all(AppSizes.s3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warningSurface,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.info_outline, color: AppColors.warning, size: 16),
+                      const SizedBox(width: AppSizes.s2),
+                      Expanded(
+                        child: Text(
+                          'Cancellation window has passed (10 min). Contact the vendor if you need to cancel.',
+                          style: AppTextStyles.caption.copyWith(color: AppColors.warning),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
               if (order.status == 'COMPLETED') ...[
                 const SizedBox(height: AppSizes.s2),
                 _ReviewButton(order: order),
+                if (order.listing != null) ...[
+                  const SizedBox(height: AppSizes.s2),
+                  _ReorderButton(listingId: order.listingId),
+                ],
               ],
               const SizedBox(height: AppSizes.s4),
             ],
@@ -160,6 +267,49 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
           error: e,
           onRetry: () => ref.invalidate(orderDetailProvider(widget.orderId)),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPickupCountdown(OrderEntity order) {
+    final timeLeft = _pickupTimeLeft;
+    final isUrgent = timeLeft.inMinutes <= 30;
+    final color = isUrgent ? AppColors.error : AppColors.primaryMedium;
+    final bgColor = isUrgent ? AppColors.errorSurface : AppColors.primarySurface;
+
+    final h = timeLeft.inHours;
+    final m = timeLeft.inMinutes.remainder(60);
+    final s = timeLeft.inSeconds.remainder(60);
+    final label = h > 0
+        ? '${h}h ${m}m remaining to pick up'
+        : timeLeft.inSeconds <= 0
+            ? 'Pickup window closed'
+            : '${m}m ${s}s remaining to pick up';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSizes.s4, vertical: AppSizes.s3),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Icon(isUrgent ? Icons.timer_off_rounded : Icons.timer_rounded, color: color, size: 20),
+          const SizedBox(width: AppSizes.s2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppTextStyles.bodySmall.copyWith(color: color, fontWeight: FontWeight.w600)),
+                Text(
+                  'Pickup: ${Formatters.formatPickupTime(order.listing!.pickupStart, order.listing!.pickupEnd)}',
+                  style: AppTextStyles.caption.copyWith(color: color.withValues(alpha: 0.8)),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -212,19 +362,26 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
           ),
           const SizedBox(height: AppSizes.s4),
           if (isCancelled)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cancel_rounded,
-                    color: AppColors.error, size: 40),
-                const SizedBox(width: AppSizes.s3),
-                Text(
-                  'This reservation\nwas cancelled',
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    color: AppColors.error,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3, vertical: AppSizes.s2),
+              decoration: BoxDecoration(
+                color: AppColors.errorSurface,
+                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.cancel_outlined, color: AppColors.error, size: 16),
+                  const SizedBox(width: AppSizes.s2),
+                  Text(
+                    'Reservation cancelled',
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.error,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             )
           else
             Row(
@@ -390,47 +547,52 @@ class _ItemCard extends StatelessWidget {
 // ─── Vendor Card ──────────────────────────────────────────────────────────
 
 class _VendorCard extends StatelessWidget {
-  const _VendorCard({required this.vendor});
+  const _VendorCard({required this.vendor, required this.vendorId});
   final dynamic vendor;
+  final String vendorId;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.s3),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        boxShadow: AppShadows.xs,
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.primarySurface,
-              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+    return GestureDetector(
+      onTap: () => context.push('/customer/vendor/$vendorId'),
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.s3),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          boxShadow: AppShadows.xs,
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primarySurface,
+                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              ),
+              child: const Icon(
+                Icons.store_rounded,
+                color: AppColors.primaryLight,
+                size: AppSizes.iconMd,
+              ),
             ),
-            child: const Icon(
-              Icons.store_rounded,
-              color: AppColors.primaryLight,
-              size: AppSizes.iconMd,
+            const SizedBox(width: AppSizes.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vendor.businessName, style: AppTextStyles.h6),
+                  if (vendor.address != null && vendor.address.isNotEmpty)
+                    Text(vendor.address, style: AppTextStyles.caption,
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: AppSizes.s3),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(vendor.businessName, style: AppTextStyles.h6),
-                if (vendor.address != null && vendor.address.isNotEmpty)
-                  Text(vendor.address, style: AppTextStyles.caption,
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-        ],
+            const Icon(Icons.chevron_right, color: AppColors.textSecondary, size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -485,6 +647,32 @@ class _InfoCard extends StatelessWidget {
             ],
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+// ─── Review button ────────────────────────────────────────────────────────
+
+// ─── Re-order button ──────────────────────────────────────────────────────
+
+class _ReorderButton extends StatelessWidget {
+  const _ReorderButton({required this.listingId});
+  final String listingId;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: () => context.push('/customer/listing/$listingId'),
+      icon: const Icon(Icons.refresh_rounded, size: 18),
+      label: const Text('Order Again'),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
+        foregroundColor: AppColors.primaryMedium,
+        side: const BorderSide(color: AppColors.primaryMedium),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusButton),
+        ),
       ),
     );
   }

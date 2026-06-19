@@ -46,7 +46,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> googleSignIn() async {
     state = const AuthLoading();
     try {
-      final googleUser = await GoogleSignIn().signIn();
+      final gsi = GoogleSignIn();
+      await gsi.signOut(); // Clear cached account so the picker always appears
+      final googleUser = await gsi.signIn();
       if (googleUser == null) {
         state = const AuthUnauthenticated();
         return;

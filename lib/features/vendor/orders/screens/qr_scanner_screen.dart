@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -93,7 +94,7 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
       ref.invalidate(vendorOrdersProvider);
       if (mounted) {
         await _showSuccessSheet();
-        if (mounted) Navigator.of(context).pop();
+        if (mounted) context.pop();
       }
     } catch (e) {
       if (mounted) {

@@ -64,7 +64,9 @@ class OrderEntity {
         status: json['status'] as String? ?? 'UNKNOWN',
         pickupCode: json['pickupCode'] as String?,
         notes: json['notes'] as String?,
-        createdAt: DateTime.parse(json['createdAt'] as String),
+        createdAt: json['createdAt'] != null
+            ? DateTime.parse(json['createdAt'] as String)
+            : DateTime.now(),
         acceptedAt: json['acceptedAt'] != null
             ? DateTime.tryParse(json['acceptedAt'] as String)
             : null,

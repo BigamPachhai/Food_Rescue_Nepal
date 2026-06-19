@@ -1,12 +1,15 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:latlong2/latlong.dart';
-import '../../../../core/constants/api_endpoints.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/utils/formatters.dart';
+import '../../../../core/widgets/verified_badge.dart';
 import '../../home/providers/listings_provider.dart';
 import '../../home/providers/location_provider.dart';
 
@@ -18,247 +21,469 @@ class MapScreen extends ConsumerStatefulWidget {
 }
 
 class _MapScreenState extends ConsumerState<MapScreen> {
-  final MapController _mapController = MapController();
-  double _radius = 10;
   List<VendorEntity> _vendors = [];
+  List<VendorEntity> _filtered = [];
+  final Map<String, double> _distancesM = {};
   bool _loading = true;
-  Position? _userPosition;
-
-  static const _kathmandu = LatLng(27.7172, 85.3240);
+  double _radius = 10;
+  String _sort = 'distance'; // distance | rating | name
+  final _searchCtrl = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _searchCtrl.addListener(_applyFilter);
     _loadVendors();
   }
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadVendors() async {
+    setState(() => _loading = true);
     try {
       final dio = ref.read(dioClientProvider);
-      final response = await dio.get(ApiEndpoints.vendors);
+      final response = await dio.get(
+        ApiEndpoints.vendors,
+        queryParameters: {'status': 'APPROVED'},
+      );
       final data = response.data;
       List<dynamic> items;
       if (data is List) {
         items = data;
       } else if (data is Map && data['data'] is List) {
         items = data['data'] as List<dynamic>;
+      } else if (data is Map &&
+          data['data'] is Map &&
+          (data['data'] as Map)['vendors'] is List) {
+        items = (data['data'] as Map)['vendors'] as List<dynamic>;
       } else {
         items = [];
       }
+      final vendors = items
+          .map((e) => VendorEntity.fromJson(e as Map<String, dynamic>))
+          .toList();
       setState(() {
-        _vendors = items
-            .map((e) => VendorEntity.fromJson(e as Map<String, dynamic>))
-            .where((v) => v.lat != null && v.lng != null)
-            .toList();
+        _vendors = vendors;
         _loading = false;
       });
+      _applyFilter();
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not load vendors: ${e.toString()}')),
+        const SnackBar(content: Text('Failed to load vendors. Pull to retry.')),
       );
     }
   }
 
-  Future<void> _goToMyLocation() async {
-    await ref.read(locationProvider.notifier).getCurrentLocation();
-    final posState = ref.read(locationProvider);
-    posState.position.when(
-      data: (pos) {
-        if (pos != null) {
-          setState(() => _userPosition = pos);
-          _mapController.move(LatLng(pos.latitude, pos.longitude), 15);
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not get location. Enable location services.')),
+  void _applyFilter() {
+    final q = _searchCtrl.text.toLowerCase().trim();
+    final userPos = ref.read(locationProvider).position.value;
+
+    // Compute distances once
+    if (userPos != null) {
+      for (final v in _vendors) {
+        if (v.lat != null && v.lng != null) {
+          _distancesM[v.id] = Geolocator.distanceBetween(
+            userPos.latitude, userPos.longitude, v.lat!, v.lng!,
           );
         }
-      },
-      loading: () {},
-      error: (_, __) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location error. Check permissions.')),
-        );
-      },
-    );
+      }
+    }
+
+    var result = _vendors.where((v) {
+      final matchQuery = q.isEmpty ||
+          v.businessName.toLowerCase().contains(q) ||
+          v.businessType.toLowerCase().contains(q) ||
+          (v.address?.toLowerCase().contains(q) ?? false);
+      final distM = _distancesM[v.id];
+      final matchRadius = (userPos == null || distM == null) ? true : distM <= _radius * 1000;
+      return matchQuery && matchRadius;
+    }).toList();
+
+    // Apply sort
+    switch (_sort) {
+      case 'rating':
+        result.sort((a, b) => b.avgRating.compareTo(a.avgRating));
+      case 'name':
+        result.sort((a, b) => a.businessName.compareTo(b.businessName));
+      default: // distance
+        result.sort((a, b) {
+          final da = _distancesM[a.id] ?? double.infinity;
+          final db = _distancesM[b.id] ?? double.infinity;
+          return da.compareTo(db);
+        });
+    }
+
+    setState(() => _filtered = result);
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasLocation =
+        ref.watch(locationProvider).position.value != null;
+
     return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            mapController: _mapController,
-            options: const MapOptions(
-              initialCenter: _kathmandu,
-              initialZoom: 12,
+      backgroundColor: AppColors.backgroundLight,
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildHeader(context),
+            _buildSearchBar(),
+            _buildRadiusRow(hasLocation),
+            const Divider(height: 1),
+            Expanded(
+              child: RefreshIndicator(
+                color: AppColors.primaryMedium,
+                onRefresh: _loadVendors,
+                child: _buildList(),
+              ),
             ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.foodrescue.nepal',
-              ),
-              if (_userPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
-                      width: 20,
-                      height: 20,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [BoxShadow(color: Colors.blue.withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 2)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              MarkerLayer(
-                markers: _vendors.map((v) {
-                  return Marker(
-                    point: LatLng(v.lat!, v.lng!),
-                    width: 44,
-                    height: 44,
-                    child: GestureDetector(
-                      onTap: () => _showVendorSheet(v),
-                      child: const CircleAvatar(
-                        backgroundColor: AppColors.primaryMedium,
-                        child: Icon(Icons.store, color: Colors.white, size: 20),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+          AppSizes.s4, AppSizes.s3, AppSizes.s2, AppSizes.s2),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryMedium],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_on_rounded,
+              color: Colors.white, size: 20),
+          const SizedBox(width: AppSizes.s2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Nearby Vendors',
+                    style: AppTextStyles.h5OnPrimary),
+                Text('Tap a vendor to browse their listings',
+                    style: AppTextStyles.caption
+                        .copyWith(color: Colors.white70)),
+              ],
+            ),
+          ),
+          Text(
+            '${_filtered.length} found',
+            style: AppTextStyles.caption.copyWith(color: Colors.white70),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort_rounded, color: Colors.white, size: 20),
+            tooltip: 'Sort',
+            onSelected: (v) { setState(() => _sort = v); _applyFilter(); },
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'distance', child: Row(children: [
+                if (_sort == 'distance') const Icon(Icons.check, size: 14, color: AppColors.primaryMedium),
+                const SizedBox(width: 4), const Text('By distance'),
+              ])),
+              PopupMenuItem(value: 'rating', child: Row(children: [
+                if (_sort == 'rating') const Icon(Icons.check, size: 14, color: AppColors.primaryMedium),
+                const SizedBox(width: 4), const Text('By rating'),
+              ])),
+              PopupMenuItem(value: 'name', child: Row(children: [
+                if (_sort == 'name') const Icon(Icons.check, size: 14, color: AppColors.primaryMedium),
+                const SizedBox(width: 4), const Text('A – Z'),
+              ])),
             ],
           ),
-          // Top overlay
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 8,
-            left: 12,
-            right: 12,
-            child: Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      style: AppTextStyles.bodyMedium,
-                      decoration: const InputDecoration(
-                        hintText: 'Search area...',
-                        prefixIcon: Icon(Icons.search),
-                        border: InputBorder.none,
-                        filled: false,
-                        contentPadding: EdgeInsets.zero,
-                        isDense: true,
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      color: AppColors.primaryMedium,
+      padding: const EdgeInsets.fromLTRB(
+          AppSizes.s4, 0, AppSizes.s4, AppSizes.s3),
+      child: TextField(
+        controller: _searchCtrl,
+        style: AppTextStyles.bodyMedium,
+        decoration: InputDecoration(
+          hintText: 'Search vendors or areas…',
+          hintStyle: AppTextStyles.bodySmall
+              .copyWith(color: AppColors.textTertiary),
+          prefixIcon: const Icon(Icons.search_rounded,
+              color: AppColors.textSecondary, size: 20),
+          suffixIcon: _searchCtrl.text.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(Icons.close_rounded,
+                      size: 18,
+                      color: AppColors.textSecondary),
+                  onPressed: () => _searchCtrl.clear(),
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius:
+                BorderRadius.circular(AppSizes.radiusFull),
+            borderSide: BorderSide.none,
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(vertical: 10),
+          isDense: true,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRadiusRow(bool hasLocation) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+          AppSizes.s4, AppSizes.s2, AppSizes.s4, 0),
+      child: Row(
+        children: [
+          Icon(
+            Icons.radar_rounded,
+            size: 16,
+            color: hasLocation
+                ? AppColors.primaryMedium
+                : AppColors.neutral400,
+          ),
+          const SizedBox(width: AppSizes.s2),
+          Text(
+            hasLocation
+                ? 'Radius: ${_radius.toInt()} km'
+                : 'Radius: ${_radius.toInt()} km (enable location)',
+            style: AppTextStyles.caption.copyWith(
+              fontWeight: FontWeight.w600,
+              color: hasLocation
+                  ? AppColors.textPrimary
+                  : AppColors.textTertiary,
+            ),
+          ),
+          Expanded(
+            child: Slider(
+              value: _radius,
+              min: 5,
+              max: 50,
+              divisions: 9,
+              activeColor: hasLocation
+                  ? AppColors.primaryMedium
+                  : AppColors.neutral300,
+              onChanged: (v) {
+                setState(() => _radius = v);
+                _applyFilter();
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildList() {
+    if (_loading) {
+      return const Center(
+        child: CircularProgressIndicator(
+            color: AppColors.primaryMedium),
+      );
+    }
+    if (_vendors.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.store_mall_directory_outlined,
+                    size: 56, color: AppColors.neutral300),
+                const SizedBox(height: AppSizes.s3),
+                Text('No vendors yet', style: AppTextStyles.h5),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    if (_filtered.isEmpty) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                    Icons.store_mall_directory_outlined,
+                    size: 56,
+                    color: AppColors.neutral300),
+                const SizedBox(height: AppSizes.s3),
+                Text('No vendors match your search',
+                    style: AppTextStyles.h5),
+                const SizedBox(height: AppSizes.s1),
+                Text(
+                  'Try different keywords or increase the radius',
+                  style: AppTextStyles.bodySmall,
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: AppSizes.s2),
+      itemCount: _filtered.length,
+      itemBuilder: (_, i) => _VendorLocationTile(
+        vendor: _filtered[i],
+        distanceM: _distancesM[_filtered[i].id],
+        onTap: () => context.push('/customer/vendor/${_filtered[i].id}'),
+      ),
+    );
+  }
+}
+
+class _VendorLocationTile extends StatelessWidget {
+  const _VendorLocationTile(
+      {required this.vendor, required this.onTap, this.distanceM});
+  final VendorEntity vendor;
+  final VoidCallback onTap;
+  final double? distanceM;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppSizes.s4, vertical: AppSizes.s1),
+        padding: const EdgeInsets.all(AppSizes.s3),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius:
+              BorderRadius.circular(AppSizes.radiusCard),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              height: 52,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primarySurface,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: ClipOval(
+                child: vendor.logoUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: vendor.logoUrl!,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => const Icon(
+                            Icons.store_rounded,
+                            color: AppColors.primaryLight),
+                      )
+                    : const Icon(Icons.store_rounded,
+                        color: AppColors.primaryLight),
+              ),
+            ),
+            const SizedBox(width: AppSizes.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          vendor.businessName,
+                          style: AppTextStyles.h6,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
+                      if (vendor.status == 'APPROVED') ...[
+                        const SizedBox(width: 4),
+                        const VerifiedBadge(size: 11),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(vendor.businessType,
+                      style: AppTextStyles.caption),
+                  if (vendor.address != null &&
+                      vendor.address!.isNotEmpty) ...[
+                    const SizedBox(height: 2),
                     Row(
                       children: [
-                        Text('Radius: ${_radius.toInt()} km',
-                            style: AppTextStyles.caption),
-                        Expanded(
-                          child: Slider(
-                            value: _radius,
-                            min: 5,
-                            max: 20,
-                            divisions: 3,
-                            activeColor: AppColors.primaryMedium,
-                            onChanged: (v) => setState(() => _radius = v),
+                        const Icon(Icons.location_on_rounded,
+                            size: 12,
+                            color: AppColors.textTertiary),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            vendor.address!,
+                            style: AppTextStyles.caption
+                                .copyWith(
+                                    color:
+                                        AppColors.textTertiary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
                   ],
-                ),
-              ),
-            ),
-          ),
-          if (_loading)
-            const Center(
-              child: CircularProgressIndicator(color: AppColors.primaryMedium),
-            ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _goToMyLocation,
-        backgroundColor: AppColors.primaryMedium,
-        child: const Icon(Icons.my_location, color: Colors.white),
-      ),
-    );
-  }
-
-  void _showVendorSheet(VendorEntity vendor) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: AppColors.primarySurface,
-                  radius: 24,
-                  backgroundImage: vendor.logoUrl != null
-                      ? NetworkImage(vendor.logoUrl!)
-                      : null,
-                  child: vendor.logoUrl == null
-                      ? const Icon(Icons.store, color: AppColors.primaryLight)
-                      : null,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(vendor.businessName, style: AppTextStyles.h5),
-                      Text(vendor.businessType, style: AppTextStyles.bodySmall),
-                    ],
-                  ),
-                ),
-                Row(
-                  children: [
-                    const Icon(Icons.star, size: 14, color: AppColors.accentAmber),
-                    const SizedBox(width: 2),
-                    Text(vendor.avgRating.toStringAsFixed(1),
-                        style: AppTextStyles.bodySmall),
-                  ],
-                ),
-              ],
-            ),
-            if (vendor.address != null) ...[
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  const Icon(Icons.location_on,
-                      size: 14, color: AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Expanded(
-                      child: Text(vendor.address!,
-                          style: AppTextStyles.bodySmall)),
                 ],
               ),
-            ],
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('View Listings'),
-              ),
+            ),
+            const SizedBox(width: AppSizes.s2),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.star_rounded,
+                        size: 13,
+                        color: AppColors.accentAmber),
+                    const SizedBox(width: 2),
+                    Text(
+                      vendor.avgRating.toStringAsFixed(1),
+                      style: AppTextStyles.label
+                          .copyWith(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                if (vendor.totalReviews > 0) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    '${vendor.totalReviews} reviews',
+                    style: AppTextStyles.caption.copyWith(
+                        color: AppColors.textTertiary,
+                        fontSize: 10),
+                  ),
+                ],
+                if (distanceM != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    Formatters.formatDistance(distanceM!),
+                    style: AppTextStyles.caption.copyWith(
+                        color: AppColors.primaryMedium,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 10),
+                  ),
+                ],
+                const SizedBox(height: 4),
+                const Icon(Icons.chevron_right_rounded,
+                    size: 16, color: AppColors.textTertiary),
+              ],
             ),
           ],
         ),

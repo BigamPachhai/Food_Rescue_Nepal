@@ -9,17 +9,63 @@ import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/shimmer_card.dart';
 import '../providers/reviews_provider.dart';
 
-class VendorReviewsScreen extends ConsumerWidget {
+class VendorReviewsScreen extends ConsumerStatefulWidget {
   const VendorReviewsScreen({super.key, required this.vendorId});
   final String vendorId;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final reviewsAsync = ref.watch(vendorReviewsProvider(vendorId));
+  ConsumerState<VendorReviewsScreen> createState() => _VendorReviewsScreenState();
+}
+
+class _VendorReviewsScreenState extends ConsumerState<VendorReviewsScreen> {
+  int? _starFilter; // null = all
+  String _sort = 'newest'; // newest | best | worst
+
+  List<ReviewEntity> _process(List<ReviewEntity> reviews) {
+    var list = _starFilter == null
+        ? reviews
+        : reviews.where((r) => r.rating == _starFilter).toList();
+    switch (_sort) {
+      case 'best':
+        list = [...list]..sort((a, b) => b.rating.compareTo(a.rating));
+      case 'worst':
+        list = [...list]..sort((a, b) => a.rating.compareTo(b.rating));
+      default:
+        list = [...list]..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    }
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final reviewsAsync = ref.watch(vendorReviewsProvider(widget.vendorId));
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      appBar: AppBar(title: const Text('Customer Reviews')),
+      appBar: AppBar(
+        title: const Text('Customer Reviews'),
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.sort_rounded),
+            tooltip: 'Sort',
+            onSelected: (v) => setState(() => _sort = v),
+            itemBuilder: (_) => [
+              PopupMenuItem(value: 'newest', child: Row(children: [
+                if (_sort == 'newest') const Icon(Icons.check, size: 16, color: AppColors.primaryMedium),
+                const SizedBox(width: 4), const Text('Newest first'),
+              ])),
+              PopupMenuItem(value: 'best', child: Row(children: [
+                if (_sort == 'best') const Icon(Icons.check, size: 16, color: AppColors.primaryMedium),
+                const SizedBox(width: 4), const Text('Highest rated'),
+              ])),
+              PopupMenuItem(value: 'worst', child: Row(children: [
+                if (_sort == 'worst') const Icon(Icons.check, size: 16, color: AppColors.primaryMedium),
+                const SizedBox(width: 4), const Text('Lowest rated'),
+              ])),
+            ],
+          ),
+        ],
+      ),
       body: reviewsAsync.when(
         data: (reviews) {
           if (reviews.isEmpty) {
@@ -30,27 +76,67 @@ class VendorReviewsScreen extends ConsumerWidget {
             );
           }
 
-          // Rating summary
-          final avg = reviews.map((r) => r.rating).reduce((a, b) => a + b) /
-              reviews.length;
+          final avg = reviews.map((r) => r.rating).reduce((a, b) => a + b) / reviews.length;
           final counts = List.generate(5, (i) {
             final star = 5 - i;
             return reviews.where((r) => r.rating == star).length;
           });
+          final processed = _process(reviews);
 
           return RefreshIndicator(
             color: AppColors.primaryMedium,
-            onRefresh: () => ref.read(vendorReviewsProvider(vendorId).notifier).fetch(),
+            onRefresh: () => ref.read(vendorReviewsProvider(widget.vendorId).notifier).fetch(),
             child: ListView(
               children: [
                 _RatingSummary(avg: avg, total: reviews.length, counts: counts),
-                const Divider(height: 1),
-                ...reviews.map(
-                  (r) => _ReviewCard(
-                    review: r,
-                    onRespond: () => _showRespondDialog(context, ref, r),
+                // Star filter chips
+                SizedBox(
+                  height: 48,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    children: [null, 5, 4, 3, 2, 1].map((star) {
+                      final sel = _starFilter == star;
+                      final label = star == null ? 'All' : '$star ★';
+                      final count = star == null
+                          ? reviews.length
+                          : reviews.where((r) => r.rating == star).length;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text('$label ($count)'),
+                          selected: sel,
+                          onSelected: (_) => setState(() => _starFilter = star),
+                          selectedColor: AppColors.accentAmber,
+                          labelStyle: TextStyle(
+                            color: sel ? Colors.white : AppColors.textPrimary,
+                            fontSize: 12,
+                            fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                          ),
+                          showCheckmark: false,
+                          visualDensity: VisualDensity.compact,
+                          side: BorderSide(
+                            color: sel ? AppColors.accentAmber : AppColors.neutral300,
+                          ),
+                        ),
+                      );
+                    }).toList(),
                   ),
                 ),
+                const Divider(height: 1),
+                if (processed.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 40),
+                    child: Center(
+                      child: Text('No reviews for this rating.',
+                          style: TextStyle(color: AppColors.textSecondary)),
+                    ),
+                  )
+                else
+                  ...processed.map((r) => _ReviewCard(
+                        review: r,
+                        onRespond: () => _showRespondDialog(context, ref, r),
+                      )),
                 const SizedBox(height: 20),
               ],
             ),
@@ -65,7 +151,7 @@ class VendorReviewsScreen extends ConsumerWidget {
         ),
         error: (e, _) => ErrorView(
           error: e,
-          onRetry: () => ref.read(vendorReviewsProvider(vendorId).notifier).fetch(),
+          onRetry: () => ref.read(vendorReviewsProvider(widget.vendorId).notifier).fetch(),
         ),
       ),
     );
@@ -101,7 +187,7 @@ class VendorReviewsScreen extends ConsumerWidget {
     if (ok != true || ctrl.text.trim().isEmpty || !context.mounted) return;
     try {
       await ref
-          .read(vendorReviewsProvider(vendorId).notifier)
+          .read(vendorReviewsProvider(widget.vendorId).notifier)
           .addResponse(review.id, ctrl.text.trim());
       if (context.mounted) context.showSnackBar('Response saved');
     } catch (e) {

@@ -65,6 +65,10 @@ class ListingEntity {
   final VendorEntity? vendor;
   final bool isFavorite;
   final double? distance;
+  final List<String> dietaryTags;
+  final String? conditionNotes;
+  final DateTime? expiryTime;
+  final DateTime? createdAt;
 
   const ListingEntity({
     required this.id,
@@ -83,6 +87,10 @@ class ListingEntity {
     this.vendor,
     this.isFavorite = false,
     this.distance,
+    this.dietaryTags = const [],
+    this.conditionNotes,
+    this.expiryTime,
+    this.createdAt,
   });
 
   factory ListingEntity.fromJson(Map<String, dynamic> json) => ListingEntity(
@@ -107,6 +115,17 @@ class ListingEntity {
             : null,
         isFavorite: json['isFavorite'] as bool? ?? false,
         distance: (json['distance'] as num?)?.toDouble(),
+        dietaryTags: (json['dietaryTags'] as List<dynamic>?)
+                ?.map((e) => e as String)
+                .toList() ??
+            [],
+        conditionNotes: json['conditionNotes'] as String?,
+        expiryTime: json['expiryTime'] != null
+            ? DateTime.tryParse(json['expiryTime'] as String)
+            : null,
+        createdAt: json['createdAt'] != null
+            ? DateTime.tryParse(json['createdAt'] as String)
+            : null,
       );
 
   int get discountPercent {

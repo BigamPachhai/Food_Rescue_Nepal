@@ -104,6 +104,10 @@ class _CustomerTab extends StatelessWidget {
                 'Head to the vendor at the listed pickup time. Show your QR code and enjoy your food — you just rescued a meal!',
           ),
           const SizedBox(height: AppSizes.s5),
+          const _ImpactSection(),
+          const SizedBox(height: AppSizes.s5),
+          const _SurpriseBagSection(),
+          const SizedBox(height: AppSizes.s5),
           Text('Frequently asked questions', style: AppTextStyles.h4),
           const SizedBox(height: AppSizes.s3),
           ..._customerFaqs.map((faq) => _FaqTile(faq: faq)),
@@ -416,6 +420,190 @@ class _CtaButton extends StatelessWidget {
     );
   }
 }
+
+// ─── Impact section ──────────────────────────────────────────────────────────
+
+class _ImpactSection extends StatelessWidget {
+  const _ImpactSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.s4),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary, AppColors.primaryMedium],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Our community impact',
+            style: AppTextStyles.h4.copyWith(color: Colors.white),
+          ),
+          const SizedBox(height: AppSizes.s1),
+          Text(
+            'Every rescue adds up. Together we\'re making a real difference.',
+            style: AppTextStyles.caption.copyWith(color: Colors.white70),
+          ),
+          const SizedBox(height: AppSizes.s4),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _ImpactStat(value: '2,500+', label: 'Meals\nRescued', emoji: '🍱'),
+              _ImpactStat(value: '6.2 t', label: 'CO₂\nSaved', emoji: '🌱'),
+              _ImpactStat(value: '70%', label: 'Avg.\nDiscount', emoji: '💰'),
+            ],
+          ),
+          const SizedBox(height: AppSizes.s3),
+          Container(
+            padding: const EdgeInsets.all(AppSizes.s3),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            ),
+            child: Row(
+              children: [
+                const Text('🌍', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: AppSizes.s2),
+                Expanded(
+                  child: Text(
+                    'Saving 1 meal prevents ~2.5 kg of CO₂ emissions — the same as driving 10 km.',
+                    style: AppTextStyles.caption.copyWith(color: Colors.white, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ImpactStat extends StatelessWidget {
+  const _ImpactStat({
+    required this.value,
+    required this.label,
+    required this.emoji,
+  });
+  final String value;
+  final String label;
+  final String emoji;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 24)),
+        const SizedBox(height: AppSizes.s1),
+        Text(
+          value,
+          style: AppTextStyles.h4.copyWith(color: Colors.white, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: AppTextStyles.caption.copyWith(color: Colors.white70),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Surprise Bag section ───────────────────────────────────────────────────
+
+class _SurpriseBagSection extends StatelessWidget {
+  const _SurpriseBagSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(AppSizes.s4),
+      decoration: BoxDecoration(
+        color: AppColors.accentAmber.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('🎁', style: TextStyle(fontSize: 26)),
+              const SizedBox(width: AppSizes.s2),
+              Expanded(
+                child: Text(
+                  'What is a Surprise Bag?',
+                  style: AppTextStyles.h4,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.s2),
+          Text(
+            'A Surprise Bag is a mystery box of surplus food from a vendor — you don\'t know exactly what\'s inside, but it\'s always good quality and worth far more than the price you pay.',
+            style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary, height: 1.5),
+          ),
+          const SizedBox(height: AppSizes.s3),
+          ..._surpriseBagPerks.map(
+            (perk) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSizes.s2),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentAmber.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(child: Text(perk.$1, style: const TextStyle(fontSize: 14))),
+                  ),
+                  const SizedBox(width: AppSizes.s2),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(perk.$2, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                        Text(perk.$3, style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSizes.s2),
+          Container(
+            padding: const EdgeInsets.all(AppSizes.s3),
+            decoration: BoxDecoration(
+              color: AppColors.accentAmber.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            ),
+            child: Text(
+              '💡 Tip: Surprise Bags are great for adventurous eaters and anyone who loves a deal — vendors pack them with whatever is freshest that day.',
+              style: AppTextStyles.caption.copyWith(height: 1.4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+const _surpriseBagPerks = [
+  ('🍽️', 'More food, less cost', 'Surprise Bags are typically 50–70% off the retail value of what\'s inside.'),
+  ('🌱', 'Zero waste hero', 'Each bag you rescue keeps perfectly good food out of landfill.'),
+  ('🎲', 'Fun mystery element', 'You\'ll get a mix of freshly made items — great for trying new things.'),
+  ('⚡', 'Limited availability', 'Only a few bags are offered each day, so grab one while it\'s there.'),
+];
 
 // ─── FAQ data ────────────────────────────────────────────────────────────────
 

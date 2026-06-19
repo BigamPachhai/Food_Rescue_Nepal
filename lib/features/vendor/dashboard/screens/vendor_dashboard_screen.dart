@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -52,6 +53,80 @@ class VendorDashboardScreen extends ConsumerWidget {
             ] else ...[
               if (vendorStatus == 'SUSPENDED')
                 SliverToBoxAdapter(child: _buildSuspendedBanner()),
+              // Urgent orders alert
+              SliverToBoxAdapter(
+                child: ordersAsync.whenOrNull(
+                  data: (orders) {
+                    final urgent = orders.where((o) =>
+                        o.status == 'PENDING' &&
+                        o.listing?.pickupEnd != null &&
+                        o.listing!.pickupEnd.difference(DateTime.now()).inMinutes <= 30 &&
+                        o.listing!.pickupEnd.isAfter(DateTime.now())).length;
+                    if (urgent == 0) return null;
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+                      padding: const EdgeInsets.all(AppSizes.s3),
+                      decoration: BoxDecoration(
+                        color: AppColors.errorSurface,
+                        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.alarm_rounded, color: AppColors.error, size: 20),
+                          const SizedBox(width: AppSizes.s2),
+                          Expanded(
+                            child: Text(
+                              '$urgent order${urgent > 1 ? 's' : ''} closing in <30 min — act now!',
+                              style: AppTextStyles.bodySmall.copyWith(color: AppColors.error, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => context.go('/vendor/orders'),
+                            style: TextButton.styleFrom(foregroundColor: AppColors.error, padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2)),
+                            child: const Text('View', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ) ?? const SizedBox.shrink(),
+              ),
+              // Low inventory alert
+              SliverToBoxAdapter(
+                child: listingsAsync.whenOrNull(
+                  data: (listings) {
+                    final lowStock = listings.where((l) => l.isActive && l.availableQty > 0 && l.availableQty <= 2).toList();
+                    if (lowStock.isEmpty) return null;
+                    return Container(
+                      margin: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+                      padding: const EdgeInsets.all(AppSizes.s3),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningSurface,
+                        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                        border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.inventory_2_rounded, color: AppColors.accentAmber, size: 20),
+                          const SizedBox(width: AppSizes.s2),
+                          Expanded(
+                            child: Text(
+                              '${lowStock.length} listing${lowStock.length > 1 ? 's' : ''} almost sold out (≤2 left)',
+                              style: AppTextStyles.bodySmall.copyWith(color: AppColors.accentAmber, fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () => context.go('/vendor/listings'),
+                            style: TextButton.styleFrom(foregroundColor: AppColors.accentAmber, padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2)),
+                            child: const Text('Manage', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ) ?? const SizedBox.shrink(),
+              ),
               SliverToBoxAdapter(
               child: statsAsync.when(
                 data: (stats) => _StatsPanel(stats: stats),
@@ -68,6 +143,37 @@ class VendorDashboardScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+            ),
+            // Food impact card
+            SliverToBoxAdapter(
+              child: statsAsync.whenOrNull(
+                data: (stats) => stats.completedPickups > 0
+                    ? _FoodImpactCard(stats: stats)
+                    : null,
+              ) ?? const SizedBox.shrink(),
+            ),
+            // Weekly tip card
+            const SliverToBoxAdapter(child: _WeeklyTipCard()),
+            // Best-selling listing
+            SliverToBoxAdapter(
+              child: listingsAsync.whenOrNull(
+                data: (listings) {
+                  if (listings.isEmpty) return null;
+                  final sorted = [...listings]..sort((a, b) => b.soldCount.compareTo(a.soldCount));
+                  final best = sorted.first;
+                  if (best.soldCount == 0) return null;
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s2, AppSizes.s4, 0),
+                    child: _QuickLinkCard(
+                      icon: Icons.trending_up_rounded,
+                      iconColor: AppColors.success,
+                      title: 'Best Seller: ${best.name}',
+                      subtitle: '${best.soldCount} sold · ${best.discountPercent}% off',
+                      onTap: () => context.push('/vendor/listings/${best.id}/edit'),
+                    ),
+                  );
+                },
+              ) ?? const SizedBox.shrink(),
             ),
             // Reviews quick-link
             SliverToBoxAdapter(
@@ -229,6 +335,9 @@ class VendorDashboardScreen extends ConsumerWidget {
   Widget _buildHeader(BuildContext context, AuthState authState) {
     final name =
         authState is AuthAuthenticated ? authState.user.name : 'Vendor';
+    final now = DateTime.now();
+    final hour = now.hour;
+    final greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
     return Container(
       padding: EdgeInsets.only(
         top: MediaQuery.of(context).padding.top + AppSizes.s3,
@@ -251,13 +360,9 @@ class VendorDashboardScreen extends ConsumerWidget {
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.2),
               shape: BoxShape.circle,
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
             ),
-            child:
-                const Icon(Icons.store_rounded, color: Colors.white, size: 24),
+            child: const Icon(Icons.store_rounded, color: Colors.white, size: 24),
           ),
           const SizedBox(width: AppSizes.s3),
           Expanded(
@@ -265,16 +370,31 @@ class VendorDashboardScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Welcome back',
-                  style: AppTextStyles.caption
-                      .copyWith(color: Colors.white.withValues(alpha: 0.75)),
+                  greeting,
+                  style: AppTextStyles.caption.copyWith(color: Colors.white.withValues(alpha: 0.75)),
                 ),
-                Text(
-                  name,
-                  style: AppTextStyles.h4OnPrimary,
-                  overflow: TextOverflow.ellipsis,
-                ),
+                Text(name, style: AppTextStyles.h4OnPrimary, overflow: TextOverflow.ellipsis),
               ],
+            ),
+          ),
+          const SizedBox(width: AppSizes.s2),
+          // Quick add listing button
+          GestureDetector(
+            onTap: () => context.push('/vendor/listings/add'),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add_rounded, color: Colors.white, size: 16),
+                  SizedBox(width: 4),
+                  Text('List Food', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
           ),
         ],
@@ -422,7 +542,14 @@ class _VendorPendingState extends StatelessWidget {
           const SizedBox(height: AppSizes.s2),
           Center(
             child: TextButton(
-              onPressed: () {},
+              onPressed: () async {
+                final uri = Uri(
+                  scheme: 'mailto',
+                  path: 'support@foodrescuenepal.com',
+                  query: 'subject=Vendor Support Request',
+                );
+                if (await canLaunchUrl(uri)) await launchUrl(uri);
+              },
               child: Text(
                 'Need help? Contact support',
                 style: AppTextStyles.bodySmall.copyWith(
@@ -1166,6 +1293,135 @@ class _InlineError extends StatelessWidget {
             ),
             child: const Text('Retry',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Food Impact Card ────────────────────────────────────────────────────────
+
+class _FoodImpactCard extends StatelessWidget {
+  const _FoodImpactCard({required this.stats});
+  final VendorStats stats;
+
+  @override
+  Widget build(BuildContext context) {
+    final co2Saved = (stats.completedPickups * 2.5);
+    final revenue = Formatters.formatNPR(stats.totalRevenuePaisa);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+      padding: const EdgeInsets.all(AppSizes.s4),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1B5E20), AppColors.primaryMedium],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.eco_rounded, color: Colors.white70, size: 16),
+              const SizedBox(width: 6),
+              Text('Your Food Rescue Impact', style: AppTextStyles.caption.copyWith(color: Colors.white70)),
+            ],
+          ),
+          const SizedBox(height: AppSizes.s3),
+          Row(
+            children: [
+              _DashImpactStat(value: '${stats.completedPickups}', label: 'Meals\nRescued', icon: Icons.restaurant_rounded),
+              _DashImpactStat(value: '~${co2Saved.toStringAsFixed(1)} kg', label: 'CO₂\nAvoided', icon: Icons.cloud_off_rounded),
+              _DashImpactStat(value: revenue, label: 'Total\nRevenue', icon: Icons.payments_rounded),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashImpactStat extends StatelessWidget {
+  const _DashImpactStat({required this.value, required this.label, required this.icon});
+  final String value;
+  final String label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Icon(icon, color: Colors.white70, size: 20),
+          const SizedBox(height: 4),
+          Text(value, style: AppTextStyles.h6.copyWith(color: Colors.white), textAlign: TextAlign.center),
+          Text(label, style: AppTextStyles.caption.copyWith(color: Colors.white60, height: 1.3, fontSize: 10), textAlign: TextAlign.center),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Weekly Tip Card ─────────────────────────────────────────────────────────
+
+class _WeeklyTipCard extends StatelessWidget {
+  const _WeeklyTipCard();
+
+  static const _tips = [
+    ('Add photos to your listings', 'Listings with photos get 3× more reservations.', Icons.photo_camera_rounded),
+    ('Set accurate pickup windows', 'Customers who miss pickups are less likely to re-order.', Icons.schedule_rounded),
+    ('Try a Surprise Bag listing', 'Mystery bags drive curiosity and sell out faster than fixed items.', Icons.card_giftcard_rounded),
+    ('Offer bigger discounts on slow days', 'Higher discounts mean faster sell-outs.', Icons.local_offer_rounded),
+    ('Respond quickly to orders', 'Fast acceptance builds customer trust and repeat business.', Icons.speed_rounded),
+    ('Keep condition notes updated', 'Honest notes reduce complaints and bad reviews.', Icons.edit_note_rounded),
+    ('List at consistent times', 'Customers who know your schedule return more often.', Icons.repeat_rounded),
+    ('Bundle near-expiry items', 'Group small items into "Surprise Bags" for higher conversions.', Icons.inventory_2_rounded),
+    ('Encourage reviews', 'Vendors with 10+ reviews get 2× more clicks than unreviewed ones.', Icons.star_rounded),
+    ('Reply to low ratings', 'A professional response to a bad review shows trustworthiness.', Icons.chat_bubble_outline_rounded),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final tip = _tips[DateTime.now().weekday % _tips.length];
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+      padding: const EdgeInsets.all(AppSizes.s3),
+      decoration: BoxDecoration(
+        color: AppColors.warningSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.accentAmber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(tip.$3, color: AppColors.accentAmber, size: 20),
+          ),
+          const SizedBox(width: AppSizes.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text('💡 Tip of the week', style: AppTextStyles.caption.copyWith(color: AppColors.accentAmber, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(tip.$1, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(tip.$2, style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
           ),
         ],
       ),

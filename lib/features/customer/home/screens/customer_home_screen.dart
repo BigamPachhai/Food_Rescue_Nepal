@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:shimmer/shimmer.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -34,13 +33,15 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
   final _scrollCtrl = ScrollController();
   bool _isSearchMode = false;
   String _selectedCategory = 'All';
+  bool _showScrollTop = false;
 
   static const _categories = [
-    'All', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
+    'All', 'Surprise Bag', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
   ];
 
   static const _categoryIcons = {
     'All': Icons.grid_view_rounded,
+    'Surprise Bag': Icons.card_giftcard_rounded,
     'Bakery': Icons.bakery_dining_rounded,
     'Restaurant': Icons.restaurant_rounded,
     'Cafe': Icons.coffee_rounded,
@@ -69,6 +70,8 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     if (_scrollCtrl.position.pixels >= _scrollCtrl.position.maxScrollExtent - 300) {
       ref.read(listingsProvider.notifier).fetch();
     }
+    final shouldShow = _scrollCtrl.position.pixels > 400;
+    if (shouldShow != _showScrollTop) setState(() => _showScrollTop = shouldShow);
   }
 
   void _enterSearch() => setState(() => _isSearchMode = true);
@@ -114,6 +117,23 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
+      floatingActionButton: AnimatedSlide(
+        duration: const Duration(milliseconds: 200),
+        offset: _showScrollTop ? Offset.zero : const Offset(0, 2),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: _showScrollTop ? 1 : 0,
+          child: FloatingActionButton.small(
+            onPressed: () => _scrollCtrl.animateTo(
+              0,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOut,
+            ),
+            backgroundColor: AppColors.primaryMedium,
+            child: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
+          ),
+        ),
+      ),
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
         onRefresh: () async {
@@ -132,8 +152,9 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
             SliverToBoxAdapter(child: _buildHeader(context, unreadCount, locationLabel)),
             SliverToBoxAdapter(child: _buildSearchBar(filter.hasActiveFilters, filter)),
             SliverToBoxAdapter(child: _buildCategoryChips()),
+            SliverToBoxAdapter(child: _buildLastCallSection()),
+            SliverToBoxAdapter(child: _buildPopularVendors()),
             SliverToBoxAdapter(child: _buildFeaturedSection()),
-            SliverToBoxAdapter(child: _buildPopularVendorsSection()),
             SliverToBoxAdapter(child: _buildFeedHeader(filter)),
             listingsAsync.when(
               data: (listings) {
@@ -187,6 +208,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
                         listing: listings[index],
                         onTap: () =>
                             context.push('/customer/listing/${listings[index].id}'),
+                        showFavorite: false,
                       );
                     },
                     childCount: listings.length + 1,
@@ -437,6 +459,235 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
     );
   }
 
+  Widget _buildLastCallSection() {
+    final listingsAsync = ref.watch(listingsProvider);
+    final listings = listingsAsync.value ?? [];
+    final now = DateTime.now();
+    final lastCall = listings
+        .where((l) =>
+            l.availableQty > 0 &&
+            l.pickupEnd.isAfter(now) &&
+            l.pickupEnd.difference(now).inMinutes <= 60)
+        .toList();
+    if (lastCall.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, AppSizes.s2),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.local_fire_department_rounded, size: 13, color: Colors.white),
+                    const SizedBox(width: 4),
+                    Text('LAST CALL',
+                        style: AppTextStyles.overline.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSizes.s2),
+              Text('Closing within the hour', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 112,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3),
+            itemCount: lastCall.length,
+            itemBuilder: (_, i) {
+              final l = lastCall[i];
+              final minsLeft = l.pickupEnd.difference(now).inMinutes;
+              return GestureDetector(
+                onTap: () => context.push('/customer/listing/${l.id}'),
+                child: Container(
+                  width: 200,
+                  margin: const EdgeInsets.only(right: AppSizes.s2),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceLight,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+                    border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                    boxShadow: AppShadows.card,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSizes.s2),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                          child: l.imageUrls.isNotEmpty
+                              ? CachedNetworkImage(imageUrl: l.imageUrls.first, width: 72, height: 72, fit: BoxFit.cover)
+                              : Container(width: 72, height: 72, color: AppColors.primarySurface,
+                                  child: const Icon(Icons.fastfood_rounded, color: AppColors.primaryLight, size: 28)),
+                        ),
+                        const SizedBox(width: AppSizes.s2),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(l.name, style: AppTextStyles.label.copyWith(fontWeight: FontWeight.w600),
+                                  maxLines: 1, overflow: TextOverflow.ellipsis),
+                              const SizedBox(height: 3),
+                              Text(
+                                Formatters.formatNPR(l.discountedPrice),
+                                style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium),
+                              ),
+                              const SizedBox(height: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.errorSurface,
+                                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.timer_rounded, size: 10, color: AppColors.error),
+                                    const SizedBox(width: 3),
+                                    Text('${minsLeft}m left',
+                                        style: AppTextStyles.caption.copyWith(
+                                            color: AppColors.error, fontWeight: FontWeight.w700, fontSize: 10)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: AppSizes.s2),
+      ],
+    );
+  }
+
+  Widget _buildPopularVendors() {
+    final topAsync = ref.watch(topVendorsProvider);
+    return topAsync.when(
+      data: (vendors) {
+        if (vendors.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                  AppSizes.s4, AppSizes.s4, AppSizes.s4, AppSizes.s3),
+              child: Row(
+                children: [
+                  Text('Popular Vendors', style: AppTextStyles.h4),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () => context.go('/customer/map'),
+                    child: Row(
+                      children: [
+                        Text(
+                          'See all',
+                          style: AppTextStyles.label.copyWith(
+                            color: AppColors.primaryMedium,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Icon(Icons.chevron_right_rounded,
+                            size: 16, color: AppColors.primaryMedium),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(
+              height: 96,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3),
+                itemCount: vendors.length,
+                itemBuilder: (_, i) {
+                  final v = vendors[i];
+                  return GestureDetector(
+                    onTap: () => context.push('/customer/vendor/${v.id}'),
+                    child: Container(
+                      width: 80,
+                      margin: const EdgeInsets.only(right: AppSizes.s3),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: AppColors.primarySurface,
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: ClipOval(
+                              child: v.logoUrl != null
+                                  ? CachedNetworkImage(
+                                      imageUrl: v.logoUrl!,
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: 112,
+                                      memCacheHeight: 112,
+                                      errorWidget: (_, __, ___) => const Icon(
+                                          Icons.store_rounded,
+                                          color: AppColors.primaryLight,
+                                          size: 24),
+                                    )
+                                  : const Icon(Icons.store_rounded,
+                                      color: AppColors.primaryLight, size: 24),
+                            ),
+                          ),
+                          const SizedBox(height: AppSizes.s1),
+                          Text(
+                            v.businessName,
+                            style: AppTextStyles.caption.copyWith(
+                                fontWeight: FontWeight.w600),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
+                          ),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.star_rounded,
+                                  size: 10, color: AppColors.accentAmber),
+                              const SizedBox(width: 2),
+                              Text(
+                                v.avgRating.toStringAsFixed(1),
+                                style: AppTextStyles.caption
+                                    .copyWith(fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: AppSizes.s2),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
   Widget _buildFeaturedSection() {
     final featuredAsync = ref.watch(featuredListingsProvider);
     return featuredAsync.when(
@@ -543,93 +794,6 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
         error: e,
         onRetry: () => ref.invalidate(featuredListingsProvider),
       ),
-    );
-  }
-
-  Widget _buildPopularVendorsSection() {
-    final vendorsAsync = ref.watch(topVendorsProvider);
-    return vendorsAsync.when(
-      data: (featured) {
-        if (featured.isEmpty) return const SizedBox.shrink();
-        final avatarSize = Responsive.isTablet(context) ? 68.0 : 56.0;
-        final rowHeight = avatarSize + 48;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s2, AppSizes.s4, AppSizes.s3),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Popular Vendors', style: AppTextStyles.h4),
-                      const SizedBox(height: 2),
-                      Text('Top-rated nearby', style: AppTextStyles.caption),
-                    ],
-                  ),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => ref.read(listingsProvider.notifier)
-                        .applyFilter(const ListingsFilter(sortBy: 'popular')),
-                    child: Row(
-                      children: [
-                        Text('See all', style: AppTextStyles.label.copyWith(color: AppColors.primaryMedium, fontWeight: FontWeight.w600)),
-                        const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.primaryMedium),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(
-              height: rowHeight,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3),
-                itemCount: featured.length,
-                itemBuilder: (_, i) => _VendorChip(
-                  vendor: featured[i],
-                  rank: i,
-                  onTap: () => ref.read(listingsProvider.notifier).search(featured[i].businessName),
-                ),
-              ),
-            ),
-            const SizedBox(height: AppSizes.s2),
-          ],
-        );
-      },
-      loading: () => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s2, AppSizes.s4, AppSizes.s3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Popular Vendors', style: AppTextStyles.h4),
-                const SizedBox(height: 2),
-                Text('Top-rated nearby', style: AppTextStyles.caption),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: 104,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3),
-              itemCount: 5,
-              itemBuilder: (_, __) => const Padding(
-                padding: EdgeInsets.only(right: AppSizes.s3),
-                child: _ShimmerVendorChip(),
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSizes.s2),
-        ],
-      ),
-      error: (_, __) => const SizedBox.shrink(),
     );
   }
 
@@ -905,146 +1069,6 @@ class _FeaturedCard extends StatelessWidget {
         color: AppColors.primarySurface,
         child: const Icon(Icons.fastfood_rounded, color: AppColors.primaryLight, size: 36),
       );
-}
-
-// ─── Vendor Chip ───────────────────────────────────────────────────────────
-
-class _VendorChip extends StatelessWidget {
-  const _VendorChip({required this.vendor, required this.onTap, this.rank = 99});
-  final VendorEntity vendor;
-  final VoidCallback onTap;
-  final int rank;
-
-  @override
-  Widget build(BuildContext context) {
-    final avatarSize = Responsive.isTablet(context) ? 68.0 : 56.0;
-    final chipWidth = avatarSize + 24;
-
-    // Gold / silver / bronze ring for top 3
-    Color? ringColor;
-    if (rank == 0) ringColor = const Color(0xFFFFD700);
-    if (rank == 1) ringColor = const Color(0xFFC0C0C0);
-    if (rank == 2) ringColor = const Color(0xFFCD7F32);
-
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: chipWidth,
-        margin: const EdgeInsets.only(right: AppSizes.s3),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: avatarSize,
-              height: avatarSize,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primarySurface,
-                border: Border.all(
-                  color: ringColor ?? AppColors.border,
-                  width: ringColor != null ? 2.0 : 1.5,
-                ),
-                boxShadow: ringColor != null
-                    ? [BoxShadow(color: ringColor.withValues(alpha: 0.35), blurRadius: 6, offset: const Offset(0, 2))]
-                    : AppShadows.xs,
-              ),
-              child: ClipOval(
-                child: vendor.logoUrl != null
-                    ? CachedNetworkImage(
-                        imageUrl: vendor.logoUrl!,
-                        fit: BoxFit.cover,
-                        memCacheWidth: 120,
-                        memCacheHeight: 120,
-                        errorWidget: (_, __, ___) => const Icon(Icons.store_rounded, color: AppColors.primaryLight, size: 24),
-                      )
-                    : const Icon(Icons.store_rounded, color: AppColors.primaryLight, size: 24),
-              ),
-            ),
-            const SizedBox(height: AppSizes.s1),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text(
-                    vendor.businessName,
-                    style: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                if (vendor.status == 'APPROVED') ...[
-                  const SizedBox(width: 2),
-                  const VerifiedBadge(size: 10),
-                ],
-              ],
-            ),
-            const SizedBox(height: 2),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.star_rounded, size: 10, color: AppColors.accentAmber),
-                const SizedBox(width: 2),
-                Text(vendor.avgRating.toStringAsFixed(1), style: AppTextStyles.caption),
-                if (vendor.totalReviews > 0) ...[
-                  const SizedBox(width: 2),
-                  Text(
-                    '(${vendor.totalReviews})',
-                    style: AppTextStyles.caption.copyWith(fontSize: 10, color: AppColors.textTertiary),
-                  ),
-                ],
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Shimmer Vendor Chip ────────────────────────────────────────────────────
-
-class _ShimmerVendorChip extends StatelessWidget {
-  const _ShimmerVendorChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor: AppColors.neutral100,
-      highlightColor: AppColors.neutral50,
-      child: SizedBox(
-        width: 80,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-            ),
-            const SizedBox(height: AppSizes.s1),
-            Container(
-              height: 10,
-              width: 52,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Container(
-              height: 10,
-              width: 36,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 // ─── Sort Button ───────────────────────────────────────────────────────────
@@ -1677,7 +1701,7 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
         return GestureDetector(
           onTap: () {
             widget.onBack();
-            ref.read(listingsProvider.notifier).search(v.businessName);
+            context.push('/customer/vendor/${v.id}');
           },
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: AppSizes.s4, vertical: AppSizes.s1),
@@ -1828,10 +1852,11 @@ class _SearchOverlayState extends ConsumerState<_SearchOverlay> {
 // ─── Listing Card (public, reused across the app) ──────────────────────────
 
 class ListingCard extends ConsumerStatefulWidget {
-  const ListingCard({super.key, required this.listing, required this.onTap});
+  const ListingCard({super.key, required this.listing, required this.onTap, this.showFavorite = true});
 
   final ListingEntity listing;
   final VoidCallback onTap;
+  final bool showFavorite;
 
   @override
   ConsumerState<ListingCard> createState() => _ListingCardState();
@@ -1921,6 +1946,34 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                             )
                           : _placeholder(),
                     ),
+                    // "New" badge for listings posted in the last 2 hours
+                    if (listing.createdAt != null &&
+                        DateTime.now().difference(listing.createdAt!).inHours < 2 &&
+                        !isSoldOut)
+                      Positioned(
+                        bottom: AppSizes.s1,
+                        left: AppSizes.s1,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.info,
+                            borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                          ),
+                          child: const Text('NEW',
+                              style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
+                    // Surprise Bag overlay icon
+                    if (listing.category == 'Surprise Bag')
+                      Positioned(
+                        bottom: AppSizes.s1,
+                        right: AppSizes.s1,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: Colors.black45, shape: BoxShape.circle),
+                          child: const Icon(Icons.card_giftcard_rounded, size: 11, color: Colors.white),
+                        ),
+                      ),
                     // Sold-out overlay
                     if (isSoldOut)
                       Positioned.fill(
@@ -1950,43 +2003,42 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                         left: AppSizes.s1,
                         child: DiscountBadge(percent: listing.discountPercent),
                       ),
-                    // Larger fav button: 32x32
-                    Positioned(
-                      top: 2,
-                      right: 2,
-                      child: GestureDetector(
-                        onTap: _toggleFavorite,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.45),
-                            shape: BoxShape.circle,
+                    if (widget.showFavorite)
+                      Positioned(
+                        top: 2,
+                        right: 2,
+                        child: GestureDetector(
+                          onTap: _toggleFavorite,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.45),
+                              shape: BoxShape.circle,
+                            ),
+                            child: _togglingFav
+                                ? const Padding(
+                                    padding: EdgeInsets.all(7),
+                                    child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
+                                  )
+                                : Icon(
+                                    isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                                    size: 17,
+                                    color: isFav ? Colors.red.shade400 : Colors.white,
+                                  ),
                           ),
-                          child: _togglingFav
-                              ? const Padding(
-                                  padding: EdgeInsets.all(7),
-                                  child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
-                                )
-                              : Icon(
-                                  isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                  size: 17,
-                                  color: isFav ? Colors.red.shade400 : Colors.white,
-                                ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(width: AppSizes.s3),
-                // ── Info column fixed to 96 height ─────────────────────
+                // ── Info column ────────────────────────────────────────
                 Expanded(
-                  child: SizedBox(
-                    height: 96,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    mainAxisSize: MainAxisSize.min,
                       children: [
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2041,9 +2093,12 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                                 const SizedBox(width: AppSizes.s2),
                                 const Icon(Icons.location_on_rounded, size: 12, color: AppColors.textTertiary),
                                 const SizedBox(width: 2),
-                                Text(
-                                  listing.distance != null ? '${listing.distance!.toStringAsFixed(1)} km' : '—',
-                                  style: AppTextStyles.caption,
+                                Flexible(
+                                  child: Text(
+                                    listing.distance != null ? '${listing.distance!.toStringAsFixed(1)} km' : '—',
+                                    style: AppTextStyles.caption,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
                                 ),
                                 if (urgency != null) ...[
                                   const SizedBox(width: AppSizes.s1),
@@ -2060,8 +2115,14 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                                         fontWeight: FontWeight.w700,
                                         fontSize: 9,
                                       ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
+                                ],
+                                // Live countdown for items closing within 2 hours
+                                if (!isSoldOut && listing.availableQty > 0) ...[
+                                  const SizedBox(width: AppSizes.s1),
+                                  _CountdownChip(pickupEnd: listing.pickupEnd),
                                 ],
                               ],
                             ),
@@ -2106,7 +2167,6 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                           ],
                         ),
                       ],
-                    ),
                   ),
                 ),
               ],
@@ -2123,4 +2183,63 @@ class _ListingCardState extends ConsumerState<ListingCard> {
         color: AppColors.primarySurface,
         child: const Icon(Icons.fastfood_rounded, color: AppColors.primaryLight, size: 32),
       );
+}
+
+// ─── Live countdown chip (shown on listing cards) ──────────────────────────
+
+class _CountdownChip extends StatefulWidget {
+  const _CountdownChip({required this.pickupEnd});
+  final DateTime pickupEnd;
+
+  @override
+  State<_CountdownChip> createState() => _CountdownChipState();
+}
+
+class _CountdownChipState extends State<_CountdownChip> {
+  late Duration _remaining;
+  late final _timer = Stream.periodic(const Duration(seconds: 30), (_) => null);
+  late final _sub = _timer.listen((_) {
+    if (mounted) setState(() => _remaining = _timeLeft());
+  });
+
+  Duration _timeLeft() {
+    final d = widget.pickupEnd.difference(DateTime.now());
+    return d.isNegative ? Duration.zero : d;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _remaining = _timeLeft();
+  }
+
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_remaining == Duration.zero) return const SizedBox.shrink();
+    final hours = _remaining.inHours;
+    final mins = _remaining.inMinutes % 60;
+    final isUrgent = _remaining.inMinutes <= 30;
+    if (!isUrgent && hours > 3) return const SizedBox.shrink();
+    final label = hours > 0 ? '${hours}h ${mins}m' : '${mins}m';
+    final color = isUrgent ? AppColors.error : AppColors.warning;
+    final bg = isUrgent ? AppColors.errorSurface : AppColors.warningSurface;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppSizes.radiusFull)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.timer_rounded, size: 9, color: color),
+          const SizedBox(width: 2),
+          Text(label, style: AppTextStyles.caption.copyWith(color: color, fontWeight: FontWeight.w700, fontSize: 9)),
+        ],
+      ),
+    );
+  }
 }

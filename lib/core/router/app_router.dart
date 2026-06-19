@@ -33,6 +33,7 @@ import '../../features/admin/screens/admin_vendors_screen.dart';
 import '../../features/admin/screens/admin_vendor_detail_screen.dart';
 import '../../features/admin/screens/admin_listings_screen.dart';
 import '../../features/admin/screens/admin_orders_screen.dart';
+import '../../features/admin/screens/admin_order_detail_screen.dart';
 import '../../features/notifications/screens/notifications_screen.dart';
 import '../../features/reviews/screens/write_review_screen.dart';
 import '../../features/reviews/screens/vendor_reviews_screen.dart';
@@ -44,6 +45,7 @@ import '../../features/legal/screens/terms_screen.dart';
 import '../../features/onboarding/screens/onboarding_screen.dart';
 import '../../features/onboarding/providers/onboarding_provider.dart';
 import '../../features/how_it_works/screens/how_it_works_screen.dart';
+import '../../features/customer/vendors/screens/customer_vendor_screen.dart';
 
 // Shell widgets
 class CustomerShell extends StatelessWidget {
@@ -101,7 +103,6 @@ class VendorShell extends StatelessWidget {
   ];
 
   static const _profileSubPaths = [
-    '/vendor/scanner',
     '/vendor/reviews',
     '/vendor/settings',
   ];
@@ -267,6 +268,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
       GoRoute(path: '/legal/privacy', builder: (_, __) => const PrivacyPolicyScreen()),
       GoRoute(path: '/legal/terms', builder: (_, __) => const TermsScreen()),
+      GoRoute(path: '/vendor/scanner', builder: (_, __) => const QrScannerScreen()),
+      GoRoute(
+        path: '/customer/qr/:id',
+        builder: (_, state) => QrDisplayScreen(orderId: state.pathParameters['id']!),
+      ),
       ShellRoute(
         builder: (_, __, child) => CustomerShell(child: child),
         routes: [
@@ -281,15 +287,21 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/customer/orders/:id',
             builder: (_, state) => OrderDetailScreen(orderId: state.pathParameters['id']!),
           ),
-          GoRoute(
-            path: '/customer/orders/:id/qr',
-            builder: (_, state) => QrDisplayScreen(orderId: state.pathParameters['id']!),
-          ),
           GoRoute(path: '/customer/favorites', builder: (_, __) => const FavoritesScreen()),
           GoRoute(path: '/customer/profile', builder: (_, __) => const CustomerProfileScreen()),
           GoRoute(path: '/customer/profile/edit', builder: (_, __) => const EditProfileScreen()),
           GoRoute(path: '/customer/support', builder: (_, __) => const SupportScreen()),
           GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+          GoRoute(
+            path: '/customer/vendor/:id',
+            builder: (_, state) =>
+                CustomerVendorScreen(vendorId: state.pathParameters['id']!),
+          ),
+          GoRoute(
+            path: '/customer/vendor/:id/reviews',
+            builder: (_, state) =>
+                VendorReviewsScreen(vendorId: state.pathParameters['id']!),
+          ),
           GoRoute(
             path: '/customer/orders/:id/review',
             builder: (_, state) {
@@ -325,7 +337,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/vendor/orders/:id',
             builder: (_, state) => VendorOrderDetailScreen(orderId: state.pathParameters['id']!),
           ),
-          GoRoute(path: '/vendor/scanner', builder: (_, __) => const QrScannerScreen()),
           GoRoute(path: '/vendor/profile', builder: (_, __) => const VendorProfileScreen()),
           GoRoute(path: '/vendor/profile/edit', builder: (_, __) => const EditVendorProfileScreen()),
           GoRoute(
@@ -352,6 +363,10 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(path: '/admin/listings', builder: (_, __) => const AdminListingsScreen()),
           GoRoute(path: '/admin/orders', builder: (_, __) => const AdminOrdersScreen()),
+          GoRoute(
+            path: '/admin/orders/:id',
+            builder: (_, state) => AdminOrderDetailScreen(orderId: state.pathParameters['id']!),
+          ),
         ],
       ),
     ],

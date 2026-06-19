@@ -174,6 +174,68 @@ final adminVendorDetailProvider =
   return AdminVendor.fromJson(d);
 });
 
+class AdminOrderDetail {
+  final String id;
+  final int totalAmount;
+  final String status;
+  final int quantity;
+  final DateTime createdAt;
+  final String? listingName;
+  final String? listingDescription;
+  final String? customerName;
+  final String? customerEmail;
+  final String? customerPhone;
+  final String? vendorName;
+  final String? vendorAddress;
+  final String? qrCode;
+
+  const AdminOrderDetail({
+    required this.id,
+    required this.totalAmount,
+    required this.status,
+    required this.quantity,
+    required this.createdAt,
+    this.listingName,
+    this.listingDescription,
+    this.customerName,
+    this.customerEmail,
+    this.customerPhone,
+    this.vendorName,
+    this.vendorAddress,
+    this.qrCode,
+  });
+
+  factory AdminOrderDetail.fromJson(Map<String, dynamic> json) {
+    final listing = json['listing'] as Map<String, dynamic>?;
+    final customer = json['customer'] as Map<String, dynamic>?;
+    final vendor = json['vendor'] as Map<String, dynamic>?;
+    return AdminOrderDetail(
+      id: json['id'] as String,
+      totalAmount: json['totalAmount'] as int? ?? 0,
+      status: json['status'] as String,
+      quantity: json['quantity'] as int? ?? 1,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      listingName: listing?['name'] as String?,
+      listingDescription: listing?['description'] as String?,
+      customerName: customer?['name'] as String?,
+      customerEmail: customer?['email'] as String?,
+      customerPhone: customer?['phone'] as String?,
+      vendorName: vendor?['businessName'] as String?,
+      vendorAddress: vendor?['address'] as String?,
+      qrCode: json['qrCode'] as String?,
+    );
+  }
+}
+
+final adminOrderDetailProvider =
+    FutureProvider.family<AdminOrderDetail, String>((ref, id) async {
+  final dio = ref.read(dioClientProvider);
+  final response = await dio.get(ApiEndpoints.adminOrderById(id));
+  final raw = response.data as Map<String, dynamic>;
+  final d = raw.containsKey('data') ? raw['data'] as Map<String, dynamic> : raw;
+  return AdminOrderDetail.fromJson(d);
+});
+
 // Orders
 final adminOrdersProvider =
     FutureProvider.family<List<AdminOrder>, String>((ref, status) async {

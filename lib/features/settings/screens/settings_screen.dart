@@ -75,6 +75,46 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ]),
 
+          // ── Dietary Preferences ─────────────────────────────────────────
+          const _SectionHeader('Dietary Preferences'),
+          _Card(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Filter listings by dietary needs', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: ['Vegan', 'Vegetarian', 'Halal', 'Gluten Free', 'Dairy Free', 'Organic']
+                        .map((tag) => _DietaryChip(label: tag))
+                        .toList(),
+                  ),
+                ],
+              ),
+            ),
+          ]),
+
+          // ── Discovery ───────────────────────────────────────────────────
+          const _SectionHeader('Discovery'),
+          _Card(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nearby Alert Radius', style: AppTextStyles.bodyMedium),
+                  const SizedBox(height: 4),
+                  Text('Get alerts for new listings within this distance', style: AppTextStyles.caption),
+                  const SizedBox(height: 8),
+                  const _RadiusSlider(),
+                ],
+              ),
+            ),
+          ]),
+
           // ── Notifications ───────────────────────────────────────────────
           const _SectionHeader('Notifications'),
           _Card(children: [
@@ -111,6 +151,16 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ]),
 
+          // ── Account ─────────────────────────────────────────────────────
+          const _SectionHeader('Account'),
+          _Card(children: [
+            _NavTile(
+              icon: Icons.lock_outline_rounded,
+              label: 'Change Password',
+              onTap: () => context.push('/forgot-password'),
+            ),
+          ]),
+
           // ── Legal ───────────────────────────────────────────────────────
           const _SectionHeader('Legal'),
           _Card(children: [
@@ -127,6 +177,26 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ]),
 
+          // ── Storage ─────────────────────────────────────────────────────
+          const _SectionHeader('Storage'),
+          _Card(children: [
+            ListTile(
+              leading: const Icon(Icons.cleaning_services_outlined,
+                  color: AppColors.textSecondary),
+              title: const Text('Clear Image Cache'),
+              subtitle: const Text('Frees up cached images on device'),
+              trailing: TextButton(
+                onPressed: () {
+                  PaintingBinding.instance.imageCache.clear();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Image cache cleared')),
+                  );
+                },
+                child: const Text('Clear'),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
           // ── About ───────────────────────────────────────────────────────
           const _SectionHeader('About'),
           _Card(children: [
@@ -465,6 +535,86 @@ class _AboutRow extends StatelessWidget {
           Text(text, style: AppTextStyles.bodySmall),
         ],
       ),
+    );
+  }
+}
+
+// ─── Dietary chip (local UI state — persisting to prefs is a future step) ──
+
+class _DietaryChip extends StatefulWidget {
+  const _DietaryChip({required this.label});
+  final String label;
+
+  @override
+  State<_DietaryChip> createState() => _DietaryChipState();
+}
+
+class _DietaryChipState extends State<_DietaryChip> {
+  bool _selected = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => setState(() => _selected = !_selected),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: _selected ? AppColors.primaryMedium : AppColors.primarySurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _selected ? AppColors.primaryMedium : AppColors.border,
+          ),
+        ),
+        child: Text(
+          widget.label,
+          style: AppTextStyles.caption.copyWith(
+            color: _selected ? Colors.white : AppColors.textSecondary,
+            fontWeight: _selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Nearby radius slider ───────────────────────────────────────────────────
+
+class _RadiusSlider extends StatefulWidget {
+  const _RadiusSlider();
+
+  @override
+  State<_RadiusSlider> createState() => _RadiusSliderState();
+}
+
+class _RadiusSliderState extends State<_RadiusSlider> {
+  double _radius = 5.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text('1 km', style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+            Text(
+              _radius >= 50 ? 'Any distance' : '${_radius.toInt()} km',
+              style: AppTextStyles.label.copyWith(color: AppColors.primaryMedium, fontWeight: FontWeight.w700),
+            ),
+            Text('50 km', style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+          ],
+        ),
+        Slider(
+          value: _radius,
+          min: 1,
+          max: 50,
+          divisions: 49,
+          activeColor: AppColors.primaryMedium,
+          inactiveColor: AppColors.primarySurface,
+          onChanged: (v) => setState(() => _radius = v),
+        ),
+      ],
     );
   }
 }

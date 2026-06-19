@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_sizes.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/utils/extensions.dart';
 import '../../../core/utils/formatters.dart';
@@ -28,13 +29,7 @@ class _AdminUserDetailScreenState
     setState(() => _isActing = true);
     try {
       final dio = ref.read(dioClientProvider);
-      if (currentlyActive) {
-        await dio.post(
-            'admin/users/${widget.userId}/ban');
-      } else {
-        await dio.post(
-            'admin/users/${widget.userId}/unban');
-      }
+      await dio.patch(ApiEndpoints.adminBanUser(widget.userId));
       if (mounted) {
         context.showSnackBar(
             currentlyActive ? 'User banned' : 'User unbanned');

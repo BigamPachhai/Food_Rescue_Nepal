@@ -3,28 +3,53 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../constants/app_colors.dart';
 import '../network/connectivity_provider.dart';
 
-class OfflineBanner extends ConsumerWidget {
+class OfflineBanner extends ConsumerStatefulWidget {
   const OfflineBanner({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<OfflineBanner> createState() => _OfflineBannerState();
+}
+
+class _OfflineBannerState extends ConsumerState<OfflineBanner> {
+  bool _wasOffline = false;
+  bool _showReconnected = false;
+
+  @override
+  Widget build(BuildContext context) {
     final isOnline = ref.watch(connectivityProvider);
-    if (isOnline) return const SizedBox.shrink();
+
+    if (!isOnline) {
+      _wasOffline = true;
+      _showReconnected = false;
+    } else if (_wasOffline && !_showReconnected) {
+      _wasOffline = false;
+      _showReconnected = true;
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) setState(() => _showReconnected = false);
+      });
+    }
+
+    if (isOnline && !_showReconnected) return const SizedBox.shrink();
 
     return Material(
       color: Colors.transparent,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
         width: double.infinity,
-        color: AppColors.error,
+        color: isOnline ? AppColors.success : AppColors.error,
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.wifi_off, color: Colors.white, size: 16),
-            SizedBox(width: 8),
+            Icon(
+              isOnline ? Icons.wifi_rounded : Icons.wifi_off,
+              color: Colors.white,
+              size: 16,
+            ),
+            const SizedBox(width: 8),
             Text(
-              'No internet connection',
-              style: TextStyle(
+              isOnline ? 'Back online' : 'No internet connection',
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
