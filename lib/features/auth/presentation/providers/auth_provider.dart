@@ -28,6 +28,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final user = await _repository.login(LoginRequest(email: email, password: password));
       state = AuthAuthenticated(user);
+    } on Requires2FAException catch (e) {
+      state = AuthRequires2FA(e.email);
     } catch (e) {
       state = AuthError(e.toString());
     }
@@ -93,6 +95,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> logout() async {
     await _repository.logout();
     state = const AuthUnauthenticated();
+  }
+
+  void setAuthenticated(UserEntity user) {
+    state = AuthAuthenticated(user);
   }
 
   void updateUser({String? name, String? phone, String? avatarUrl}) {

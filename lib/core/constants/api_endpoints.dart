@@ -178,6 +178,7 @@ class ApiEndpoints {
   static const String twoFaSetup = '/2fa/setup';
   static const String twoFaEnable = '/2fa/enable';
   static const String twoFaDisable = '/2fa/disable';
+  static const String twoFaVerifyLogin = '/auth/verify-2fa';
 
   // Feature 15: Data Export + Account Deletion
   static const String requestDataExport = '/data/export';

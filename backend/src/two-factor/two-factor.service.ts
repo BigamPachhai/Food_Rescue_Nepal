@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 
 // Simple TOTP implementation (compatible with Google Authenticator)
 function generateSecret(): string {
-  return crypto.randomBytes(20).toString('base32').slice(0, 32);
+  return Buffer.from(crypto.randomBytes(20)).toString('base64').replace(/[^A-Z2-7]/gi, '').toUpperCase().slice(0, 32);
 }
 
 function hotp(secret: string, counter: number): string {
@@ -101,6 +101,6 @@ export class TwoFactorService {
       where: { id: userId },
       select: { twoFactorEnabled: true },
     });
-    return { enabled: user?.twoFactorEnabled ?? false };
+    return { isEnabled: user?.twoFactorEnabled ?? false };
   }
 }

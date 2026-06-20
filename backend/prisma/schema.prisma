@@ -118,6 +118,7 @@ model User {
   disputesRaised    OrderDispute[]  @relation("DisputeReporter")
   dataExportRequests DataExportRequest[]
   announcements     Announcement[]  @relation("AnnouncementAuthor")
+  waitlistEntries   WaitlistEntry[]
 
   @@map("users")
 }

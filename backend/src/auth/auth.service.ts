@@ -19,6 +19,35 @@ import { MailService } from '../mail/mail.service';
 
 const BCRYPT_ROUNDS = 12;
 
+function base32Decode(s: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  let bits = 0, value = 0;
+  const output: number[] = [];
+  for (const c of s.toUpperCase()) {
+    const idx = alphabet.indexOf(c);
+    if (idx < 0) continue;
+    value = (value << 5) | idx;
+    bits += 5;
+    if (bits >= 8) { bits -= 8; output.push((value >> bits) & 0xff); }
+  }
+  return Buffer.from(output);
+}
+
+function verifyTotp(secret: string, token: string, window = 1): boolean {
+  const counter = Math.floor(Date.now() / 1000 / 30);
+  for (let i = -window; i <= window; i++) {
+    const buf = Buffer.alloc(8);
+    let tmp = counter + i;
+    for (let j = 7; j >= 0; j--) { buf[j] = tmp & 0xff; tmp >>= 8; }
+    const hmac = crypto.createHmac('sha1', base32Decode(secret)).update(buf).digest();
+    const offset = hmac[hmac.length - 1] & 0x0f;
+    const code = (((hmac[offset] & 0x7f) << 24) | ((hmac[offset + 1] & 0xff) << 16) |
+      ((hmac[offset + 2] & 0xff) << 8) | (hmac[offset + 3] & 0xff)) % 1000000;
+    if (String(code).padStart(6, '0') === token) return true;
+  }
+  return false;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
@@ -115,9 +144,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
+    // If 2FA is enabled, don't issue tokens yet — client must verify TOTP first
+    if (user.twoFactorEnabled) {
+      return { requires2FA: true, pendingEmail: user.email } as const;
+    }
+
     const tokens = await this.generateTokens(user.id, user.email, user.role);
 
     return {
+      requires2FA: false as const,
       user: {
         id: user.id,
         name: user.name,
@@ -166,6 +201,43 @@ export class AuthService {
     if (refreshToken) {
       await this.prisma.refreshToken.deleteMany({ where: { token: refreshToken } });
     }
+  }
+
+  async verifyTotpLogin(email: string, token: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      include: { vendor: true },
+    });
+
+    if (!user || user.deletedAt || !user.isActive) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    if (!user.twoFactorEnabled || !user.twoFactorSecret) {
+      throw new BadRequestException('2FA is not enabled for this account');
+    }
+
+    const valid = verifyTotp(user.twoFactorSecret, token);
+    if (!valid) {
+      throw new UnauthorizedException('Invalid or expired authenticator code');
+    }
+
+    const tokens = await this.generateTokens(user.id, user.email, user.role);
+    return {
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        vendor: user.vendor ? { id: user.vendor.id, status: user.vendor.status } : null,
+      },
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   async forgotPassword(email: string): Promise<{ otp: string; isDevMode: boolean }> {

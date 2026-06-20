@@ -96,6 +96,7 @@ import '../../features/customer/analytics/screens/spending_analytics_screen.dart
 import '../../features/vendor/operating_hours/screens/operating_hours_screen.dart' as oh_new;
 import '../../features/vendor_verification/screens/vendor_verification_screen.dart';
 import '../../features/two_factor/screens/two_factor_screen.dart';
+import '../../features/two_factor/screens/two_factor_login_screen.dart';
 import '../../features/gdpr/screens/gdpr_screen.dart';
 import '../../features/settings/screens/notification_preferences_screen.dart';
 import '../../features/settings/screens/language_screen.dart';
@@ -279,6 +280,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           isOnboardingRoute ||
           loc == '/forgot-password' ||
           loc == '/reset-password' ||
+          loc == '/2fa-login' ||
           loc == '/legal/privacy' ||
           loc == '/legal/terms' ||
           loc == '/how-it-works';
@@ -333,6 +335,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) {
           final extra = state.extra as Map<String, String?>? ?? {};
           return ResetPasswordScreen(email: extra['email'] ?? '');
+        },
+      ),
+      GoRoute(
+        path: '/2fa-login',
+        builder: (_, state) {
+          final extra = state.extra as Map<String, String?>? ?? {};
+          return TwoFactorLoginScreen(email: extra['email'] ?? '');
         },
       ),
       // Shared routes

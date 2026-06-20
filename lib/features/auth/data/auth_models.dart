@@ -47,6 +47,12 @@ class RegisterRequest {
   }
 }
 
+/// Thrown by [AuthRemoteDataSource.login] when the server requires a TOTP code.
+class Requires2FAException implements Exception {
+  final String email;
+  const Requires2FAException(this.email);
+}
+
 class AuthResponse {
   final String accessToken;
   final String? refreshToken;
