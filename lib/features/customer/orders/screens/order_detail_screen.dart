@@ -43,6 +43,10 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
     _pulseAnimation = Tween(begin: 0.85, end: 1.0).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
+    // Always fetch fresh data when navigating to this screen (e.g. from notification tap)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(orderDetailProvider(widget.orderId));
+    });
     _startCountdown();
   }
 
@@ -252,6 +256,8 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
                 ),
               ],
               if (order.status == 'COMPLETED') ...[
+                const SizedBox(height: AppSizes.s4),
+                _PointsEarnedCard(order: order),
                 const SizedBox(height: AppSizes.s2),
                 _ReviewButton(order: order),
                 if (order.listing != null) ...[
@@ -321,6 +327,76 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
 
   Widget _buildStatusTimeline(OrderEntity order) {
     final currentStatus = order.status;
+
+    // Terminal failure states get a dedicated banner instead of the progress timeline
+    if (currentStatus == 'CANCELLED' || currentStatus == 'REJECTED' || currentStatus == 'EXPIRED') {
+      final isCancelled = currentStatus == 'CANCELLED';
+      final isExpired = currentStatus == 'EXPIRED';
+      final color = isExpired ? AppColors.statusExpired : AppColors.statusCancelled;
+      final surface = isExpired ? AppColors.statusExpiredSurface : AppColors.statusCancelledSurface;
+      final icon = isCancelled
+          ? Icons.cancel_rounded
+          : isExpired
+              ? Icons.timer_off_rounded
+              : Icons.block_rounded;
+      final label = isCancelled ? 'Cancelled' : isExpired ? 'Expired' : 'Rejected';
+      final subtitle = isCancelled
+          ? 'This reservation was cancelled.'
+          : isExpired
+              ? 'The pickup window expired before this was picked up.'
+              : 'This reservation was rejected by the vendor.';
+
+      return Container(
+        padding: const EdgeInsets.all(AppSizes.s4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceLight,
+          borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+          boxShadow: AppShadows.card,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Status', style: AppTextStyles.h4),
+            const SizedBox(height: AppSizes.s3),
+            Container(
+              padding: const EdgeInsets.all(AppSizes.s3),
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: color, size: 28),
+                  const SizedBox(width: AppSizes.s3),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: AppTextStyles.h6.copyWith(color: color),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: AppTextStyles.caption.copyWith(color: color.withValues(alpha: 0.8)),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          Formatters.formatDateTime(order.createdAt),
+                          style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     const steps = ['PENDING', 'ACCEPTED', 'READY', 'COMPLETED'];
     const labels = ['Placed', 'Accepted', 'Ready', 'Picked Up'];
     final timestamps = [
@@ -329,8 +405,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
       order.readyAt,
       order.completedAt,
     ];
-    final currentIndex = steps.indexOf(currentStatus);
-    final isCancelled = currentStatus == 'CANCELLED';
+    final currentIndex = steps.indexOf(currentStatus).clamp(0, steps.length - 1);
 
     return Container(
       padding: const EdgeInsets.all(AppSizes.s4),
@@ -342,54 +417,9 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text('Status', style: AppTextStyles.h4),
-              const Spacer(),
-              if (isCancelled)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: AppSizes.s2, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.errorSurface,
-                    borderRadius:
-                        BorderRadius.circular(AppSizes.radiusFull),
-                  ),
-                  child: Text(
-                    'Cancelled',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
+          Text('Status', style: AppTextStyles.h4),
           const SizedBox(height: AppSizes.s4),
-          if (isCancelled)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3, vertical: AppSizes.s2),
-              decoration: BoxDecoration(
-                color: AppColors.errorSurface,
-                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.cancel_outlined, color: AppColors.error, size: 16),
-                  const SizedBox(width: AppSizes.s2),
-                  Text(
-                    'Reservation cancelled',
-                    style: AppTextStyles.caption.copyWith(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else
-            Row(
+          Row(
               children: List.generate(steps.length * 2 - 1, (i) {
                 if (i.isOdd) {
                   final stepIndex = i ~/ 2;
@@ -658,6 +688,54 @@ class _InfoCard extends StatelessWidget {
 }
 
 // ─── Review button ────────────────────────────────────────────────────────
+
+// ─── Points Earned Card ───────────────────────────────────────────────────
+
+class _PointsEarnedCard extends StatelessWidget {
+  const _PointsEarnedCard({required this.order});
+  final OrderEntity order;
+
+  @override
+  Widget build(BuildContext context) {
+    final points = ((order.totalAmount / 100) * 10).floor().clamp(1, 999);
+    return GestureDetector(
+      onTap: () => context.push('/customer/loyalty'),
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.s3),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFF1B5E20), AppColors.primaryMedium],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.stars_rounded, color: Colors.white, size: 28),
+            const SizedBox(width: AppSizes.s3),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'You earned $points points!',
+                    style: AppTextStyles.h6.copyWith(color: Colors.white),
+                  ),
+                  Text(
+                    'Tap to view your loyalty points',
+                    style: AppTextStyles.caption.copyWith(color: Colors.white70),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Colors.white70),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 // ─── Re-order button ──────────────────────────────────────────────────────
 

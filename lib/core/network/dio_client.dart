@@ -10,6 +10,14 @@ class AppException implements Exception {
   AppException(this.message, {this.statusCode});
   @override
   String toString() => message;
+
+  static String extractMessage(Object e) {
+    if (e is DioException && e.error is AppException) {
+      return (e.error as AppException).message;
+    }
+    if (e is AppException) return e.message;
+    return e.toString();
+  }
 }
 
 const _androidOptions = AndroidOptions(encryptedSharedPreferences: true);
@@ -17,13 +25,17 @@ const _storage = FlutterSecureStorage(aOptions: _androidOptions);
 const _tokenKey = 'access_token';
 const _refreshKey = 'refresh_token';
 
+// Set this from authProvider after it is created so the interceptor can
+// force-logout when a token refresh fails with 401/403.
+void Function()? onSessionExpired;
+
 class DioClient {
   DioClient._() {
     _dio = Dio(
       BaseOptions(
         baseUrl: '${ApiEndpoints.baseUrl}${ApiEndpoints.apiPrefix}',
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 30),
+        connectTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 60),
         headers: {'Content-Type': 'application/json'},
       ),
     );
@@ -63,9 +75,11 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
-    final token = await DioClient.getAccessToken();
-    if (token != null) {
-      options.headers['Authorization'] = 'Bearer $token';
+    if (!options.path.contains(ApiEndpoints.refresh)) {
+      final token = await DioClient.getAccessToken();
+      if (token != null) {
+        options.headers['Authorization'] = 'Bearer $token';
+      }
     }
     handler.next(options);
   }
@@ -73,6 +87,20 @@ class _AuthInterceptor extends Interceptor {
   @override
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
+      // Don't try to refresh if the request that failed is the refresh request itself.
+      if (err.requestOptions.path.contains(ApiEndpoints.refresh)) {
+        final message = _extractMessage(err);
+        handler.reject(
+          DioException(
+            requestOptions: err.requestOptions,
+            error: AppException(message, statusCode: err.response?.statusCode),
+            response: err.response,
+            type: err.type,
+          ),
+        );
+        return;
+      }
+
       // If a refresh is already in flight, queue this request instead of
       // triggering a second refresh (which would fail — old token already rotated).
       if (_isRefreshing) {
@@ -129,12 +157,21 @@ class _AuthInterceptor extends Interceptor {
             (e.response?.statusCode == 401 || e.response?.statusCode == 403);
         if (isAuthFailure) {
           await DioClient.clearTokens();
+          onSessionExpired?.call();
         }
         for (final pending in _pendingQueue) {
           pending.completer.completeError('Refresh failed');
         }
         _pendingQueue.clear();
-        handler.reject(err);
+        final message = _extractMessage(err);
+        handler.reject(
+          DioException(
+            requestOptions: err.requestOptions,
+            error: AppException(message, statusCode: err.response?.statusCode),
+            response: err.response,
+            type: err.type,
+          ),
+        );
       } finally {
         _isRefreshing = false;
       }

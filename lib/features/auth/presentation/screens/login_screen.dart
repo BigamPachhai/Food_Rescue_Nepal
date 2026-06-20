@@ -62,8 +62,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         registerFcmToken(ref.read(dioClientProvider));
       } else if (next is AuthGoogleNewUser) {
         _showRolePicker(context, next.firebaseIdToken);
-      } else if (next is AuthRequires2FA) {
-        context.push('/2fa-login', extra: {'email': next.email});
       }
     });
 

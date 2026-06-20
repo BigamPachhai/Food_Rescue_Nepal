@@ -133,7 +133,10 @@ class _EarnRuleCard extends StatelessWidget {
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
-          Text(rule.icon, style: const TextStyle(fontSize: 28)),
+          SizedBox(
+            width: 32,
+            child: Text(rule.icon, style: const TextStyle(fontSize: 22), textAlign: TextAlign.center),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -173,7 +176,10 @@ class _RewardCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(reward.icon, style: const TextStyle(fontSize: 32)),
+          SizedBox(
+            width: 36,
+            child: Text(reward.icon, style: const TextStyle(fontSize: 22), textAlign: TextAlign.center),
+          ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(

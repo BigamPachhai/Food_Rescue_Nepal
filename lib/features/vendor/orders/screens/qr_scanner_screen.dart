@@ -92,10 +92,12 @@ class _QrScannerScreenState extends ConsumerState<QrScannerScreen> {
         data: {'pickupCode': pickupCode},
       );
       ref.invalidate(vendorOrdersProvider);
-      if (mounted) {
-        await _showSuccessSheet();
-        if (mounted) context.pop();
-      }
+      if (!mounted) return;
+      await _showSuccessSheet();
+      // Wait for the sheet's exit animation before popping the scanner,
+      // so we never call pop() while another navigation is in progress.
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) context.pop();
     } catch (e) {
       if (mounted) {
         context.showErrorSnackBar(e.toString());
@@ -361,7 +363,7 @@ class _SuccessSheetState extends State<_SuccessSheet>
     _scale = CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut);
     _ctrl.forward();
     Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) Navigator.of(context).maybePop();
     });
   }
 

@@ -70,6 +70,8 @@ class VendorOrdersNotifier extends StateNotifier<AsyncValue<List<VendorOrder>>> 
         items = data;
       } else if (data is Map && data['data'] is List) {
         items = data['data'] as List<dynamic>;
+      } else if (data is Map && data['data'] is Map && data['data']['orders'] is List) {
+        items = data['data']['orders'] as List<dynamic>;
       } else {
         items = [];
       }

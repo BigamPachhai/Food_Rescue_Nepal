@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'core/constants/api_endpoints.dart';
+import 'package:go_router/go_router.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/widgets/offline_banner.dart';
@@ -123,10 +124,12 @@ class FoodRescueApp extends ConsumerStatefulWidget {
 
 class _FoodRescueAppState extends ConsumerState<FoodRescueApp> {
   StreamSubscription<Map<String, dynamic>>? _notifSub;
+  late final GoRouter _router;
 
   @override
   void initState() {
     super.initState();
+    _router = ref.read(routerProvider);
 
     // Handle notification tap from terminated state (cold start).
     if (!_firebaseInitialized) return;
@@ -159,37 +162,32 @@ class _FoodRescueAppState extends ConsumerState<FoodRescueApp> {
     final listingId = data['listingId'] as String?;
     final type = (data['type'] as String?) ?? '';
 
-    final router = ref.read(routerProvider);
     final authState = ref.read(authProvider);
 
     if (orderId != null) {
-      // NEW_ORDER and ORDER_CANCELLED are sent to vendors; everything else to
-      // customers.  Also fall back on the current user role if type is absent.
-      final isVendorNotif =
-          type == 'NEW_ORDER' || type == 'ORDER_CANCELLED';
+      final isVendorNotif = type == 'NEW_ORDER' || type == 'ORDER_CANCELLED';
       final isVendor =
           authState is AuthAuthenticated && authState.user.isVendor;
 
       if (isVendorNotif || isVendor) {
-        router.push('/vendor/orders/$orderId');
+        _router.push('/vendor/orders/$orderId');
       } else {
-        router.push('/customer/orders/$orderId');
+        _router.push('/customer/orders/$orderId');
       }
     } else if (listingId != null) {
-      router.push('/customer/listing/$listingId');
+      _router.push('/customer/listing/$listingId');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeProvider);
     return MaterialApp.router(
       title: 'Food Rescue Nepal',
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
-      routerConfig: router,
+      routerConfig: _router,
       debugShowCheckedModeBanner: false,
       scrollBehavior: const MaterialScrollBehavior().copyWith(overscroll: false),
       builder: (context, child) => Column(

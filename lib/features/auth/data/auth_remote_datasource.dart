@@ -11,12 +11,7 @@ class AuthRemoteDataSource {
       ApiEndpoints.login,
       data: request.toJson(),
     );
-    final raw = response.data as Map<String, dynamic>;
-    final data = (raw['data'] ?? raw) as Map<String, dynamic>;
-    if (data['requires2FA'] == true) {
-      throw Requires2FAException(data['pendingEmail'] as String? ?? request.email);
-    }
-    return AuthResponse.fromJson(raw);
+    return AuthResponse.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<AuthResponse> register(RegisterRequest request) async {

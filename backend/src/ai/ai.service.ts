@@ -5,7 +5,7 @@ import { ConfigService } from '@nestjs/config';
 export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly apiKey: string;
-  private readonly model = 'mistral-small-latest';
+  private readonly model = 'mistral-small-2603';
   private readonly baseUrl = 'https://api.mistral.ai/v1/chat/completions';
 
   constructor(private readonly config: ConfigService) {
@@ -34,8 +34,9 @@ export class AiService {
     });
 
     if (!res.ok) {
-      this.logger.error(`Mistral API error: ${res.status} ${res.statusText}`);
-      throw new ServiceUnavailableException('AI service request failed');
+      const errBody = await res.text();
+      this.logger.error(`Mistral API error: ${res.status} ${res.statusText} — ${errBody}`);
+      throw new ServiceUnavailableException(`AI service error: ${res.status} ${res.statusText}`);
     }
 
     const data = await res.json() as any;
@@ -63,7 +64,11 @@ export class AiService {
       }),
     });
 
-    if (!res.ok) throw new ServiceUnavailableException('AI service request failed');
+    if (!res.ok) {
+      const errBody = await res.text();
+      this.logger.error(`Mistral chat error: ${res.status} ${res.statusText} — ${errBody}`);
+      throw new ServiceUnavailableException(`AI service error: ${res.status} ${res.statusText}`);
+    }
     const data = await res.json() as any;
     return data.choices?.[0]?.message?.content ?? '';
   }

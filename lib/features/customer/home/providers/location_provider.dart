@@ -64,14 +64,22 @@ class LocationNotifier extends StateNotifier<LocationState> {
         return;
       }
 
+      // Use last known position immediately so the UI is never stuck waiting
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        final lastLabel = await _reverseGeocode(last.latitude, last.longitude);
+        state = LocationState(position: AsyncValue.data(last), label: lastLabel);
+      }
+
+      // Then get a fresh fix in the background (no hard timeout)
       final position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
       );
-
       final label = await _reverseGeocode(position.latitude, position.longitude);
       state = LocationState(position: AsyncValue.data(position), label: label);
     } catch (e, st) {
+      // If we already have a position from last known, keep it instead of erroring
+      if (state.position.value != null) return;
       state = state.copyWith(
         position: AsyncValue.error(e, st),
         label: 'Location unavailable',

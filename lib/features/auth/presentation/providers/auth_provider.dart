@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../data/auth_models.dart';
 import '../../data/auth_repository.dart';
 import '../../domain/auth_state.dart';
@@ -28,10 +29,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final user = await _repository.login(LoginRequest(email: email, password: password));
       state = AuthAuthenticated(user);
-    } on Requires2FAException catch (e) {
-      state = AuthRequires2FA(e.email);
     } catch (e) {
-      state = AuthError(e.toString());
+      state = AuthError(AppException.extractMessage(e));
     }
   }
 
@@ -41,7 +40,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = await _repository.register(request);
       state = AuthAuthenticated(user);
     } catch (e) {
-      state = AuthError(e.toString());
+      state = AuthError(AppException.extractMessage(e));
     }
   }
 
@@ -72,7 +71,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = AuthAuthenticated(user);
       }
     } catch (e) {
-      state = AuthError(e.toString());
+      state = AuthError(AppException.extractMessage(e));
     }
   }
 
@@ -88,7 +87,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = const AuthError('Failed to complete sign-in. Please try again.');
       }
     } catch (e) {
-      state = AuthError(e.toString());
+      state = AuthError(AppException.extractMessage(e));
     }
   }
 
@@ -116,5 +115,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 }
 
 final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.read(authRepositoryProvider));
+  final notifier = AuthNotifier(ref.read(authRepositoryProvider));
+  onSessionExpired = () => notifier.logout();
+  return notifier;
 });

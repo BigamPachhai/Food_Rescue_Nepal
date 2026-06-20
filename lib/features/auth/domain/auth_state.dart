@@ -32,8 +32,3 @@ class AuthGoogleNewUser extends AuthState {
   const AuthGoogleNewUser(this.firebaseIdToken);
 }
 
-/// Password login succeeded but 2FA verification is still required.
-class AuthRequires2FA extends AuthState {
-  final String email;
-  const AuthRequires2FA(this.email);
-}

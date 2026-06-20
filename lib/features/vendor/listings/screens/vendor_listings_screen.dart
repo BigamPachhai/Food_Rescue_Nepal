@@ -479,27 +479,6 @@ class _ListingCard extends StatelessWidget {
               ],
             ),
           ),
-          // Stock progress bar with color-coded urgency
-          Builder(builder: (context) {
-            final ratio = listing.quantity > 0 ? listing.availableQty / listing.quantity : 0.0;
-            final barColor = listing.isSoldOut
-                ? AppColors.error
-                : ratio <= 0.25
-                    ? AppColors.warning
-                    : AppColors.success;
-            return ClipRRect(
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(16),
-                bottomRight: Radius.circular(16),
-              ),
-              child: LinearProgressIndicator(
-                value: ratio,
-                minHeight: 4,
-                backgroundColor: barColor.withValues(alpha: 0.1),
-                valueColor: AlwaysStoppedAnimation<Color>(barColor),
-              ),
-            );
-          }),
         ],
       ),
     );

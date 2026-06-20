@@ -173,13 +173,6 @@ class ApiEndpoints {
   static const String pendingVerificationDocs = '/verification/pending';
   static String reviewVerificationDoc(String id) => '/verification/$id/review';
 
-  // Feature 14: 2FA
-  static const String twoFaStatus = '/2fa/status';
-  static const String twoFaSetup = '/2fa/setup';
-  static const String twoFaEnable = '/2fa/enable';
-  static const String twoFaDisable = '/2fa/disable';
-  static const String twoFaVerifyLogin = '/auth/verify-2fa';
-
   // Feature 15: Data Export + Account Deletion
   static const String requestDataExport = '/data/export';
   static const String myDataExports = '/data/export';

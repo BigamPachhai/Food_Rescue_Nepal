@@ -30,7 +30,6 @@ import { DisputesModule } from './disputes/disputes.module';
 import { AnnouncementsModule } from './announcements/announcements.module';
 import { AuditLogModule } from './audit-log/audit-log.module';
 import { VendorVerificationModule } from './vendor-verification/vendor-verification.module';
-import { TwoFactorModule } from './two-factor/two-factor.module';
 import { DataExportModule } from './data-export/data-export.module';
 
 @Module({
@@ -71,7 +70,6 @@ import { DataExportModule } from './data-export/data-export.module';
     AnnouncementsModule,
     AuditLogModule,
     VendorVerificationModule,
-    TwoFactorModule,
     DataExportModule,
   ],
   providers: [

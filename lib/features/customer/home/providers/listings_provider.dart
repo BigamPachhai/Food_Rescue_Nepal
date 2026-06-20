@@ -350,10 +350,7 @@ final featuredListingsProvider = FutureProvider<List<ListingEntity>>((ref) async
 final publicVendorsProvider = FutureProvider<List<VendorEntity>>((ref) async {
   ref.keepAlive();
   final dio = ref.read(dioClientProvider);
-  final response = await dio.get(
-    ApiEndpoints.vendors,
-    queryParameters: {'status': 'APPROVED'},
-  );
+  final response = await dio.get(ApiEndpoints.vendors);
   final body = response.data as Map<String, dynamic>;
   final data = body['data'];
   List<dynamic> items;

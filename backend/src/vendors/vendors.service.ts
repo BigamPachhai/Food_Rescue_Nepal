@@ -14,11 +14,20 @@ export class VendorsService {
   async findAll(lat?: number, lng?: number) {
     const vendors = await this.prisma.vendor.findMany({
       where: { status: VendorStatus.APPROVED },
-      include: {
-        user: {
-          select: { name: true, email: true, avatarUrl: true },
-        },
-        _count: { select: { listings: true } },
+      select: {
+        id: true,
+        userId: true,
+        businessName: true,
+        businessType: true,
+        address: true,
+        lat: true,
+        lng: true,
+        logoUrl: true,
+        isOpen: true,
+        avgRating: true,
+        totalReviews: true,
+        status: true,
+        createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     });

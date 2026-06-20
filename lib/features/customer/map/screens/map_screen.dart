@@ -25,6 +25,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
   List<VendorEntity> _filtered = [];
   final Map<String, double> _distancesM = {};
   bool _loading = true;
+  String? _error;
   double _radius = 10;
   String _sort = 'distance'; // distance | rating | name
   final _searchCtrl = TextEditingController();
@@ -42,14 +43,11 @@ class _MapScreenState extends ConsumerState<MapScreen> {
     super.dispose();
   }
 
-  Future<void> _loadVendors() async {
-    setState(() => _loading = true);
+  Future<void> _loadVendors({int attempt = 1}) async {
+    setState(() { _loading = true; _error = null; });
     try {
       final dio = ref.read(dioClientProvider);
-      final response = await dio.get(
-        ApiEndpoints.vendors,
-        queryParameters: {'status': 'APPROVED'},
-      );
+      final response = await dio.get(ApiEndpoints.vendors);
       final data = response.data;
       List<dynamic> items;
       if (data is List) {
@@ -66,6 +64,7 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       final vendors = items
           .map((e) => VendorEntity.fromJson(e as Map<String, dynamic>))
           .toList();
+      if (!mounted) return;
       setState(() {
         _vendors = vendors;
         _loading = false;
@@ -73,10 +72,20 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       _applyFilter();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to load vendors. Pull to retry.')),
-      );
+      // Auto-retry up to 3 times on timeout/network errors before showing error
+      final isTransient = e.toString().contains('timed out') ||
+          e.toString().contains('timeout') ||
+          e.toString().contains('SocketException') ||
+          e.toString().contains('network');
+      if (isTransient && attempt < 3) {
+        await Future.delayed(Duration(seconds: attempt * 2));
+        if (mounted) _loadVendors(attempt: attempt + 1);
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
   }
 
@@ -322,6 +331,40 @@ class _MapScreenState extends ConsumerState<MapScreen> {
       return const Center(
         child: CircularProgressIndicator(
             color: AppColors.primaryMedium),
+      );
+    }
+    if (_error != null) {
+      return ListView(
+        children: [
+          const SizedBox(height: 80),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.cloud_off_rounded,
+                    size: 56, color: AppColors.neutral300),
+                const SizedBox(height: AppSizes.s3),
+                Text('Failed to load vendors', style: AppTextStyles.h5),
+                const SizedBox(height: AppSizes.s1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSizes.s6),
+                  child: Text(
+                    _error!,
+                    style: AppTextStyles.bodySmall
+                        .copyWith(color: AppColors.textTertiary),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: AppSizes.s4),
+                TextButton.icon(
+                  onPressed: () { setState(() => _error = null); _loadVendors(); },
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ],
       );
     }
     if (_vendors.isEmpty) {

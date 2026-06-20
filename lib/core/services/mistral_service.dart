@@ -11,7 +11,7 @@ class MistralService {
   Future<String> _post(String path, Map<String, dynamic> body) async {
     try {
       final res = await _dio.post(
-        '${ApiEndpoints.apiPrefix}$path',
+        path,
         data: body,
       );
       final data = res.data as Map<String, dynamic>;

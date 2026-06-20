@@ -89,9 +89,11 @@ class VendorListingsNotifier
   final Dio _dio;
 
   Future<void> fetch() async {
+    if (!mounted) return;
     state = const AsyncValue.loading();
     try {
       final response = await _dio.get(ApiEndpoints.vendorListings);
+      if (!mounted) return;
       final data = response.data;
       List<dynamic> items;
       if (data is List) {
@@ -107,22 +109,26 @@ class VendorListingsNotifier
             .toList(),
       );
     } catch (e, st) {
+      if (!mounted) return;
       state = AsyncValue.error(e, st);
     }
   }
 
   Future<void> deleteListing(String id) async {
     await _dio.delete(ApiEndpoints.vendorListingById(id));
+    if (!mounted) return;
     await fetch();
   }
 
   Future<void> toggleActive(String id, bool isActive) async {
     await _dio.patch(ApiEndpoints.vendorListingById(id), data: {'isActive': isActive});
+    if (!mounted) return;
     await fetch();
   }
 
   Future<void> markSoldOut(String id) async {
     await _dio.patch(ApiEndpoints.vendorListingById(id), data: {'availableQty': 0});
+    if (!mounted) return;
     await fetch();
   }
 
@@ -140,6 +146,7 @@ class VendorListingsNotifier
       if (listing.conditionNotes != null) 'conditionNotes': listing.conditionNotes,
       if (listing.dietaryTags.isNotEmpty) 'dietaryTags': listing.dietaryTags,
     });
+    if (!mounted) return;
     await fetch();
   }
 }

@@ -178,19 +178,8 @@ class _OrderCard extends StatelessWidget {
   const _OrderCard({required this.order});
   final OrderEntity order;
 
-  double _pickupProgress() {
-    final listing = order.listing;
-    if (listing == null || !order.isActive) return 0;
-    final now = DateTime.now();
-    final total = listing.pickupEnd.difference(listing.pickupStart).inSeconds;
-    if (total <= 0) return 1;
-    final elapsed = now.difference(listing.pickupStart).inSeconds;
-    return (elapsed / total).clamp(0.0, 1.0);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final progress = _pickupProgress();
     final isUrgent = order.isActive &&
         order.listing != null &&
         order.listing!.pickupEnd.difference(DateTime.now()).inMinutes <= 30;
@@ -282,15 +271,13 @@ class _OrderCard extends StatelessWidget {
                 (order.status == 'ACCEPTED' || order.status == 'READY'))
               Padding(
                 padding: const EdgeInsets.fromLTRB(AppSizes.s3, 0, AppSizes.s3, AppSizes.s2),
-                child: OutlinedButton.icon(
+                child: ElevatedButton.icon(
                   onPressed: () => context.push('/customer/qr/${order.id}'),
                   icon: const Icon(Icons.qr_code_rounded, size: 14),
                   label: const Text('Show QR'),
-                  style: OutlinedButton.styleFrom(
+                  style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 36),
                     padding: const EdgeInsets.symmetric(vertical: 6),
-                    foregroundColor: AppColors.primaryMedium,
-                    side: const BorderSide(color: AppColors.primaryMedium),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusSm)),
                     textStyle: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
                   ),
@@ -302,30 +289,15 @@ class _OrderCard extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(AppSizes.s3, 0, AppSizes.s3, AppSizes.s2),
                 child: SizedBox(
                   width: double.infinity,
-                  child: OutlinedButton.icon(
+                  child: ElevatedButton.icon(
                     onPressed: () => context.push('/customer/listing/${order.listing!.id}'),
                     icon: const Icon(Icons.repeat_rounded, size: 14),
                     label: const Text('Order again'),
-                    style: OutlinedButton.styleFrom(
+                    style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 6),
-                      foregroundColor: AppColors.primaryMedium,
-                      side: const BorderSide(color: AppColors.primaryMedium),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusSm)),
                       textStyle: AppTextStyles.caption.copyWith(fontWeight: FontWeight.w600),
                     ),
-                  ),
-                ),
-              ),
-            // Pickup window progress bar for active orders
-            if (order.isActive && order.listing != null)
-              ClipRRect(
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(AppSizes.radiusCard)),
-                child: LinearProgressIndicator(
-                  value: progress,
-                  minHeight: 3,
-                  backgroundColor: AppColors.neutral100,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    isUrgent ? AppColors.error : AppColors.primaryMedium,
                   ),
                 ),
               ),

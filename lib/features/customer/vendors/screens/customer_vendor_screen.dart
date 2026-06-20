@@ -26,9 +26,12 @@ final vendorDetailProvider =
   final dio = ref.read(dioClientProvider);
   final response = await dio.get(ApiEndpoints.vendorPublicById(id));
   final raw = response.data as Map<String, dynamic>;
-  final data = raw.containsKey('data')
-      ? raw['data'] as Map<String, dynamic>
-      : raw;
+  Map<String, dynamic> data;
+  if (raw['data'] is Map<String, dynamic>) {
+    data = raw['data'] as Map<String, dynamic>;
+  } else {
+    data = raw;
+  }
   return VendorEntity.fromJson(data);
 });
 
@@ -74,6 +77,24 @@ class _CustomerVendorScreenState extends ConsumerState<CustomerVendorScreen> {
     super.dispose();
   }
 
+  Future<void> _toggleFavorite(VendorEntity? vendor) async {
+    if (_isToggling.value) return;
+    _isToggling.value = true;
+    HapticFeedback.lightImpact();
+    final added = await ref
+        .read(vendorFavoritesProvider.notifier)
+        .toggle(widget.vendorId, vendor: vendor);
+    _isToggling.value = false;
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(added
+            ? 'Vendor added to favorites'
+            : 'Vendor removed from favorites'),
+        duration: const Duration(seconds: 2),
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final vendorAsync = ref.watch(vendorDetailProvider(widget.vendorId));
@@ -85,169 +106,145 @@ class _CustomerVendorScreenState extends ConsumerState<CustomerVendorScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      body: RefreshIndicator(
-        color: AppColors.primaryMedium,
-        onRefresh: () async {
-          ref.invalidate(vendorDetailProvider(widget.vendorId));
-          ref.invalidate(vendorPublicListingsProvider(widget.vendorId));
-        },
-        child: CustomScrollView(
-          slivers: [
-            // ── Vendor header ──────────────────────────────────────────
-            vendorAsync.when(
-              data: (vendor) => SliverToBoxAdapter(
-                child: _VendorHeader(
-                  vendor: vendor,
-                  isFav: isFav,
-                  onFavToggle: () async {
-                    if (_isToggling.value) return;
-                    _isToggling.value = true;
-                    HapticFeedback.lightImpact();
-                    final added = await ref
-                        .read(vendorFavoritesProvider.notifier)
-                        .toggle(widget.vendorId);
-                    _isToggling.value = false;
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text(added
-                            ? 'Vendor added to favorites'
-                            : 'Vendor removed from favorites'),
-                        duration: const Duration(seconds: 2),
-                      ));
-                    }
-                  },
-                  onReviews: () => context
-                      .push('/customer/vendor/${widget.vendorId}/reviews'),
-                ),
-              ),
-              loading: () =>
-                  const SliverToBoxAdapter(child: _VendorHeaderShimmer()),
-              error: (e, _) => SliverFillRemaining(
-                child: ErrorView(
-                  error: e,
-                  onRetry: () =>
-                      ref.invalidate(vendorDetailProvider(widget.vendorId)),
-                ),
-              ),
-            ),
+      body: Stack(
+        children: [
+          // ── Scrollable content ──────────────────────────────────────────
+          RefreshIndicator(
+            color: AppColors.primaryMedium,
+            onRefresh: () async {
+              ref.invalidate(vendorDetailProvider(widget.vendorId));
+              ref.invalidate(vendorPublicListingsProvider(widget.vendorId));
+            },
+            child: CustomScrollView(
+              slivers: [
+                // Reserve space so content starts below the floating bar
+                const SliverToBoxAdapter(child: _AppBarSpacer()),
 
-            // ── Listings header ────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    AppSizes.s4, AppSizes.s4, AppSizes.s4, AppSizes.s2),
-                child: Text('Active Listings', style: AppTextStyles.h4),
-              ),
-            ),
-
-            // ── Listings ───────────────────────────────────────────────
-            listingsAsync.when(
-              data: (listings) {
-                if (listings.isEmpty) {
-                  return const SliverFillRemaining(
-                    child: EmptyStateView(
-                      icon: Icons.fastfood_outlined,
-                      title: 'No listings right now',
-                      subtitle:
-                          'This vendor has no active listings at the moment. Check back later!',
+                if (vendorAsync.isLoading)
+                  const SliverToBoxAdapter(child: _VendorHeaderShimmer())
+                else if (vendorAsync.hasError)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: ErrorView(
+                      error: vendorAsync.error,
+                      onRetry: () =>
+                          ref.invalidate(vendorDetailProvider(widget.vendorId)),
                     ),
-                  );
-                }
-                return SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (_, i) => ListingCard(
-                      listing: listings[i],
-                      onTap: () =>
-                          context.push('/customer/listing/${listings[i].id}'),
+                  )
+                else ...[
+                  SliverToBoxAdapter(
+                    child: _VendorHeader(
+                      vendor: vendorAsync.value!,
+                      onReviews: () => context
+                          .push('/customer/vendor/${widget.vendorId}/reviews'),
                     ),
-                    childCount: listings.length,
                   ),
-                );
-              },
-              loading: () => SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (_, __) => const Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: AppSizes.s4, vertical: AppSizes.s1),
-                    child: ShimmerCard(height: 108),
+
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                          AppSizes.s4, AppSizes.s4, AppSizes.s4, AppSizes.s2),
+                      child: Text('Active Listings', style: AppTextStyles.h4),
+                    ),
                   ),
-                  childCount: 3,
-                ),
-              ),
-              error: (e, _) => SliverFillRemaining(
-                child: ErrorView(
-                  error: e,
-                  onRetry: () => ref.invalidate(
-                      vendorPublicListingsProvider(widget.vendorId)),
-                ),
-              ),
-            ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 32)),
-          ],
-        ),
-      ),
-    );
-  }
-}
+                  if (listingsAsync.isLoading)
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, __) => const Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: AppSizes.s4, vertical: AppSizes.s1),
+                          child: ShimmerCard(height: 108),
+                        ),
+                        childCount: 3,
+                      ),
+                    )
+                  else if (listingsAsync.hasError)
+                    SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: ErrorView(
+                        error: listingsAsync.error,
+                        onRetry: () => ref.invalidate(
+                            vendorPublicListingsProvider(widget.vendorId)),
+                      ),
+                    )
+                  else if (listingsAsync.value?.isEmpty ?? true)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: EmptyStateView(
+                          icon: Icons.fastfood_outlined,
+                          title: 'No listings right now',
+                          subtitle:
+                              'This vendor has no active listings at the moment. Check back later!',
+                        ),
+                      ),
+                    )
+                  else
+                    SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (_, i) => ListingCard(
+                          listing: listingsAsync.value![i],
+                          onTap: () => context.push(
+                              '/customer/listing/${listingsAsync.value![i].id}'),
+                        ),
+                        childCount: listingsAsync.value!.length,
+                      ),
+                    ),
 
-// ── Vendor Header ──────────────────────────────────────────────────────────
-
-class _VendorHeader extends StatelessWidget {
-  const _VendorHeader({
-    required this.vendor,
-    required this.isFav,
-    required this.onFavToggle,
-    required this.onReviews,
-  });
-
-  final VendorEntity vendor;
-  final bool isFav;
-  final VoidCallback onFavToggle;
-  final VoidCallback onReviews;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Green gradient hero ──────────────────────────────────────────
-        Container(
-          width: double.infinity,
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [AppColors.primary, AppColors.primaryMedium],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+                  const SliverToBoxAdapter(child: SizedBox(height: 32)),
+                ],
+              ],
             ),
           ),
-          child: SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                // Back + Actions row
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSizes.s2, AppSizes.s2, AppSizes.s2, 0),
-                  child: Row(
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.arrow_back_rounded,
-                            color: Colors.white),
-                        onPressed: () => context.pop(),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.share_rounded, color: Colors.white),
-                        tooltip: 'Share vendor',
-                        onPressed: () {
-                          final msg =
-                              'Check out ${vendor.businessName} on Food Rescue Nepal! '
-                              'Great deals on surplus food near you.';
-                          Share.share(msg);
-                        },
-                      ),
-                      IconButton(
+
+          // ── Floating action bar — always on top, outside scroll arena ───
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, AppColors.primaryMedium],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Color(0x33000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                bottom: false,
+                child: Row(
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back_rounded,
+                          color: Colors.white),
+                      onPressed: () => context.pop(),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      icon: const Icon(Icons.share_rounded,
+                          color: Colors.white),
+                      tooltip: 'Share vendor',
+                      onPressed: () {
+                        final name =
+                            vendorAsync.value?.businessName ?? 'this vendor';
+                        Share.share(
+                          'Check out $name on Food Rescue Nepal! '
+                          'Great deals on surplus food near you.',
+                        );
+                      },
+                    ),
+                    ValueListenableBuilder<bool>(
+                      valueListenable: _isToggling,
+                      builder: (_, toggling, __) => IconButton(
                         icon: AnimatedSwitcher(
                           duration: const Duration(milliseconds: 200),
                           child: Icon(
@@ -261,87 +258,124 @@ class _VendorHeader extends StatelessWidget {
                         tooltip: isFav
                             ? 'Remove from favorites'
                             : 'Add to favorites',
-                        onPressed: onFavToggle,
+                        onPressed: toggling
+                            ? null
+                            : () => _toggleFavorite(vendorAsync.value),
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Reserves space equal to the floating action bar so scroll content
+// starts below it rather than hidden underneath.
+class _AppBarSpacer extends StatelessWidget {
+  const _AppBarSpacer();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(height: MediaQuery.of(context).padding.top + 48);
+  }
+}
+
+// ── Vendor Header ──────────────────────────────────────────────────────────
+
+class _VendorHeader extends StatelessWidget {
+  const _VendorHeader({
+    required this.vendor,
+    required this.onReviews,
+  });
+
+  final VendorEntity vendor;
+  final VoidCallback onReviews;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Vendor identity section ──────────────────────────────────────
+        Container(
+          width: double.infinity,
+          color: AppColors.primary,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+                AppSizes.s4, AppSizes.s4, AppSizes.s4, AppSizes.s5),
+            child: Row(
+              children: [
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primarySurface,
+                    border: Border.all(color: Colors.white30, width: 2),
+                  ),
+                  child: ClipOval(
+                    child: vendor.logoUrl != null
+                        ? CachedNetworkImage(
+                            imageUrl: vendor.logoUrl!,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const Icon(
+                                Icons.store_rounded,
+                                color: AppColors.primaryLight,
+                                size: 36),
+                          )
+                        : const Icon(Icons.store_rounded,
+                            color: AppColors.primaryLight, size: 36),
                   ),
                 ),
-                // Logo + name
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                      AppSizes.s4, AppSizes.s2, AppSizes.s4, AppSizes.s5),
-                  child: Row(
+                const SizedBox(width: AppSizes.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 72,
-                        height: 72,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primarySurface,
-                          border:
-                              Border.all(color: Colors.white30, width: 2),
-                        ),
-                        child: ClipOval(
-                          child: vendor.logoUrl != null
-                              ? CachedNetworkImage(
-                                  imageUrl: vendor.logoUrl!,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (_, __, ___) => const Icon(
-                                      Icons.store_rounded,
-                                      color: AppColors.primaryLight,
-                                      size: 36),
-                                )
-                              : const Icon(Icons.store_rounded,
-                                  color: AppColors.primaryLight, size: 36),
-                        ),
-                      ),
-                      const SizedBox(width: AppSizes.s3),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Flexible(
-                                  child: Text(
-                                    vendor.businessName,
-                                    style: AppTextStyles.h3OnPrimary,
-                                    maxLines: 2,
-                                  ),
-                                ),
-                                if (vendor.status == 'APPROVED') ...[
-                                  const SizedBox(width: 6),
-                                  const VerifiedBadge(size: 16),
-                                ],
-                              ],
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              vendor.businessName,
+                              style: AppTextStyles.h3OnPrimary,
+                              maxLines: 2,
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              vendor.businessType.replaceAll('_', ' '),
-                              style: AppTextStyles.bodySmall
-                                  .copyWith(color: Colors.white70),
-                            ),
-                            const SizedBox(height: 6),
-                            Row(
-                              children: [
-                                const Icon(Icons.star_rounded,
-                                    size: 14, color: AppColors.accentAmber),
-                                const SizedBox(width: 3),
-                                Text(
-                                  vendor.avgRating.toStringAsFixed(1),
-                                  style: AppTextStyles.h6
-                                      .copyWith(color: Colors.white),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '(${vendor.totalReviews} reviews)',
-                                  style: AppTextStyles.caption
-                                      .copyWith(color: Colors.white60),
-                                ),
-                              ],
-                            ),
+                          ),
+                          if (vendor.status == 'APPROVED') ...[
+                            const SizedBox(width: 6),
+                            const VerifiedBadge(size: 16),
                           ],
-                        ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        vendor.businessType.replaceAll('_', ' '),
+                        style: AppTextStyles.bodySmall
+                            .copyWith(color: Colors.white70),
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          const Icon(Icons.star_rounded,
+                              size: 14, color: AppColors.accentAmber),
+                          const SizedBox(width: 3),
+                          Text(
+                            vendor.avgRating.toStringAsFixed(1),
+                            style:
+                                AppTextStyles.h6.copyWith(color: Colors.white),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '(${vendor.totalReviews} reviews)',
+                            style: AppTextStyles.caption
+                                .copyWith(color: Colors.white60),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -351,113 +385,118 @@ class _VendorHeader extends StatelessWidget {
           ),
         ),
 
-        // ── Info card ────────────────────────────────────────────────────
+        // ── Location chip ────────────────────────────────────────────────
+        if (vendor.address != null && vendor.address!.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.fromLTRB(
+                AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+            padding: const EdgeInsets.symmetric(
+                horizontal: AppSizes.s3, vertical: AppSizes.s2),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceLight,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+              boxShadow: AppShadows.card,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(Icons.location_on_rounded,
+                    size: 16, color: AppColors.primaryMedium),
+                const SizedBox(width: AppSizes.s2),
+                Expanded(
+                  child: Text(vendor.address!,
+                      style: AppTextStyles.caption
+                          .copyWith(color: AppColors.textSecondary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis),
+                ),
+              ],
+            ),
+          ),
+
+        // ── Action buttons card ───────────────────────────────────────────
         Container(
-          margin: const EdgeInsets.all(AppSizes.s4),
-          padding: const EdgeInsets.all(AppSizes.s4),
+          margin: const EdgeInsets.fromLTRB(
+              AppSizes.s4, AppSizes.s3, AppSizes.s4, AppSizes.s4),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.s3, vertical: AppSizes.s2),
           decoration: BoxDecoration(
             color: AppColors.surfaceLight,
             borderRadius: BorderRadius.circular(AppSizes.radiusCard),
             boxShadow: AppShadows.card,
           ),
-          child: Column(
+          child: Row(
             children: [
-              // Address row
-              if (vendor.address != null && vendor.address!.isNotEmpty) ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on_rounded,
-                        size: AppSizes.iconMd,
-                        color: AppColors.primaryMedium),
-                    const SizedBox(width: AppSizes.s2),
-                    Expanded(
-                      child: Text(vendor.address!,
-                          style: AppTextStyles.bodySmall),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSizes.s3),
-              ],
-
-              // Action buttons
-              Row(
-                children: [
-                  // Directions
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () async {
-                        final uri = (vendor.lat != null && vendor.lng != null)
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri =
+                        (vendor.lat != null && vendor.lng != null)
                             ? Uri.parse(
                                 'https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}')
                             : vendor.address != null
                                 ? Uri.parse(
                                     'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}')
                                 : null;
-                        if (uri != null && await canLaunchUrl(uri)) {
-                          await launchUrl(uri,
-                              mode: LaunchMode.externalApplication);
-                        }
-                      },
-                      icon: const Icon(Icons.directions_rounded, size: 16),
-                      label: const Text('Directions'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.primaryMedium,
-                        side: const BorderSide(color: AppColors.primaryMedium),
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppSizes.radiusSm)),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSizes.s2),
-                        textStyle: AppTextStyles.caption
-                            .copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
+                    if (uri != null && await canLaunchUrl(uri)) {
+                      await launchUrl(uri,
+                          mode: LaunchMode.externalApplication);
+                    }
+                  },
+                  icon: const Icon(Icons.directions_rounded, size: 16),
+                  label: const Text('Directions'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primaryMedium,
+                    side: const BorderSide(color: AppColors.primaryMedium),
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusSm)),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSizes.s2),
+                    textStyle: AppTextStyles.caption
+                        .copyWith(fontWeight: FontWeight.w600),
                   ),
-                  // Phone
-                  if (vendor.phone != null &&
-                      vendor.phone!.isNotEmpty) ...[
-                    const SizedBox(width: AppSizes.s2),
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final uri = Uri(scheme: 'tel', path: vendor.phone);
-                        if (await canLaunchUrl(uri)) await launchUrl(uri);
-                      },
-                      icon: const Icon(Icons.call_rounded, size: 16),
-                      label: const Text('Call'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.success,
-                        side: const BorderSide(color: AppColors.success),
-                        shape: RoundedRectangleBorder(
-                            borderRadius:
-                                BorderRadius.circular(AppSizes.radiusSm)),
-                        padding: const EdgeInsets.symmetric(
-                            vertical: AppSizes.s2),
-                        textStyle: AppTextStyles.caption
-                            .copyWith(fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  ],
-                  // Reviews
-                  const SizedBox(width: AppSizes.s2),
-                  OutlinedButton.icon(
-                    onPressed: onReviews,
-                    icon: const Icon(Icons.star_rounded, size: 16),
-                    label: const Text('Reviews'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.accentAmber,
-                      side:
-                          const BorderSide(color: AppColors.accentAmber),
-                      shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSizes.radiusSm)),
-                      padding: const EdgeInsets.symmetric(
-                          vertical: AppSizes.s2),
-                      textStyle: AppTextStyles.caption
-                          .copyWith(fontWeight: FontWeight.w600),
-                    ),
+                ),
+              ),
+              if (vendor.phone != null && vendor.phone!.isNotEmpty) ...[
+                const SizedBox(width: AppSizes.s2),
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final uri =
+                        Uri(scheme: 'tel', path: vendor.phone);
+                    if (await canLaunchUrl(uri)) await launchUrl(uri);
+                  },
+                  icon: const Icon(Icons.call_rounded, size: 16),
+                  label: const Text('Call'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.success,
+                    side: const BorderSide(color: AppColors.success),
+                    shape: RoundedRectangleBorder(
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusSm)),
+                    padding:
+                        const EdgeInsets.symmetric(vertical: AppSizes.s2),
+                    textStyle: AppTextStyles.caption
+                        .copyWith(fontWeight: FontWeight.w600),
                   ),
-                ],
+                ),
+              ],
+              const SizedBox(width: AppSizes.s2),
+              OutlinedButton.icon(
+                onPressed: onReviews,
+                icon: const Icon(Icons.star_rounded, size: 16),
+                label: const Text('Reviews'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.accentAmber,
+                  side: const BorderSide(color: AppColors.accentAmber),
+                  shape: RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(AppSizes.radiusSm)),
+                  padding:
+                      const EdgeInsets.symmetric(vertical: AppSizes.s2),
+                  textStyle: AppTextStyles.caption
+                      .copyWith(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
@@ -475,7 +514,7 @@ class _VendorHeaderShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 240,
+      height: 160,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           colors: [AppColors.primary, AppColors.primaryMedium],

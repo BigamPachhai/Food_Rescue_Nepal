@@ -117,22 +117,36 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      floatingActionButton: AnimatedSlide(
-        duration: const Duration(milliseconds: 200),
-        offset: _showScrollTop ? Offset.zero : const Offset(0, 2),
-        child: AnimatedOpacity(
-          duration: const Duration(milliseconds: 200),
-          opacity: _showScrollTop ? 1 : 0,
-          child: FloatingActionButton.small(
-            onPressed: () => _scrollCtrl.animateTo(
-              0,
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOut,
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          AnimatedSlide(
+            duration: const Duration(milliseconds: 200),
+            offset: _showScrollTop ? Offset.zero : const Offset(0, 2),
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 200),
+              opacity: _showScrollTop ? 1 : 0,
+              child: FloatingActionButton.small(
+                heroTag: 'scrollTop',
+                onPressed: () => _scrollCtrl.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                ),
+                backgroundColor: AppColors.primaryMedium,
+                child: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
+              ),
             ),
-            backgroundColor: AppColors.primaryMedium,
-            child: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
           ),
-        ),
+          const SizedBox(height: 10),
+          FloatingActionButton(
+            heroTag: 'aiChat',
+            onPressed: () => context.push('/ai/chat'),
+            backgroundColor: AppColors.primaryMedium,
+            tooltip: 'AI Food Assistant',
+            child: const Icon(Icons.psychology_rounded, color: Colors.white),
+          ),
+        ],
       ),
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
@@ -160,9 +174,9 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
               data: (listings) {
                 if (listings.isEmpty) {
                   final hasFilters = filter.hasActiveFilters;
-                  return SliverFillRemaining(
+                  return SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.only(top: 40),
+                      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 0),
                       child: EmptyStateView(
                         icon: hasFilters
                             ? Icons.filter_list_off_rounded
@@ -618,6 +632,7 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
                 itemCount: vendors.length,
                 itemBuilder: (_, i) {
                   final v = vendors[i];
+                  if (v.id.isEmpty) return const SizedBox.shrink();
                   return GestureDetector(
                     onTap: () => context.push('/customer/vendor/${v.id}'),
                     child: Container(
@@ -2037,136 +2052,126 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(listing.name, style: AppTextStyles.h5, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            const SizedBox(height: 2),
-                            if (listing.vendor != null)
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      listing.vendor!.businessName,
-                                      style: AppTextStyles.caption,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (listing.vendor!.status == 'APPROVED') ...[
-                                    const SizedBox(width: 3),
-                                    const VerifiedBadge(size: 11),
-                                  ],
-                                ],
-                              ),
-                            if (listing.category.isNotEmpty) ...[
-                              const SizedBox(height: 3),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primarySurface,
-                                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                                ),
+                    children: [
+                        Text(listing.name, style: AppTextStyles.h5, maxLines: 1, overflow: TextOverflow.ellipsis),
+                        const SizedBox(height: 2),
+                        if (listing.vendor != null)
+                          Row(
+                            children: [
+                              Flexible(
                                 child: Text(
-                                  Formatters.formatCategory(listing.category),
-                                  style: AppTextStyles.caption.copyWith(
-                                    fontSize: 10,
-                                    color: AppColors.primaryMedium,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  listing.vendor!.businessName,
+                                  style: AppTextStyles.caption,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                            ],
-                          ],
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                const Icon(Icons.star_rounded, size: 12, color: AppColors.accentAmber),
-                                const SizedBox(width: 2),
-                                Text(listing.vendor?.avgRating.toStringAsFixed(1) ?? '—', style: AppTextStyles.caption),
-                                const SizedBox(width: AppSizes.s2),
-                                const Icon(Icons.location_on_rounded, size: 12, color: AppColors.textTertiary),
-                                const SizedBox(width: 2),
-                                Flexible(
-                                  child: Text(
-                                    listing.distance != null ? '${listing.distance!.toStringAsFixed(1)} km' : '—',
-                                    style: AppTextStyles.caption,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (urgency != null) ...[
-                                  const SizedBox(width: AppSizes.s1),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: urgency.bgColor,
-                                      borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                                    ),
-                                    child: Text(
-                                      urgency.label,
-                                      style: AppTextStyles.caption.copyWith(
-                                        color: urgency.color,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 9,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                                // Live countdown for items closing within 2 hours
-                                if (!isSoldOut && listing.availableQty > 0) ...[
-                                  const SizedBox(width: AppSizes.s1),
-                                  _CountdownChip(pickupEnd: listing.pickupEnd),
-                                ],
+                              if (listing.vendor!.status == 'APPROVED') ...[
+                                const SizedBox(width: 3),
+                                const VerifiedBadge(size: 11),
                               ],
+                            ],
+                          ),
+                        if (listing.category.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.primarySurface,
+                              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                             ),
-                            const SizedBox(height: 4),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.center,
-                              children: [
-                                Text(
-                                  Formatters.formatNPR(listing.discountedPrice),
-                                  style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium),
-                                ),
-                                const SizedBox(width: AppSizes.s1),
-                                Text(
-                                  Formatters.formatNPR(listing.originalPrice),
-                                  style: AppTextStyles.caption.copyWith(decoration: TextDecoration.lineThrough),
-                                ),
-                                const Spacer(),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            child: Text(
+                              Formatters.formatCategory(listing.category),
+                              style: AppTextStyles.caption.copyWith(
+                                fontSize: 10,
+                                color: AppColors.primaryMedium,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Icon(Icons.star_rounded, size: 12, color: AppColors.accentAmber),
+                            const SizedBox(width: 2),
+                            Text(listing.vendor?.avgRating.toStringAsFixed(1) ?? '—', style: AppTextStyles.caption),
+                            const SizedBox(width: AppSizes.s2),
+                            const Icon(Icons.location_on_rounded, size: 12, color: AppColors.textTertiary),
+                            const SizedBox(width: 2),
+                            Flexible(
+                              child: Text(
+                                listing.distance != null ? '${listing.distance!.toStringAsFixed(1)} km' : '—',
+                                style: AppTextStyles.caption,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (urgency != null) ...[
+                              const SizedBox(width: AppSizes.s1),
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: isSoldOut
-                                        ? AppColors.errorSurface
-                                        : isLowStock
-                                            ? AppColors.warningSurface
-                                            : AppColors.primarySurface,
+                                    color: urgency.bgColor,
                                     borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                                   ),
                                   child: Text(
-                                    isSoldOut ? 'Sold out' : '${listing.availableQty} left',
+                                    urgency.label,
                                     style: AppTextStyles.caption.copyWith(
-                                      color: isSoldOut
-                                          ? AppColors.error
-                                          : isLowStock
-                                              ? AppColors.warning
-                                              : AppColors.primaryMedium,
-                                      fontWeight: FontWeight.w600,
+                                      color: urgency.color,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 9,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              ],
+                              ),
+                            ] else if (!isSoldOut && listing.availableQty > 0) ...[
+                              const SizedBox(width: AppSizes.s1),
+                              _CountdownChip(pickupEnd: listing.pickupEnd),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Text(
+                              Formatters.formatNPR(listing.discountedPrice),
+                              style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium),
+                            ),
+                            const SizedBox(width: AppSizes.s1),
+                            Text(
+                              Formatters.formatNPR(listing.originalPrice),
+                              style: AppTextStyles.caption.copyWith(decoration: TextDecoration.lineThrough),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isSoldOut
+                                    ? AppColors.errorSurface
+                                    : isLowStock
+                                        ? AppColors.warningSurface
+                                        : AppColors.primarySurface,
+                                borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                              ),
+                              child: Text(
+                                isSoldOut ? 'Sold out' : '${listing.availableQty} left',
+                                style: AppTextStyles.caption.copyWith(
+                                  color: isSoldOut
+                                      ? AppColors.error
+                                      : isLowStock
+                                          ? AppColors.warning
+                                          : AppColors.primaryMedium,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ),
                           ],
                         ),
-                      ],
+                    ],
                   ),
                 ),
               ],

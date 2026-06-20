@@ -55,7 +55,7 @@ class CustomerProfileScreen extends ConsumerWidget {
                         iconColor: AppColors.error,
                         label: 'My Favorites',
                         subtitle: 'Saved vendors and listings',
-                        onTap: () => context.go('/customer/favorites'),
+                        onTap: () => context.push('/customer/favorites'),
                       ),
                       _ProfileTile(
                         icon: Icons.receipt_long_outlined,
@@ -92,11 +92,39 @@ class CustomerProfileScreen extends ConsumerWidget {
                         onTap: () => context.push('/customer/leaderboard'),
                       ),
                       _ProfileTile(
+                        icon: Icons.stars_rounded,
+                        iconColor: Colors.orange,
+                        label: 'Loyalty Points',
+                        subtitle: 'Your points balance and history',
+                        onTap: () => context.push('/customer/loyalty'),
+                      ),
+                      _ProfileTile(
                         icon: Icons.card_giftcard_rounded,
                         iconColor: AppColors.primaryMedium,
                         label: 'My Rewards',
                         subtitle: 'Points, discounts, and redemptions',
                         onTap: () => context.push('/customer/rewards'),
+                        showDivider: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SectionCard(
+                    title: 'AI Tools',
+                    children: [
+                      _ProfileTile(
+                        icon: Icons.psychology_rounded,
+                        iconColor: AppColors.primaryMedium,
+                        label: 'AI Food Assistant',
+                        subtitle: 'Chat with AI for recipes and food tips',
+                        onTap: () => context.push('/ai/chat'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.restaurant_menu_rounded,
+                        iconColor: Colors.deepPurple,
+                        label: 'AI Recipe Suggestions',
+                        subtitle: 'Get recipes from your rescued food items',
+                        onTap: () => context.push('/ai/recipes'),
                         showDivider: false,
                       ),
                     ],

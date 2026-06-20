@@ -16,8 +16,8 @@ export class FavoritesService {
     });
 
     if (existing) {
-      await this.prisma.favorite.delete({
-        where: { userId_listingId: { userId, listingId } },
+      await this.prisma.favorite.deleteMany({
+        where: { userId, listingId },
       });
       return { favorited: false, listingId };
     } else {
@@ -61,8 +61,8 @@ export class FavoritesService {
     });
 
     if (existing) {
-      await this.prisma.vendorFavorite.delete({
-        where: { userId_vendorId: { userId, vendorId } },
+      await this.prisma.vendorFavorite.deleteMany({
+        where: { userId, vendorId },
       });
       return { favorited: false, vendorId };
     } else {

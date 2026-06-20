@@ -79,15 +79,15 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     if (mounted) setState(() => _isReserving = false);
   }
 
-  Future<void> _toggleFavorite(String listingId) async {
+  Future<void> _toggleFavorite(ListingEntity listing) async {
     HapticFeedback.lightImpact();
-    try {
-      final added = await ref.read(favoritesProvider.notifier).toggle(listingId);
-      if (!mounted) return;
-      context.showSnackBar(
-        added ? 'Added to favorites ❤️' : 'Removed from favorites',
-      );
-    } catch (_) {}
+    final favorites = ref.read(favoritesProvider).value ?? [];
+    final isFav = favorites.any((f) => f.id == listing.id);
+    // Pass the listing so the notifier can optimistically add it without network wait
+    ref.read(favoritesProvider.notifier).toggle(listing.id, listing: listing);
+    if (mounted) {
+      context.showSnackBar(isFav ? 'Removed from favorites' : 'Added to favorites ❤️');
+    }
   }
 
   void _share(ListingEntity listing) {
@@ -110,8 +110,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
         final isUrgent =
             listing.availableQty > 0 && listing.availableQty <= 3;
         final isSoldOut = listing.availableQty == 0;
-        final savings =
-            (listing.originalPrice - listing.discountedPrice) * _quantity;
 
         return Scaffold(
           backgroundColor: AppColors.backgroundLight,
@@ -210,11 +208,8 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                             if (!isSoldOut) ...[
                               const Divider(height: AppSizes.s6),
                               _buildQuantitySection(listing),
-                              const SizedBox(height: AppSizes.s2),
-                              if (savings > 0)
-                                _SavingsBanner(savings: savings),
                             ],
-                            const SizedBox(height: 110),
+                            const SizedBox(height: 160),
                           ],
                         ),
                       ),
@@ -306,7 +301,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                       ? Icons.favorite_rounded
                       : Icons.favorite_border_rounded,
                   iconColor: isFav ? Colors.red.shade400 : Colors.white,
-                  onTap: () => _toggleFavorite(listing.id),
+                  onTap: () => _toggleFavorite(listing),
                 ),
                 const SizedBox(width: AppSizes.s2),
                 _CircleIconButton(
@@ -626,21 +621,28 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () async {
-                          final Uri? uri;
+                          final Uri uri;
                           if (vendor.lat != null && vendor.lng != null) {
                             uri = Uri.parse(
-                                'https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}');
+                                'geo:${vendor.lat},${vendor.lng}?q=${vendor.lat},${vendor.lng}(${Uri.encodeComponent(vendor.businessName)})');
                           } else if (vendor.address != null &&
                               vendor.address!.isNotEmpty) {
                             uri = Uri.parse(
-                                'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}');
+                                'geo:0,0?q=${Uri.encodeComponent(vendor.address!)}');
                           } else {
-                            uri = null;
+                            return;
                           }
-                          if (uri != null && await canLaunchUrl(uri)) {
-                            await launchUrl(uri,
+                          try {
+                            final launched = await launchUrl(uri,
                                 mode: LaunchMode.externalApplication);
-                          }
+                            if (!launched && context.mounted) {
+                              // Fallback to Google Maps web URL
+                              final webUri = vendor.lat != null && vendor.lng != null
+                                  ? Uri.parse('https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}')
+                                  : Uri.parse('https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}');
+                              await launchUrl(webUri, mode: LaunchMode.externalApplication);
+                            }
+                          } catch (_) {}
                         },
                         icon: const Icon(Icons.directions_rounded, size: 16),
                         label: const Text('Directions'),
@@ -1189,39 +1191,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
 }
 
 // ─── Sub-widgets ───────────────────────────────────────────────────────────
-
-class _SavingsBanner extends StatelessWidget {
-  const _SavingsBanner({required this.savings});
-  final int savings;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.s3, vertical: AppSizes.s2),
-      decoration: BoxDecoration(
-        color: AppColors.successSurface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border:
-            Border.all(color: AppColors.success.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.eco_rounded,
-              color: AppColors.success, size: AppSizes.iconMd),
-          const SizedBox(width: AppSizes.s2),
-          Expanded(
-            child: Text(
-              'You save ${Formatters.formatNPR(savings)} and help reduce food waste!',
-              style: AppTextStyles.bodySmall
-                  .copyWith(color: AppColors.success),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _NetworkImage extends StatelessWidget {
   const _NetworkImage({required this.url});

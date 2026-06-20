@@ -222,8 +222,11 @@ class VendorDashboardScreen extends ConsumerWidget {
                     _ToolCard(icon: Icons.photo_library_rounded, label: 'Gallery', color: Colors.green, onTap: () => context.push('/vendor/gallery')),
                     _ToolCard(icon: Icons.stars_rounded, label: 'Loyalty', color: Colors.amber, onTap: () => context.push('/vendor/loyalty')),
                     _ToolCard(icon: Icons.people_rounded, label: 'Customers', color: Colors.indigo, onTap: () => context.push('/vendor/customers')),
-                    _ToolCard(icon: Icons.psychology_rounded, label: 'AI Tools', color: AppColors.primaryMedium, onTap: () => context.push('/vendor/ai/description')),
                     _ToolCard(icon: Icons.help_outline_rounded, label: 'FAQ', color: Colors.grey, onTap: () => context.push('/vendor/faq')),
+                    _ToolCard(icon: Icons.verified_rounded, label: 'Verification', color: Colors.cyan.shade700, onTap: () => context.push('/vendor/verification')),
+                    _ToolCard(icon: Icons.auto_awesome_rounded, label: 'AI Description', color: AppColors.primaryMedium, onTap: () => context.push('/vendor/ai/description')),
+                    _ToolCard(icon: Icons.price_change_rounded, label: 'AI Pricing', color: Colors.deepPurple, onTap: () => context.push('/vendor/ai/pricing')),
+                    _ToolCard(icon: Icons.chat_rounded, label: 'AI Assistant', color: Colors.teal.shade700, onTap: () => context.push('/ai/chat')),
                   ],
                 ),
               ),
@@ -1098,7 +1101,10 @@ class _ActiveListingTile extends StatelessWidget {
         boxShadow: AppShadows.xs,
         border: Border.all(color: AppColors.border),
       ),
-      child: ListTile(
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        child: ListTile(
         leading: Container(
           width: 42,
           height: 42,
@@ -1122,6 +1128,7 @@ class _ActiveListingTile extends StatelessWidget {
           color: AppColors.neutral400,
         ),
         onTap: () => context.push('/vendor/listings/${listing.id}/edit'),
+      ),
       ),
     );
   }

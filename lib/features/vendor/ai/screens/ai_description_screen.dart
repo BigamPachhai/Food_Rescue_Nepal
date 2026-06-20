@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
 import '../../../../core/services/mistral_service.dart';
@@ -85,6 +86,17 @@ class _AiDescriptionScreenState extends ConsumerState<AiDescriptionScreen> {
           ],
           const SizedBox(height: 20),
           _TipsCard(),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => context.push('/vendor/ai/pricing'),
+            icon: const Icon(Icons.price_change_rounded),
+            label: const Text('Also try AI Price Suggestion'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primaryMedium,
+              side: const BorderSide(color: AppColors.primaryMedium),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
         ],
       ),
     );

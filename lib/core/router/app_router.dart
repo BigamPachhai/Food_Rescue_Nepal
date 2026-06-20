@@ -95,8 +95,6 @@ import '../../features/referral/screens/referral_screen.dart' as referral_new;
 import '../../features/customer/analytics/screens/spending_analytics_screen.dart';
 import '../../features/vendor/operating_hours/screens/operating_hours_screen.dart' as oh_new;
 import '../../features/vendor_verification/screens/vendor_verification_screen.dart';
-import '../../features/two_factor/screens/two_factor_screen.dart';
-import '../../features/two_factor/screens/two_factor_login_screen.dart';
 import '../../features/gdpr/screens/gdpr_screen.dart';
 import '../../features/settings/screens/notification_preferences_screen.dart';
 import '../../features/settings/screens/language_screen.dart';
@@ -119,7 +117,6 @@ class CustomerShell extends StatelessWidget {
   static const _profileSubPaths = [
     '/customer/favorites',
     '/customer/support',
-    '/settings',
     '/customer/impact',
     '/customer/achievements',
     '/customer/leaderboard',
@@ -280,7 +277,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           isOnboardingRoute ||
           loc == '/forgot-password' ||
           loc == '/reset-password' ||
-          loc == '/2fa-login' ||
           loc == '/legal/privacy' ||
           loc == '/legal/terms' ||
           loc == '/how-it-works';
@@ -337,19 +333,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           return ResetPasswordScreen(email: extra['email'] ?? '');
         },
       ),
-      GoRoute(
-        path: '/2fa-login',
-        builder: (_, state) {
-          final extra = state.extra as Map<String, String?>? ?? {};
-          return TwoFactorLoginScreen(email: extra['email'] ?? '');
-        },
-      ),
       // Shared routes
       GoRoute(path: '/notifications', builder: (_, __) => const NotificationsScreen()),
       GoRoute(path: '/legal/privacy', builder: (_, __) => const PrivacyPolicyScreen()),
       GoRoute(path: '/legal/terms', builder: (_, __) => const TermsScreen()),
       GoRoute(path: '/vendor/scanner', builder: (_, __) => const QrScannerScreen()),
-      GoRoute(path: '/customer/qr/:id', builder: (_, state) => QrDisplayScreen(orderId: state.pathParameters['id']!)),
       // Settings (accessible from any role)
       GoRoute(path: '/settings/accessibility', builder: (_, __) => const AccessibilityScreen()),
       GoRoute(path: '/settings/notifications', builder: (_, __) => const NotificationSettingsScreen()),
@@ -357,7 +345,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/settings/language', builder: (_, __) => const LanguageScreen()),
       GoRoute(path: '/settings/dark-mode', builder: (_, __) => const DarkModeScreen()),
       GoRoute(path: '/settings/app-lock', builder: (_, __) => const AppLockScreen()),
-      GoRoute(path: '/settings/2fa', builder: (_, __) => const TwoFactorScreen()),
       GoRoute(path: '/settings/privacy-data', builder: (_, __) => const GdprScreen()),
       GoRoute(path: '/settings/notification-prefs', builder: (_, __) => const NotificationPreferencesScreen()),
       // AI features (accessible from customer shell context)
@@ -391,7 +378,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             },
           ),
           // Profile & social
-          GoRoute(path: '/customer/favorites', builder: (_, __) => const FavoritesScreen()),
           GoRoute(path: '/customer/profile', builder: (_, __) => const CustomerProfileScreen()),
           GoRoute(path: '/customer/profile/edit', builder: (_, __) => const EditProfileScreen()),
           GoRoute(path: '/customer/referral', builder: (_, __) => const ReferralScreen()),
@@ -410,12 +396,8 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/customer/new-vendors', builder: (_, __) => const NewVendorsScreen()),
           GoRoute(path: '/customer/dietary-alerts', builder: (_, __) => const DietaryAlertsScreen()),
           GoRoute(path: '/customer/advanced-filter', builder: (_, __) => const AdvancedFilterScreen(initial: FilterOptions())),
-          // Vendor browsing
-          GoRoute(path: '/customer/vendor/:id', builder: (_, state) => CustomerVendorScreen(vendorId: state.pathParameters['id']!)),
-          GoRoute(path: '/customer/vendor/:id/reviews', builder: (_, state) => VendorReviewsScreen(vendorId: state.pathParameters['id']!)),
           // Misc
           GoRoute(path: '/customer/support', builder: (_, __) => const SupportScreen()),
-          GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
           // New features
           GoRoute(path: '/customer/loyalty', builder: (_, __) => const LoyaltyScreen()),
           GoRoute(path: '/customer/waitlist', builder: (_, __) => const WaitlistScreen()),
@@ -424,6 +406,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/customer/announcements', builder: (_, __) => const AnnouncementsScreen()),
           GoRoute(path: '/customer/referral-earn', builder: (_, __) => const referral_new.ReferralScreen()),
           GoRoute(path: '/customer/spending-analytics', builder: (_, __) => const SpendingAnalyticsScreen()),
+          GoRoute(path: '/customer/qr/:id', builder: (_, state) => QrDisplayScreen(orderId: state.pathParameters['id']!)),
           GoRoute(
             path: '/customer/orders/:id/dispute',
             builder: (_, state) => DisputeScreen(orderId: state.pathParameters['id']!),
@@ -441,6 +424,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+
+      // ── Customer routes outside shell so back button works correctly ─────────
+      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/customer/favorites', builder: (_, __) => const FavoritesScreen()),
+      GoRoute(path: '/customer/vendor/:id', builder: (_, state) => CustomerVendorScreen(vendorId: state.pathParameters['id']!)),
+      GoRoute(path: '/customer/vendor/:id/reviews', builder: (_, state) => VendorReviewsScreen(vendorId: state.pathParameters['id']!)),
 
       // ── Vendor Shell ────────────────────────────────────────────────────────
       ShellRoute(

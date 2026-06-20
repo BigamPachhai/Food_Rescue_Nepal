@@ -15,7 +15,21 @@ class LoyaltyScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Loyalty Points')),
       body: state.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => const Center(child: Text('Error loading loyalty data')),
+        error: (e, _) => Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              const Text('Could not load loyalty data'),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => ref.refresh(loyaltyProvider.future),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
         data: (loyalty) => RefreshIndicator(
           onRefresh: () => ref.refresh(loyaltyProvider.future),
           child: SingleChildScrollView(

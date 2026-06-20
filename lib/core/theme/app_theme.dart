@@ -332,6 +332,7 @@ class AppTheme {
         contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         minLeadingWidth: 0,
         iconColor: AppColors.textSecondary,
+        tileColor: Colors.transparent,
       ),
     );
   }

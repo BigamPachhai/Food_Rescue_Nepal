@@ -55,13 +55,6 @@ export class AuthController {
   @ApiOperation({ summary: 'Login with email and password' })
   async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(dto);
-    if (result.requires2FA) {
-      return {
-        success: true,
-        data: { requires2FA: true, pendingEmail: result.pendingEmail },
-        message: 'Two-factor authentication required',
-      };
-    }
     res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
     return {
       success: true,
@@ -139,22 +132,6 @@ export class AuthController {
       success: true,
       data: { isNewUser: result.isNewUser, user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken },
       message: 'Google sign-in successful',
-    };
-  }
-
-  @Post('verify-2fa')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Complete login by verifying TOTP code (2FA step 2)' })
-  async verifyTotpLogin(
-    @Body() body: { email: string; token: string },
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.verifyTotpLogin(body.email, body.token);
-    res.cookie('refreshToken', result.refreshToken, REFRESH_COOKIE_OPTIONS);
-    return {
-      success: true,
-      data: { user: result.user, accessToken: result.accessToken, refreshToken: result.refreshToken },
-      message: 'Login successful',
     };
   }
 
