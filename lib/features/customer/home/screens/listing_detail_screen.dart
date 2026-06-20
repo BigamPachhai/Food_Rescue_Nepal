@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -315,7 +316,7 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
               ],
             ),
           ),
-          if (images.length > 1)
+          if (images.length > 1 && images.length <= 6)
             Positioned(
               bottom: AppSizes.s3,
               left: 0,
@@ -1645,8 +1646,7 @@ class _DetailCountdown extends StatefulWidget {
 
 class _DetailCountdownState extends State<_DetailCountdown> {
   late Duration _remaining;
-  late final _sub = Stream.periodic(const Duration(seconds: 1), (_) => null)
-      .listen((_) { if (mounted) setState(() => _remaining = _calc()); });
+  Timer? _timer;
 
   Duration _calc() {
     final d = widget.pickupEnd.difference(DateTime.now());
@@ -1654,10 +1654,19 @@ class _DetailCountdownState extends State<_DetailCountdown> {
   }
 
   @override
-  void initState() { super.initState(); _remaining = _calc(); }
+  void initState() {
+    super.initState();
+    _remaining = _calc();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() => _remaining = _calc());
+    });
+  }
 
   @override
-  void dispose() { _sub.cancel(); super.dispose(); }
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -20,67 +20,72 @@ class AdminOrderDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Order Details')),
       body: orderAsync.when(
-        data: (order) => SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSizes.lg),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Status header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(16),
+        data: (order) => RefreshIndicator(
+          color: AppColors.primaryMedium,
+          onRefresh: () async => ref.invalidate(adminOrderDetailProvider(orderId)),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(AppSizes.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Status header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.receipt_long,
+                          size: 40, color: AppColors.primaryMedium),
+                      const SizedBox(height: 12),
+                      Text(
+                        order.listingName ?? 'Order',
+                        style: AppTextStyles.h3,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      StatusBadge(status: order.status),
+                    ],
+                  ),
                 ),
-                child: Column(
+                const SizedBox(height: AppSizes.lg),
+                _Section(
+                  title: 'Order Info',
                   children: [
-                    const Icon(Icons.receipt_long,
-                        size: 40, color: AppColors.primaryMedium),
-                    const SizedBox(height: 12),
-                    Text(
-                      order.listingName ?? 'Order',
-                      style: AppTextStyles.h3,
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 8),
-                    StatusBadge(status: order.status),
+                    _Row('Order ID', '#${order.id.substring(0, 8).toUpperCase()}'),
+                    _Row('Date', Formatters.formatDate(order.createdAt)),
+                    _Row('Quantity', '${order.quantity}'),
+                    _Row('Total', Formatters.formatNPR(order.totalAmount)),
                   ],
                 ),
-              ),
-              const SizedBox(height: AppSizes.lg),
-              _Section(
-                title: 'Order Info',
-                children: [
-                  _Row('Order ID', '#${order.id.substring(0, 8).toUpperCase()}'),
-                  _Row('Date', Formatters.formatDate(order.createdAt)),
-                  _Row('Quantity', '${order.quantity}'),
-                  _Row('Total', Formatters.formatNPR(order.totalAmount)),
-                ],
-              ),
-              const SizedBox(height: AppSizes.lg),
-              _Section(
-                title: 'Customer',
-                children: [
-                  if (order.customerName != null)
-                    _Row('Name', order.customerName!),
-                  if (order.customerEmail != null)
-                    _Row('Email', order.customerEmail!),
-                  if (order.customerPhone != null)
-                    _Row('Phone', order.customerPhone!),
-                ],
-              ),
-              const SizedBox(height: AppSizes.lg),
-              _Section(
-                title: 'Vendor',
-                children: [
-                  if (order.vendorName != null)
-                    _Row('Business', order.vendorName!),
-                  if (order.vendorAddress != null)
-                    _Row('Address', order.vendorAddress!),
-                ],
-              ),
-            ],
+                const SizedBox(height: AppSizes.lg),
+                _Section(
+                  title: 'Customer',
+                  children: [
+                    if (order.customerName != null)
+                      _Row('Name', order.customerName!),
+                    if (order.customerEmail != null)
+                      _Row('Email', order.customerEmail!),
+                    if (order.customerPhone != null)
+                      _Row('Phone', order.customerPhone!),
+                  ],
+                ),
+                const SizedBox(height: AppSizes.lg),
+                _Section(
+                  title: 'Vendor',
+                  children: [
+                    if (order.vendorName != null)
+                      _Row('Business', order.vendorName!),
+                    if (order.vendorAddress != null)
+                      _Row('Address', order.vendorAddress!),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
         loading: () => ListView.builder(

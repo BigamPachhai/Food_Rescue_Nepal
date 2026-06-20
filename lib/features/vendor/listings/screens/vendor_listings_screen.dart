@@ -24,6 +24,14 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
   final _filters = ['All', 'Active', 'Paused', 'Sold Out'];
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(vendorListingsProvider);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final listingsAsync = ref.watch(vendorListingsProvider);
 
@@ -83,14 +91,24 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
                 }).toList();
 
                 if (filtered.isEmpty) {
-                  return EmptyStateView(
-                    icon: Icons.restaurant_menu_outlined,
-                    title: listings.isEmpty ? 'No listings yet' : 'No $_filter listings',
-                    subtitle: listings.isEmpty
-                        ? 'Add your first food listing to start reducing waste.'
-                        : 'Try switching to a different filter.',
-                    ctaLabel: listings.isEmpty ? 'Add Listing' : null,
-                    onCtaTap: listings.isEmpty ? () => context.push('/vendor/listings/add') : null,
+                  return RefreshIndicator(
+                    color: AppColors.primaryMedium,
+                    onRefresh: () => ref.read(vendorListingsProvider.notifier).fetch(),
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: SizedBox(
+                        height: MediaQuery.of(context).size.height * 0.5,
+                        child: EmptyStateView(
+                          icon: Icons.restaurant_menu_outlined,
+                          title: listings.isEmpty ? 'No listings yet' : 'No $_filter listings',
+                          subtitle: listings.isEmpty
+                              ? 'Add your first food listing to start reducing waste.'
+                              : 'Try switching to a different filter.',
+                          ctaLabel: listings.isEmpty ? 'Add Listing' : null,
+                          onCtaTap: listings.isEmpty ? () => context.push('/vendor/listings/add') : null,
+                        ),
+                      ),
+                    ),
                   );
                 }
 
@@ -106,10 +124,14 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
                       onToggleActive: () => _confirmToggleActive(context, filtered[i]),
                       onMarkSoldOut: () => _confirmMarkSoldOut(context, filtered[i]),
                       onDuplicate: () async {
-                        await ref
-                            .read(vendorListingsProvider.notifier)
-                            .duplicateListing(filtered[i]);
-                        if (context.mounted) context.showSnackBar('Listing duplicated!');
+                        try {
+                          await ref
+                              .read(vendorListingsProvider.notifier)
+                              .duplicateListing(filtered[i]);
+                          if (context.mounted) context.showSnackBar('Listing duplicated!');
+                        } catch (e) {
+                          if (context.mounted) context.showErrorSnackBar('Failed to duplicate listing');
+                        }
                       },
                       onDelete: () => _confirmDelete(context, filtered[i]),
                       onAnalytics: () => _showAnalytics(context, filtered[i]),
@@ -161,11 +183,15 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogCtx);
-              await ref
-                  .read(vendorListingsProvider.notifier)
-                  .toggleActive(listing.id, !listing.isActive);
-              if (context.mounted) {
-                context.showSnackBar(pausing ? 'Listing paused' : 'Listing activated');
+              try {
+                await ref
+                    .read(vendorListingsProvider.notifier)
+                    .toggleActive(listing.id, !listing.isActive);
+                if (context.mounted) {
+                  context.showSnackBar(pausing ? 'Listing paused' : 'Listing activated');
+                }
+              } catch (e) {
+                if (context.mounted) context.showErrorSnackBar('Failed to update listing');
               }
             },
             child: Text(pausing ? 'Pause' : 'Activate'),
@@ -189,8 +215,12 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogCtx);
-              await ref.read(vendorListingsProvider.notifier).markSoldOut(listing.id);
-              if (context.mounted) context.showSnackBar('Marked as sold out');
+              try {
+                await ref.read(vendorListingsProvider.notifier).markSoldOut(listing.id);
+                if (context.mounted) context.showSnackBar('Marked as sold out');
+              } catch (e) {
+                if (context.mounted) context.showErrorSnackBar('Failed to mark sold out');
+              }
             },
             child: const Text('Mark Sold Out', style: TextStyle(color: AppColors.error)),
           ),
@@ -213,8 +243,12 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
           TextButton(
             onPressed: () async {
               Navigator.pop(dialogCtx);
-              await ref.read(vendorListingsProvider.notifier).deleteListing(listing.id);
-              if (context.mounted) context.showSnackBar('Listing deleted');
+              try {
+                await ref.read(vendorListingsProvider.notifier).deleteListing(listing.id);
+                if (context.mounted) context.showSnackBar('Listing deleted');
+              } catch (e) {
+                if (context.mounted) context.showErrorSnackBar('Failed to delete listing');
+              }
             },
             child: const Text('Delete', style: TextStyle(color: AppColors.error)),
           ),
@@ -347,7 +381,7 @@ class _ListingCard extends StatelessWidget {
                       Row(
                         children: [
                           Text(
-                            listing.category,
+                            Formatters.formatCategory(listing.category),
                             style: AppTextStyles.caption.copyWith(
                               color: AppColors.primaryMedium,
                               fontWeight: FontWeight.w500,

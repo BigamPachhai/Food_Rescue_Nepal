@@ -15,6 +15,7 @@ class VendorOrder {
   final String? pickupCode;
   final String? notes;
   final DateTime createdAt;
+  final DateTime updatedAt;
   final ListingEntity? listing;
 
   const VendorOrder({
@@ -28,6 +29,7 @@ class VendorOrder {
     this.pickupCode,
     this.notes,
     required this.createdAt,
+    required this.updatedAt,
     this.listing,
   });
 
@@ -43,6 +45,9 @@ class VendorOrder {
         notes: json['notes'] as String?,
         createdAt: json['createdAt'] != null
             ? DateTime.parse(json['createdAt'] as String)
+            : DateTime.now(),
+        updatedAt: json['updatedAt'] != null
+            ? DateTime.parse(json['updatedAt'] as String)
             : DateTime.now(),
         listing: json['listing'] != null
             ? ListingEntity.fromJson(json['listing'] as Map<String, dynamic>)

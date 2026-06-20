@@ -170,7 +170,11 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
         ],
       ),
       body: orderAsync.when(
-        data: (order) => SingleChildScrollView(
+        data: (order) => RefreshIndicator(
+          color: AppColors.primaryMedium,
+          onRefresh: () async => ref.invalidate(orderDetailProvider(widget.orderId)),
+          child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(AppSizes.s4),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -258,6 +262,7 @@ class _OrderDetailScreenState extends ConsumerState<OrderDetailScreen>
               const SizedBox(height: AppSizes.s4),
             ],
           ),
+        ),
         ),
         loading: () => const Padding(
           padding: EdgeInsets.all(AppSizes.s4),

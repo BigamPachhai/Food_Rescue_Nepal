@@ -99,3 +99,62 @@ class LanguageNotifier extends StateNotifier<String> {
 final languageProvider = StateNotifierProvider<LanguageNotifier, String>(
   (_) => LanguageNotifier(),
 );
+
+// ─── Dietary preferences ──────────────────────────────────────────────────
+
+class DietaryPrefsNotifier extends StateNotifier<Set<String>> {
+  DietaryPrefsNotifier() : super(const {}) {
+    _load();
+  }
+
+  static const _key = 'dietary_prefs';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getStringList(_key);
+    if (stored != null) state = Set<String>.from(stored);
+  }
+
+  Future<void> toggle(String tag) async {
+    final next = {...state};
+    if (next.contains(tag)) {
+      next.remove(tag);
+    } else {
+      next.add(tag);
+    }
+    state = next;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_key, next.toList());
+  }
+}
+
+final dietaryPrefsProvider =
+    StateNotifierProvider<DietaryPrefsNotifier, Set<String>>(
+  (_) => DietaryPrefsNotifier(),
+);
+
+// ─── Nearby alert radius ──────────────────────────────────────────────────
+
+class NearbyRadiusNotifier extends StateNotifier<double> {
+  NearbyRadiusNotifier() : super(5.0) {
+    _load();
+  }
+
+  static const _key = 'nearby_radius';
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = prefs.getDouble(_key) ?? 5.0;
+  }
+
+  Future<void> set(double value) async {
+    state = value;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_key, value);
+  }
+}
+
+final nearbyRadiusProvider =
+    StateNotifierProvider<NearbyRadiusNotifier, double>(
+  (_) => NearbyRadiusNotifier(),
+);

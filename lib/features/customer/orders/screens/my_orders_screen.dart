@@ -277,8 +277,9 @@ class _OrderCard extends StatelessWidget {
                 ],
               ),
             ),
-            // Quick actions row
-            if (order.isActive)
+            // Quick actions row — only show QR for orders vendor has accepted/readied
+            if (order.isActive &&
+                (order.status == 'ACCEPTED' || order.status == 'READY'))
               Padding(
                 padding: const EdgeInsets.fromLTRB(AppSizes.s3, 0, AppSizes.s3, AppSizes.s2),
                 child: OutlinedButton.icon(

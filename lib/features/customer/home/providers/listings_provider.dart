@@ -232,7 +232,9 @@ class ListingsNotifier extends StateNotifier<AsyncValue<List<ListingEntity>>> {
     try {
       final params = <String, dynamic>{'page': _page, 'limit': 20};
       if (_filter.category != null && _filter.category != 'All') {
-        params['category'] = _filter.category!.toUpperCase();
+        // Map display names to backend enum values
+        params['category'] =
+            _filter.category!.toUpperCase().replaceAll(' ', '_');
       }
       if (_filter.search.isNotEmpty) params['search'] = _filter.search;
       if (_filter.sortBy != 'newest') params['sortBy'] = _filter.sortBy;

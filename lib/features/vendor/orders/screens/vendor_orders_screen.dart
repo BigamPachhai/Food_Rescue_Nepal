@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -91,9 +92,9 @@ class _VendorOrdersScreenState extends ConsumerState<VendorOrdersScreen>
           final todayRevenue = history
               .where((o) =>
                   o.status == 'COMPLETED' &&
-                  o.createdAt.year == today.year &&
-                  o.createdAt.month == today.month &&
-                  o.createdAt.day == today.day)
+                  o.updatedAt.year == today.year &&
+                  o.updatedAt.month == today.month &&
+                  o.updatedAt.day == today.day)
               .fold<int>(0, (sum, o) => sum + o.totalAmount);
 
           return TabBarView(
@@ -331,6 +332,7 @@ class _VendorOrderCard extends ConsumerWidget {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: () async {
+                          HapticFeedback.mediumImpact();
                           await ref.read(vendorOrdersProvider.notifier).rejectReservation(order.id);
                           if (context.mounted) context.showSnackBar('Reservation rejected');
                         },
@@ -348,6 +350,7 @@ class _VendorOrderCard extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton(
                         onPressed: () async {
+                          HapticFeedback.mediumImpact();
                           await ref.read(vendorOrdersProvider.notifier).acceptOrder(order.id);
                           if (context.mounted) context.showSnackBar('Reservation accepted!');
                         },

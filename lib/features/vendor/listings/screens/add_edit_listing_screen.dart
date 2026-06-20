@@ -184,8 +184,15 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         'file': await MultipartFile.fromFile(file.path),
       });
       final response = await dio.post(ApiEndpoints.uploadImage, data: formData);
-      final responseData = response.data as Map<String, dynamic>;
-      return (responseData['data'] as Map<String, dynamic>)['url'] as String;
+      final responseData = response.data;
+      if (responseData is! Map<String, dynamic>) {
+        throw AppException('Invalid response from image upload');
+      }
+      final dataMap = responseData['data'];
+      if (dataMap is! Map<String, dynamic> || dataMap['url'] == null) {
+        throw AppException('Image upload failed: missing URL in response');
+      }
+      return dataMap['url'] as String;
     });
     return Future.wait(futures);
   }
@@ -254,7 +261,17 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         context.pop();
       }
     } catch (e) {
-      if (mounted) context.showErrorSnackBar(e.toString());
+      if (mounted) {
+        String msg;
+        if (e is DioException && e.error is AppException) {
+          msg = (e.error as AppException).message;
+        } else if (e is AppException) {
+          msg = e.message;
+        } else {
+          msg = 'Something went wrong. Please try again.';
+        }
+        context.showErrorSnackBar(msg);
+      }
     }
     if (mounted) setState(() => _isLoading = false);
   }
@@ -296,7 +313,15 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
     setState(() {
       if (isStart) {
         _pickupStart = dt;
+        // Ensure end is always after start
+        if (!_pickupEnd.isAfter(_pickupStart)) {
+          _pickupEnd = _pickupStart.add(const Duration(hours: 2));
+        }
       } else {
+        if (!dt.isAfter(_pickupStart)) {
+          context.showSnackBar('Pickup end must be after pickup start');
+          return;
+        }
         _pickupEnd = dt;
       }
     });

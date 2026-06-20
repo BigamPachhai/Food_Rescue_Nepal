@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
@@ -69,6 +68,97 @@ class CustomerProfileScreen extends ConsumerWidget {
                   ),
                   const SizedBox(height: 12),
                   _SectionCard(
+                    title: 'Impact & Rewards',
+                    children: [
+                      _ProfileTile(
+                        icon: Icons.eco_rounded,
+                        iconColor: Colors.green,
+                        label: 'My Impact',
+                        subtitle: 'CO₂ saved, meals rescued, streaks',
+                        onTap: () => context.push('/customer/impact'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.emoji_events_rounded,
+                        iconColor: Colors.amber,
+                        label: 'Achievements',
+                        subtitle: 'Badges and milestones unlocked',
+                        onTap: () => context.push('/customer/achievements'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.leaderboard_rounded,
+                        iconColor: Colors.purple,
+                        label: 'Leaderboard',
+                        subtitle: 'See top food rescuers',
+                        onTap: () => context.push('/customer/leaderboard'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.card_giftcard_rounded,
+                        iconColor: AppColors.primaryMedium,
+                        label: 'My Rewards',
+                        subtitle: 'Points, discounts, and redemptions',
+                        onTap: () => context.push('/customer/rewards'),
+                        showDivider: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SectionCard(
+                    title: 'Order Tools',
+                    children: [
+                      _ProfileTile(
+                        icon: Icons.bar_chart_rounded,
+                        iconColor: Colors.blue,
+                        label: 'Order Statistics',
+                        subtitle: 'Your rescue history and spending',
+                        onTap: () => context.push('/customer/orders/stats'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.calendar_month_rounded,
+                        iconColor: Colors.teal,
+                        label: 'Pickup Calendar',
+                        subtitle: 'View scheduled pickups by date',
+                        onTap: () => context.push('/customer/orders/calendar'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.no_meals_rounded,
+                        iconColor: Colors.orange,
+                        label: 'Dietary Preferences',
+                        subtitle: 'Allergens and dietary filters',
+                        onTap: () => context.push('/customer/dietary-alerts'),
+                        showDivider: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SectionCard(
+                    title: 'Community',
+                    children: [
+                      _ProfileTile(
+                        icon: Icons.forum_rounded,
+                        iconColor: AppColors.success,
+                        label: 'Community Feed',
+                        subtitle: 'Share your food rescue stories',
+                        onTap: () => context.push('/customer/community'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.flag_rounded,
+                        iconColor: Colors.deepOrange,
+                        label: 'Challenges',
+                        subtitle: 'Weekly and monthly rescue challenges',
+                        onTap: () => context.push('/customer/challenges'),
+                      ),
+                      _ProfileTile(
+                        icon: Icons.people_outline_rounded,
+                        iconColor: Colors.indigo,
+                        label: 'Refer a Friend',
+                        subtitle: 'Earn rewards for each referral',
+                        onTap: () => context.push('/customer/referral'),
+                        showDivider: false,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SectionCard(
                     title: 'Preferences',
                     children: [
                       _ProfileTile(
@@ -79,50 +169,15 @@ class CustomerProfileScreen extends ConsumerWidget {
                       ),
                       _ProfileTile(
                         icon: Icons.notifications_outlined,
-                        label: 'Notifications',
-                        subtitle: 'Manage notification preferences',
-                        onTap: () => context.push('/notifications'),
-                        showDivider: false,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _SectionCard(
-                    title: 'Community',
-                    children: [
-                      _ProfileTile(
-                        icon: Icons.people_outline_rounded,
-                        iconColor: AppColors.success,
-                        label: 'Refer a Friend',
-                        subtitle: 'Invite friends to rescue food together',
-                        onTap: () {
-                          Share.share(
-                            '🌿 Join me on Food Rescue Nepal! Get discounted food and help reduce food waste across Nepal. Download the app now!',
-                            subject: 'Join Food Rescue Nepal',
-                          );
-                        },
+                        label: 'Notification Settings',
+                        subtitle: 'Manage what alerts you receive',
+                        onTap: () => context.push('/settings/notifications'),
                       ),
                       _ProfileTile(
-                        icon: Icons.leaderboard_outlined,
-                        iconColor: AppColors.accentAmber,
-                        label: 'Impact Leaderboard',
-                        subtitle: 'See top food rescuers in your area',
-                        onTap: () {
-                          showDialog<void>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                              title: const Text('Coming Soon'),
-                              content: const Text('The Impact Leaderboard is under development and will be available in a future update.'),
-                              actions: [
-                                TextButton(
-                                  onPressed: () => Navigator.pop(ctx),
-                                  child: const Text('Got it'),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
+                        icon: Icons.accessibility_new_rounded,
+                        label: 'Accessibility',
+                        subtitle: 'Font size, contrast, motion',
+                        onTap: () => context.push('/settings/accessibility'),
                         showDivider: false,
                       ),
                     ],

@@ -124,8 +124,16 @@ class _MapScreenState extends ConsumerState<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final hasLocation =
-        ref.watch(locationProvider).position.value != null;
+    final locationState = ref.watch(locationProvider);
+    final hasLocation = locationState.position.value != null;
+    final locationError = locationState.position.hasError;
+
+    // Re-apply filter whenever location changes so distances update
+    ref.listen(locationProvider, (prev, next) {
+      if (next.position.value != prev?.position.value) {
+        _applyFilter();
+      }
+    });
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -134,6 +142,28 @@ class _MapScreenState extends ConsumerState<MapScreen> {
           children: [
             _buildHeader(context),
             _buildSearchBar(),
+            if (locationError)
+              Container(
+                margin: const EdgeInsets.fromLTRB(AppSizes.s3, AppSizes.s2, AppSizes.s3, 0),
+                padding: const EdgeInsets.all(AppSizes.s2),
+                decoration: BoxDecoration(
+                  color: AppColors.warningSurface,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.location_off_outlined, color: AppColors.warning, size: 16),
+                    SizedBox(width: AppSizes.s2),
+                    Expanded(
+                      child: Text(
+                        'Location unavailable. Enable location for distance-based results.',
+                        style: TextStyle(fontSize: 12, color: AppColors.warning),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             _buildRadiusRow(hasLocation),
             const Divider(height: 1),
             Expanded(

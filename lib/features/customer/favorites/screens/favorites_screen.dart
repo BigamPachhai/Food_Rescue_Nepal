@@ -124,8 +124,12 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
                     direction: DismissDirection.endToStart,
                     background: _swipeBackground(),
                     onDismissed: (_) async {
-                      await ref.read(favoritesProvider.notifier).toggle(sorted[i].id);
-                      if (context.mounted) context.showSnackBar('Removed from favorites');
+                      try {
+                        await ref.read(favoritesProvider.notifier).toggle(sorted[i].id);
+                        if (context.mounted) context.showSnackBar('Removed from favorites');
+                      } catch (_) {
+                        if (context.mounted) context.showErrorSnackBar('Could not remove favorite');
+                      }
                     },
                     child: ListingCard(
                       listing: sorted[i],
@@ -173,11 +177,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen>
                     direction: DismissDirection.endToStart,
                     background: _swipeBackground(),
                     onDismissed: (_) async {
-                      await ref
-                          .read(vendorFavoritesProvider.notifier)
-                          .toggle(vendors[i].id);
-                      if (context.mounted) {
-                        context.showSnackBar('Vendor removed from favorites');
+                      try {
+                        await ref
+                            .read(vendorFavoritesProvider.notifier)
+                            .toggle(vendors[i].id);
+                        if (context.mounted) context.showSnackBar('Vendor removed from favorites');
+                      } catch (_) {
+                        if (context.mounted) context.showErrorSnackBar('Could not remove favorite');
                       }
                     },
                     child: _VendorFavCard(vendor: vendors[i]),

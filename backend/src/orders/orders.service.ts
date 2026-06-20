@@ -8,6 +8,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrderStatus } from '@prisma/client';
+import { IsArray, IsString } from 'class-validator';
+
+export class BulkAcceptDto {
+  @IsArray()
+  @IsString({ each: true })
+  orderIds: string[];
+}
 
 @Injectable()
 export class OrdersService {
@@ -35,16 +42,24 @@ export class OrdersService {
         throw new NotFoundException('Listing not found or inactive');
       }
 
+      if (dto.quantity < 1) {
+        throw new BadRequestException('Quantity must be at least 1');
+      }
+
       if (listing.availableQty < dto.quantity) {
         throw new BadRequestException(
           `Not enough quantity. Available: ${listing.availableQty}`,
         );
       }
 
-      await tx.listing.update({
-        where: { id: dto.listingId },
+      // Atomic conditional decrement — prevents race condition on concurrent orders
+      const decremented = await tx.listing.updateMany({
+        where: { id: dto.listingId, availableQty: { gte: dto.quantity } },
         data: { availableQty: { decrement: dto.quantity } },
       });
+      if (decremented.count === 0) {
+        throw new BadRequestException('Item just sold out — please try again');
+      }
 
       const customer = await tx.user.findUnique({
         where: { id: customerId },
@@ -92,7 +107,17 @@ export class OrdersService {
       this.prisma.order.findMany({
         where: { customerId },
         include: {
-          listing: { select: { name: true, imageUrls: true, pickupStart: true, pickupEnd: true } },
+          listing: {
+            select: {
+              id: true,
+              name: true,
+              imageUrls: true,
+              originalPrice: true,
+              discountedPrice: true,
+              pickupStart: true,
+              pickupEnd: true,
+            },
+          },
           vendor: { select: { businessName: true, address: true, logoUrl: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -113,7 +138,16 @@ export class OrdersService {
       this.prisma.order.findMany({
         where: { vendorId: vendor.id },
         include: {
-          listing: { select: { name: true, imageUrls: true } },
+          listing: {
+            select: {
+              id: true,
+              name: true,
+              imageUrls: true,
+              pickupStart: true,
+              pickupEnd: true,
+              discountedPrice: true,
+            },
+          },
           customer: { select: { name: true, email: true, phone: true, avatarUrl: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -165,7 +199,7 @@ export class OrdersService {
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: OrderStatus.ACCEPTED },
+      data: { status: OrderStatus.ACCEPTED, acceptedAt: new Date() },
     });
 
     setImmediate(async () => {
@@ -206,7 +240,7 @@ export class OrdersService {
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: OrderStatus.READY },
+      data: { status: OrderStatus.READY, readyAt: new Date() },
     });
 
     setImmediate(async () => {
@@ -249,7 +283,7 @@ export class OrdersService {
 
     const updated = await this.prisma.order.update({
       where: { id: orderId },
-      data: { status: OrderStatus.COMPLETED },
+      data: { status: OrderStatus.COMPLETED, completedAt: new Date() },
     });
 
     setImmediate(async () => {
@@ -327,14 +361,20 @@ export class OrdersService {
 
     if (!order) throw new NotFoundException('Order not found');
     if (order.vendorId !== vendor.id) throw new ForbiddenException('Not your order');
-    if (order.status !== OrderStatus.READY) {
-      throw new BadRequestException('Only READY reservations can be marked as expired');
+    if (order.status !== OrderStatus.READY && order.status !== OrderStatus.ACCEPTED) {
+      throw new BadRequestException('Only ACCEPTED or READY reservations can be marked as expired');
     }
 
-    const updated = await this.prisma.order.update({
-      where: { id: orderId },
-      data: { status: OrderStatus.EXPIRED },
-    });
+    const [updated] = await this.prisma.$transaction([
+      this.prisma.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.EXPIRED },
+      }),
+      this.prisma.listing.update({
+        where: { id: order.listingId },
+        data: { availableQty: { increment: order.quantity } },
+      }),
+    ]);
 
     setImmediate(async () => {
       try {
@@ -350,6 +390,34 @@ export class OrdersService {
     });
 
     return updated;
+  }
+
+  async bulkAccept(userId: string, dto: BulkAcceptDto) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) throw new ForbiddenException('Vendor profile not found');
+
+    const results: { id: string; success: boolean; error?: string }[] = [];
+    for (const orderId of dto.orderIds) {
+      try {
+        await this.accept(orderId, userId);
+        results.push({ id: orderId, success: true });
+      } catch (e: any) {
+        results.push({ id: orderId, success: false, error: e.message });
+      }
+    }
+    return results;
+  }
+
+  private async updateCustomerReliability(customerId: string) {
+    const [total, completed] = await Promise.all([
+      this.prisma.order.count({ where: { customerId, status: { in: ['COMPLETED', 'CANCELLED', 'EXPIRED'] } } }),
+      this.prisma.order.count({ where: { customerId, status: 'COMPLETED' } }),
+    ]);
+    const score = total > 0 ? Math.round((completed / total) * 100) : 100;
+    await this.prisma.user.update({
+      where: { id: customerId },
+      data: { totalOrders: total, completedOrders: completed, reliabilityScore: score },
+    });
   }
 
   async cancel(orderId: string, customerId: string) {

@@ -43,6 +43,7 @@ class _AdminOrdersScreenState extends ConsumerState<AdminOrdersScreen> {
                 'COMPLETED',
                 'CANCELLED',
                 'REJECTED',
+                'EXPIRED',
               ].map((s) {
                 final label = s.isEmpty
                     ? 'All'

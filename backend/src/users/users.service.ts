@@ -54,8 +54,35 @@ export class UsersService {
       data: {
         deletedAt: new Date(),
         isActive: false,
+        name: 'Deleted User',
+        email: `deleted_${userId}@foodrescue.np`,
+        phone: null,
+        passwordHash: null,
+        googleId: null,
+        avatarUrl: null,
+        fcmToken: null,
       },
     });
     return { deleted: true };
+  }
+
+  async getProfile(userId: string) {
+    return this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true, name: true, email: true, phone: true, role: true,
+        avatarUrl: true, twoFactorEnabled: true, reliabilityScore: true,
+        totalOrders: true, completedOrders: true, referralCode: true,
+        disabledNotifTypes: true, createdAt: true,
+      },
+    });
+  }
+
+  async updateNotificationPrefs(userId: string, disabledTypes: string[]) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { disabledNotifTypes: disabledTypes },
+      select: { id: true, disabledNotifTypes: true },
+    });
   }
 }

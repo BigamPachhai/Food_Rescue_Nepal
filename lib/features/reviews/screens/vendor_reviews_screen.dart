@@ -10,8 +10,9 @@ import '../../../core/widgets/shimmer_card.dart';
 import '../providers/reviews_provider.dart';
 
 class VendorReviewsScreen extends ConsumerStatefulWidget {
-  const VendorReviewsScreen({super.key, required this.vendorId});
+  const VendorReviewsScreen({super.key, required this.vendorId, this.canRespond = false});
   final String vendorId;
+  final bool canRespond;
 
   @override
   ConsumerState<VendorReviewsScreen> createState() => _VendorReviewsScreenState();
@@ -135,6 +136,7 @@ class _VendorReviewsScreenState extends ConsumerState<VendorReviewsScreen> {
                 else
                   ...processed.map((r) => _ReviewCard(
                         review: r,
+                        canRespond: widget.canRespond,
                         onRespond: () => _showRespondDialog(context, ref, r),
                       )),
                 const SizedBox(height: 20),
@@ -291,8 +293,9 @@ class _RatingSummary extends StatelessWidget {
 // ─── Review card ───────────────────────────────────────────────────────────
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.review, required this.onRespond});
+  const _ReviewCard({required this.review, required this.canRespond, required this.onRespond});
   final ReviewEntity review;
+  final bool canRespond;
   final VoidCallback onRespond;
 
   @override
@@ -387,25 +390,27 @@ class _ReviewCard extends StatelessWidget {
                 ),
               ),
             ],
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: onRespond,
-                icon: Icon(
-                  review.vendorResponse != null ? Icons.edit : Icons.reply,
-                  size: 16,
-                ),
-                label: Text(
-                  review.vendorResponse != null ? 'Edit Response' : 'Respond',
-                  style: const TextStyle(fontSize: 13),
-                ),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primaryMedium,
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            if (canRespond) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: onRespond,
+                  icon: Icon(
+                    review.vendorResponse != null ? Icons.edit : Icons.reply,
+                    size: 16,
+                  ),
+                  label: Text(
+                    review.vendorResponse != null ? 'Edit Response' : 'Respond',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primaryMedium,
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
       ),

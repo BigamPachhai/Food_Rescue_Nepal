@@ -51,11 +51,18 @@ export class ReviewsService {
     if (review.customerId !== customerId)
       throw new ForbiddenException('This is not your review');
 
-    return this.prisma.review.update({
+    const updated = await this.prisma.review.update({
       where: { id: reviewId },
       data: { rating, comment, updatedAt: new Date() },
       include: { customer: { select: { name: true, avatarUrl: true } } },
     });
+
+    // Recalculate vendor rating if the rating value changed
+    if (rating !== review.rating) {
+      await this._recalcVendorRating(review.vendorId);
+    }
+
+    return updated;
   }
 
   async delete(reviewId: string, customerId: string) {

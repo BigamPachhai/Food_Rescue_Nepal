@@ -27,9 +27,15 @@ export class VendorsService {
       return vendors
         .map((v) => ({
           ...v,
-          distance: this.haversine(lat, lng, v.lat, v.lng),
+          distance: v.lat != null && v.lng != null
+            ? this.haversine(lat, lng, v.lat!, v.lng!)
+            : null,
         }))
-        .sort((a, b) => a.distance - b.distance);
+        .sort((a, b) => {
+          if (a.distance == null) return 1;
+          if (b.distance == null) return -1;
+          return a.distance - b.distance;
+        });
     }
 
     return vendors;
@@ -120,8 +126,8 @@ export class VendorsService {
       this.prisma.order.aggregate({
         where: {
           vendorId: vendor.id,
-          status: { in: ['COMPLETED', 'READY', 'ACCEPTED'] },
-          createdAt: { gte: todayStart },
+          status: 'COMPLETED',
+          updatedAt: { gte: todayStart },
         },
         _sum: { totalAmount: true },
       }),
@@ -182,6 +188,51 @@ export class VendorsService {
 
   async getVendorByUserId(userId: string) {
     return this.prisma.vendor.findUnique({ where: { userId } });
+  }
+
+  async toggleOpen(userId: string) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) throw new NotFoundException('Vendor profile not found');
+    const updated = await this.prisma.vendor.update({
+      where: { userId },
+      data: { isOpen: !vendor.isOpen },
+    });
+    return { isOpen: updated.isOpen };
+  }
+
+  async getAnalyticsCsv(userId: string): Promise<string> {
+    const vendor = await this.prisma.vendor.findUnique({ where: { userId } });
+    if (!vendor) throw new NotFoundException('Vendor not found');
+
+    const orders = await this.prisma.order.findMany({
+      where: { vendorId: vendor.id, status: 'COMPLETED' },
+      include: { listing: { select: { name: true } }, customer: { select: { name: true } } },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    const header = 'Order ID,Listing,Customer,Amount (Rs),Date\n';
+    const rows = orders.map((o) =>
+      `${o.id},${o.listing.name},${o.customer.name},${(o.totalAmount / 100).toFixed(2)},${o.completedAt?.toISOString() ?? ''}`
+    );
+    return header + rows.join('\n');
+  }
+
+  async updateResponseTime(vendorId: string, minutesToAccept: number) {
+    const vendor = await this.prisma.vendor.findUnique({ where: { id: vendorId } });
+    if (!vendor) return;
+    const totalAccepted = vendor.totalAccepted + 1;
+    const newAvg = ((vendor.avgResponseTime * vendor.totalAccepted) + minutesToAccept) / totalAccepted;
+    await this.prisma.vendor.update({
+      where: { id: vendorId },
+      data: { avgResponseTime: newAvg, totalAccepted },
+    });
+  }
+
+  async getCoverageMap() {
+    return this.prisma.vendor.findMany({
+      where: { status: VendorStatus.APPROVED },
+      select: { id: true, businessName: true, lat: true, lng: true, avgRating: true, totalReviews: true },
+    });
   }
 
   private haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {

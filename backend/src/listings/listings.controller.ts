@@ -84,4 +84,17 @@ export class ListingsController {
     const listing = await this.listingsService.remove(id, userId);
     return { success: true, data: listing, message: 'Listing deactivated' };
   }
+
+  @Get('search/autocomplete')
+  async autocomplete(@Query('q') q: string) {
+    const suggestions = await this.listingsService.autocomplete(q);
+    return { success: true, data: suggestions };
+  }
+
+  @Get('recommendations/for-me')
+  @UseGuards(JwtAuthGuard)
+  async getRecommendations(@CurrentUser('id') userId: string, @Query('limit') limit: number) {
+    const listings = await this.listingsService.getRecommendations(userId, limit || 10);
+    return { success: true, data: listings };
+  }
 }

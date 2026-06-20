@@ -7,6 +7,8 @@ import {
   IsDateString,
   IsArray,
   Min,
+  MinLength,
+  MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ListingCategory } from '@prisma/client';
@@ -14,11 +16,14 @@ import { ListingCategory } from '@prisma/client';
 export class CreateListingDto {
   @ApiProperty({ example: 'Momo Box (15 pcs)' })
   @IsString()
+  @MinLength(3)
+  @MaxLength(120)
   name: string;
 
   @ApiPropertyOptional({ example: 'Fresh steamed momos with tomato chutney' })
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @ApiPropertyOptional({ enum: ListingCategory, default: ListingCategory.OTHER })
@@ -64,4 +69,10 @@ export class CreateListingDto {
   @IsOptional()
   @IsString()
   conditionNotes?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['VEGAN', 'HALAL'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  dietaryTags?: string[];
 }

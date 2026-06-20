@@ -125,8 +125,8 @@ class VendorProfileScreen extends ConsumerWidget {
                         _ProfileTile(
                           icon: Icons.help_outline,
                           label: 'Help & Support',
-                          subtitle: 'Contact us',
-                          onTap: () => _showHelpDialog(context),
+                          subtitle: 'FAQ, contact & report',
+                          onTap: () => context.push('/vendor/support'),
                           showDivider: false,
                         ),
                       ],
@@ -287,7 +287,26 @@ class VendorProfileScreen extends ConsumerWidget {
     return SizedBox(
       width: double.infinity,
       child: OutlinedButton.icon(
-        onPressed: () => ref.read(authProvider.notifier).logout(),
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Log Out'),
+              content: const Text('Are you sure you want to log out?'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Log Out'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) ref.read(authProvider.notifier).logout();
+        },
         icon: const Icon(Icons.logout, color: AppColors.primaryMedium),
         label: Text(
           'Logout',
@@ -298,30 +317,6 @@ class VendorProfileScreen extends ConsumerWidget {
           side: const BorderSide(color: AppColors.primaryMedium),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-      ),
-    );
-  }
-
-  void _showHelpDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Help & Support'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [Icon(Icons.email_outlined, size: 16), SizedBox(width: 8), Text('support@foodrescuenepal.com')]),
-            SizedBox(height: 8),
-            Row(children: [Icon(Icons.phone_outlined, size: 16), SizedBox(width: 8), Text('+977-01-5555000')]),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Close'),
-          ),
-        ],
       ),
     );
   }
@@ -348,17 +343,18 @@ class VendorProfileScreen extends ConsumerWidget {
 class _InfoRow extends StatelessWidget {
   const _InfoRow({required this.icon, required this.text});
   final IconData icon;
-  final String text;
+  final String? text;
 
   @override
   Widget build(BuildContext context) {
+    if (text == null || text!.isEmpty) return const SizedBox.shrink();
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
         children: [
           Icon(icon, size: 16, color: AppColors.textSecondary),
           const SizedBox(width: 8),
-          Expanded(child: Text(text, style: AppTextStyles.bodySmall)),
+          Expanded(child: Text(text!, style: AppTextStyles.bodySmall)),
         ],
       ),
     );

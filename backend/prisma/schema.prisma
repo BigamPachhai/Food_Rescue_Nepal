@@ -8,6 +8,8 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
 enum Role {
   CUSTOMER
   VENDOR
@@ -41,29 +43,81 @@ enum VendorStatus {
   REJECTED
 }
 
-model User {
-  id           String    @id @default(cuid())
-  name         String
-  email        String    @unique
-  phone        String?
-  passwordHash String?
-  googleId     String?   @unique
-  role         Role
-  avatarUrl    String?
-  fcmToken     String?
-  isActive     Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  deletedAt    DateTime?
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED
+  CLOSED
+}
 
-  refreshTokens RefreshToken[]
-  vendor        Vendor?
-  orders        Order[]        @relation("CustomerOrders")
-  reviews       Review[]
-  notifications Notification[]
-  favorites       Favorite[]
-  vendorFavorites VendorFavorite[]
-  reports         Report[]
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum DonationStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+
+enum AnnouncementTarget {
+  ALL
+  CUSTOMERS
+  VENDORS
+  ADMINS
+}
+
+// ─── Core Models ───────────────────────────────────────────────────────────
+
+model User {
+  id                String    @id @default(cuid())
+  name              String
+  email             String    @unique
+  phone             String?
+  passwordHash      String?
+  googleId          String?   @unique
+  role              Role
+  avatarUrl         String?
+  fcmToken          String?
+  isActive          Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  // 2FA
+  twoFactorEnabled  Boolean   @default(false)
+  twoFactorSecret   String?
+
+  // Reliability (pickup rate for customers)
+  totalOrders       Int       @default(0)
+  completedOrders   Int       @default(0)
+  reliabilityScore  Float     @default(100)
+
+  // Notification preferences (stored as JSON array of disabled types)
+  disabledNotifTypes String[] @default([])
+
+  // Referral
+  referralCode      String?   @unique
+  referredById      String?
+
+  referredBy        User?     @relation("Referrals", fields: [referredById], references: [id])
+  referrals         User[]    @relation("Referrals")
+
+  refreshTokens     RefreshToken[]
+  vendor            Vendor?
+  orders            Order[]         @relation("CustomerOrders")
+  reviews           Review[]
+  notifications     Notification[]
+  favorites         Favorite[]
+  vendorFavorites   VendorFavorite[]
+  reports           Report[]
+  loyaltyAccount    LoyaltyAccount?
+  sentMessages      Message[]       @relation("SentMessages")
+  disputesRaised    OrderDispute[]  @relation("DisputeReporter")
+  dataExportRequests DataExportRequest[]
+  announcements     Announcement[]  @relation("AnnouncementAuthor")
 
   @@map("users")
 }
@@ -80,26 +134,41 @@ model RefreshToken {
 }
 
 model Vendor {
-  id            String       @id @default(cuid())
-  userId        String       @unique
-  businessName  String
-  businessType  String
-  address       String
-  lat           Float
-  lng           Float
-  logoUrl       String?
-  description   String?
-  status        VendorStatus @default(PENDING)
-  avgRating     Float        @default(0)
-  totalReviews  Int          @default(0)
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id              String       @id @default(cuid())
+  userId          String       @unique
+  businessName    String
+  businessType    String
+  address         String
+  lat             Float
+  lng             Float
+  logoUrl         String?
+  description     String?
+  status          VendorStatus @default(PENDING)
+  avgRating       Float        @default(0)
+  totalReviews    Int          @default(0)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 
-  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  listings        Listing[]
-  orders          Order[]          @relation("VendorOrders")
-  reviews         Review[]
-  vendorFavorites VendorFavorite[]
+  // Open/closed toggle (affects listing visibility)
+  isOpen          Boolean      @default(true)
+
+  // Performance metrics
+  avgResponseTime Float        @default(0) // minutes to accept order
+  totalAccepted   Int          @default(0)
+
+  // Verification
+  isVerified      Boolean      @default(false)
+
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listings         Listing[]
+  orders           Order[]           @relation("VendorOrders")
+  reviews          Review[]
+  vendorFavorites  VendorFavorite[]
+  operatingHours   OperatingHours[]
+  verificationDocs VerificationDocument[]
+  flashSales       FlashSale[]
+  listingTemplates ListingTemplate[]
+  donations        FoodBankDonation[]
 
   @@map("vendors")
 }
@@ -119,13 +188,20 @@ model Listing {
   expiryTime      DateTime?
   conditionNotes  String?
   imageUrls       String[]        @default([])
+  dietaryTags     String[]        @default([])
+  allergens       String[]        @default([])
   isActive        Boolean         @default(true)
+  isFeatured      Boolean         @default(false)
+  trendingScore   Float           @default(0)
+  viewCount       Int             @default(0)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
-  vendor    Vendor     @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  orders    Order[]
-  favorites Favorite[]
+  vendor     Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  orders     Order[]
+  favorites  Favorite[]
+  waitlist   WaitlistEntry[]
+  flashSales FlashSale[]
 
   @@map("listings")
 }
@@ -140,28 +216,39 @@ model Order {
   status      OrderStatus @default(PENDING)
   pickupCode  String      @unique @default(cuid())
   notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
 
-  customer User    @relation("CustomerOrders", fields: [customerId], references: [id])
-  vendor   Vendor  @relation("VendorOrders", fields: [vendorId], references: [id])
-  listing  Listing @relation(fields: [listingId], references: [id])
-  review   Review?
+  // Promo applied
+  promoCodeId   String?
+  discountAmount Int     @default(0)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  acceptedAt  DateTime?
+  readyAt     DateTime?
+  completedAt DateTime?
+
+  customer  User          @relation("CustomerOrders", fields: [customerId], references: [id])
+  vendor    Vendor        @relation("VendorOrders", fields: [vendorId], references: [id])
+  listing   Listing       @relation(fields: [listingId], references: [id])
+  review    Review?
+  messages  Message[]
+  dispute   OrderDispute?
+  promoCode PromoCode?    @relation(fields: [promoCodeId], references: [id])
 
   @@map("orders")
 }
 
 model Review {
-  id                  String    @id @default(cuid())
-  customerId          String
-  vendorId            String
-  orderId             String    @unique
-  rating              Int
-  comment             String?
-  vendorResponse      String?
-  vendorRespondedAt   DateTime?
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  customerId        String
+  vendorId          String
+  orderId           String    @unique
+  rating            Int
+  comment           String?
+  vendorResponse    String?
+  vendorRespondedAt DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   customer User   @relation(fields: [customerId], references: [id])
   vendor   Vendor @relation(fields: [vendorId], references: [id])
@@ -173,7 +260,7 @@ model Review {
 model Report {
   id          String   @id @default(cuid())
   reporterId  String
-  type        String   // VENDOR | LISTING | OTHER
+  type        String
   targetId    String?
   reason      String
   description String?
@@ -232,4 +319,269 @@ model PasswordResetOtp {
   createdAt DateTime @default(now())
 
   @@map("password_reset_otps")
+}
+
+// ─── Feature 1: Waitlist ───────────────────────────────────────────────────
+
+model WaitlistEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  notified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@map("waitlist_entries")
+}
+
+// ─── Feature 2: Promo Codes ────────────────────────────────────────────────
+
+model PromoCode {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  description     String?
+  discountType    String    @default("PERCENT") // PERCENT | FIXED
+  discountValue   Int
+  minOrderAmount  Int       @default(0)
+  maxUses         Int?
+  usedCount       Int       @default(0)
+  isActive        Boolean   @default(true)
+  expiresAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  // Optional: restrict to specific vendor
+  vendorId        String?
+
+  orders          Order[]
+
+  @@map("promo_codes")
+}
+
+// ─── Feature 3: Loyalty Points ─────────────────────────────────────────────
+
+model LoyaltyAccount {
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  balance      Int      @default(0)
+  totalEarned  Int      @default(0)
+  totalSpent   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions LoyaltyTransaction[]
+
+  @@map("loyalty_accounts")
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(cuid())
+  accountId   String
+  type        String   // EARN | REDEEM | REFERRAL_BONUS | ADMIN_GRANT | EXPIRE
+  points      Int
+  description String
+  orderId     String?
+  createdAt   DateTime @default(now())
+
+  account     LoyaltyAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@map("loyalty_transactions")
+}
+
+// ─── Feature 4: Referral Tracking ─────────────────────────────────────────
+
+model ReferralReward {
+  id              String   @id @default(cuid())
+  referrerId      String
+  referredUserId  String
+  pointsAwarded   Int      @default(100)
+  createdAt       DateTime @default(now())
+
+  @@map("referral_rewards")
+}
+
+// ─── Feature 5: In-app Messaging ──────────────────────────────────────────
+
+model Message {
+  id        String   @id @default(cuid())
+  orderId   String
+  senderId  String
+  body      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sender User  @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// ─── Feature 6: Listing Templates ─────────────────────────────────────────
+
+model ListingTemplate {
+  id              String   @id @default(cuid())
+  vendorId        String
+  name            String
+  templateData    Json
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("listing_templates")
+}
+
+// ─── Feature 7: Flash Sales ────────────────────────────────────────────────
+
+model FlashSale {
+  id              String   @id @default(cuid())
+  vendorId        String
+  listingId       String
+  salePrice       Int
+  originalPrice   Int
+  startsAt        DateTime
+  endsAt          DateTime
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+
+  vendor  Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@map("flash_sales")
+}
+
+// ─── Feature 8: Operating Hours ────────────────────────────────────────────
+
+model OperatingHours {
+  id        String   @id @default(cuid())
+  vendorId  String
+  dayOfWeek Int      // 0=Sun … 6=Sat
+  openTime  String   // "08:00"
+  closeTime String   // "20:00"
+  isClosed  Boolean  @default(false)
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, dayOfWeek])
+  @@map("operating_hours")
+}
+
+// ─── Feature 9: Food Bank Donations ───────────────────────────────────────
+
+model FoodBankPartner {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  address     String?
+  logoUrl     String?
+  contactEmail String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  donations FoodBankDonation[]
+
+  @@map("food_bank_partners")
+}
+
+model FoodBankDonation {
+  id             String         @id @default(cuid())
+  userId         String?
+  vendorId       String?
+  partnerId      String
+  amountNpr      Int?
+  foodDescription String?
+  status         DonationStatus @default(PENDING)
+  createdAt      DateTime       @default(now())
+
+  partner FoodBankPartner @relation(fields: [partnerId], references: [id])
+  vendor  Vendor?         @relation(fields: [vendorId], references: [id])
+
+  @@map("food_bank_donations")
+}
+
+// ─── Feature 10: Order Disputes ────────────────────────────────────────────
+
+model OrderDispute {
+  id          String        @id @default(cuid())
+  orderId     String        @unique
+  reporterId  String
+  reason      String
+  description String?
+  status      DisputeStatus @default(OPEN)
+  adminNote   String?
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+
+  order    Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reporter User  @relation("DisputeReporter", fields: [reporterId], references: [id])
+
+  @@map("order_disputes")
+}
+
+// ─── Feature 11: System Announcements ─────────────────────────────────────
+
+model Announcement {
+  id        String             @id @default(cuid())
+  authorId  String
+  title     String
+  body      String
+  target    AnnouncementTarget @default(ALL)
+  imageUrl  String?
+  isActive  Boolean            @default(true)
+  createdAt DateTime           @default(now())
+
+  author User @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+
+  @@map("announcements")
+}
+
+// ─── Feature 12: Audit Log ─────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actorRole  String?
+  action     String
+  targetType String?
+  targetId   String?
+  meta       Json?
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+// ─── Feature 13: Vendor Verification ──────────────────────────────────────
+
+model VerificationDocument {
+  id         String             @id @default(cuid())
+  vendorId   String
+  docType    String             // BUSINESS_REG | TAX | ID | OTHER
+  docUrl     String
+  status     VerificationStatus @default(PENDING)
+  adminNote  String?
+  createdAt  DateTime           @default(now())
+  reviewedAt DateTime?
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("verification_documents")
+}
+
+// ─── Feature 14: Data Export Requests ─────────────────────────────────────
+
+model DataExportRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  status      String    @default("PENDING") // PENDING | PROCESSING | READY | EXPIRED
+  downloadUrl String?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("data_export_requests")
 }

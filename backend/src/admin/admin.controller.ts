@@ -140,4 +140,18 @@ export class AdminController {
     const order = await this.adminService.getOrderById(id);
     return { success: true, data: order, message: 'Success' };
   }
+
+  @Patch('listings/:id/feature')
+  @ApiOperation({ summary: 'Toggle featured flag on a listing (ADMIN only)' })
+  async toggleFeatured(@Param('id') id: string) {
+    const listing = await this.adminService.toggleFeaturedListing(id);
+    return { success: true, data: listing, message: listing.isFeatured ? 'Listing featured' : 'Listing unfeatured' };
+  }
+
+  @Get('insights')
+  @ApiOperation({ summary: 'Get advanced platform insights (ADMIN only)' })
+  async getInsights() {
+    const data = await this.adminService.getPlatformInsights();
+    return { success: true, data, message: 'Success' };
+  }
 }

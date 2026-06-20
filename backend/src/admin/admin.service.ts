@@ -168,20 +168,53 @@ export class AdminService {
     const vendor = await this.prisma.vendor.findUnique({ where: { id } });
     if (!vendor) throw new NotFoundException('Vendor not found');
 
-    return this.prisma.vendor.update({
-      where: { id },
-      data: { status: VendorStatus.SUSPENDED },
-    });
+    const [updatedVendor] = await this.prisma.$transaction([
+      this.prisma.vendor.update({
+        where: { id },
+        data: { status: VendorStatus.SUSPENDED },
+      }),
+      // Deactivate all active listings so customers can't place new orders
+      this.prisma.listing.updateMany({
+        where: { vendorId: id, isActive: true },
+        data: { isActive: false },
+      }),
+    ]);
+
+    return updatedVendor;
   }
 
   async rejectVendor(id: string) {
-    const vendor = await this.prisma.vendor.findUnique({ where: { id } });
+    const vendor = await this.prisma.vendor.findUnique({
+      where: { id },
+      include: { user: { select: { id: true, fcmToken: true } } },
+    });
     if (!vendor) throw new NotFoundException('Vendor not found');
 
-    return this.prisma.vendor.update({
-      where: { id },
-      data: { status: VendorStatus.REJECTED },
+    const [updatedVendor] = await this.prisma.$transaction([
+      this.prisma.vendor.update({
+        where: { id },
+        data: { status: VendorStatus.REJECTED },
+      }),
+      this.prisma.listing.updateMany({
+        where: { vendorId: id, isActive: true },
+        data: { isActive: false },
+      }),
+    ]);
+
+    setImmediate(async () => {
+      try {
+        await this.notificationsService.send({
+          userId: vendor.user.id,
+          title: 'Application Not Approved',
+          body: 'Your vendor application was not approved. Contact support for more information.',
+          type: 'VENDOR_REJECTED',
+          data: { vendorId: id },
+          fcmToken: vendor.user.fcmToken || undefined,
+        });
+      } catch (_) {}
     });
+
+    return updatedVendor;
   }
 
   async getListings(isActive?: boolean, vendorId?: string, category?: string) {
@@ -253,5 +286,53 @@ export class AdminService {
     });
     if (!order) throw new NotFoundException('Order not found');
     return order;
+  }
+
+  async toggleFeaturedListing(id: string) {
+    const listing = await this.prisma.listing.findUnique({ where: { id } });
+    if (!listing) throw new NotFoundException('Listing not found');
+    return this.prisma.listing.update({
+      where: { id },
+      data: { isFeatured: !listing.isFeatured },
+    });
+  }
+
+  async getPlatformInsights() {
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      newUsers30d,
+      newVendors30d,
+      orders30d,
+      revenue30d,
+      topListings,
+      disputeCount,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.vendor.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.order.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      this.prisma.order.aggregate({
+        where: { status: 'COMPLETED', completedAt: { gte: thirtyDaysAgo } },
+        _sum: { totalAmount: true },
+      }),
+      this.prisma.listing.findMany({
+        orderBy: { trendingScore: 'desc' },
+        take: 10,
+        include: { vendor: { select: { businessName: true } } },
+      }),
+      this.prisma.orderDispute.count({ where: { status: 'OPEN' } }),
+    ]);
+
+    return {
+      last30Days: {
+        newUsers: newUsers30d,
+        newVendors: newVendors30d,
+        orders: orders30d,
+        revenue: revenue30d._sum.totalAmount ?? 0,
+      },
+      topTrendingListings: topListings,
+      openDisputes: disputeCount,
+    };
   }
 }

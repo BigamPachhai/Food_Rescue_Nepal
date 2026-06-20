@@ -22,16 +22,21 @@ class ApiEndpoints {
   static const String listings = '/listings';
   static String listingById(String id) => '/listings/$id';
   static const String uploadImage = '/upload/image';
+  static const String listingAutocomplete = '/listings/search/autocomplete';
+  static const String listingRecommendations = '/listings/recommendations/for-me';
 
   // Orders (customer)
   static const String orders = '/orders';
   static const String customerOrders = '/orders/my';
   static String orderById(String id) => '/orders/$id';
   static String orderAccept(String id) => '/orders/$id/accept';
+  static String orderReady(String id) => '/orders/$id/ready';
   static String orderPickup(String id) => '/orders/$id/pickup';
   static String orderCancel(String id) => '/orders/$id/cancel';
   static String orderReject(String id) => '/orders/$id/reject';
   static String orderExpire(String id) => '/orders/$id/expire';
+  static const String orderBulkAccept = '/orders/bulk-accept';
+  static const String vendorOrders = '/orders/vendor';
 
   // Favorites
   static const String customerFavorites = '/favorites';
@@ -42,6 +47,7 @@ class ApiEndpoints {
   // User profile
   static const String customerProfile = '/users/profile';
   static const String deleteAccount = '/users/account';
+  static const String notificationPrefs = '/users/notification-prefs';
 
   // Vendor
   static const String vendorProfile = '/vendors/profile';
@@ -49,11 +55,14 @@ class ApiEndpoints {
   static const String vendorListings = '/listings/vendor/mine';
   static const String createListing = '/listings';
   static String vendorListingById(String id) => '/listings/$id';
-  static const String vendorOrders = '/orders/vendor';
   static String vendorOrderById(String id) => '/orders/$id';
+  static const String vendorToggleOpen = '/vendors/toggle-open';
+  static const String vendorAnalyticsCsv = '/vendors/analytics/export-csv';
+  static const String vendorCoverageMap = '/vendors/coverage-map';
 
   // Admin
   static const String adminStats = '/admin/stats';
+  static const String adminInsights = '/admin/insights';
   static const String adminUsers = '/admin/users';
   static String adminUserById(String id) => '/admin/users/$id';
   static String adminBanUser(String id) => '/admin/users/$id/ban';
@@ -65,6 +74,7 @@ class ApiEndpoints {
   static String adminRejectVendor(String id) => '/admin/vendors/$id/reject';
   static const String adminListings = '/admin/listings';
   static String adminDeactivateListing(String id) => '/admin/listings/$id/deactivate';
+  static String adminFeatureListing(String id) => '/admin/listings/$id/feature';
   static const String adminOrders = '/admin/orders';
   static String adminOrderById(String id) => '/admin/orders/$id';
 
@@ -90,4 +100,88 @@ class ApiEndpoints {
   // Vendors (public)
   static const String vendors = '/vendors';
   static String vendorPublicById(String id) => '/vendors/$id';
+
+  // AI
+  static const String aiChat = '/ai/chat';
+  static const String aiDescription = '/ai/description';
+  static const String aiPricing = '/ai/pricing';
+  static const String aiRecipes = '/ai/recipes';
+  static const String aiSentiment = '/ai/sentiment';
+  static const String aiDemand = '/ai/demand';
+
+  // Feature 1: Waitlist
+  static String waitlistJoin(String listingId) => '/waitlist/$listingId';
+  static String waitlistLeave(String listingId) => '/waitlist/$listingId';
+  static const String myWaitlist = '/waitlist/my';
+  static String waitlistStatus(String listingId) => '/waitlist/$listingId/status';
+
+  // Feature 2: Promo Codes
+  static const String validatePromo = '/promo-codes/validate';
+  static const String promoCodes = '/promo-codes';
+  static String promoCodeToggle(String id) => '/promo-codes/$id/toggle';
+
+  // Feature 3: Loyalty Points
+  static const String loyalty = '/loyalty';
+  static const String loyaltyRedeem = '/loyalty/redeem';
+
+  // Feature 4: Referral
+  static const String referralMyCode = '/referral/my-code';
+  static const String referralStats = '/referral/stats';
+  static const String referralApply = '/referral/apply';
+
+  // Feature 5: In-app Chat
+  static String chatMessages(String orderId) => '/chat/$orderId';
+  static String sendMessage(String orderId) => '/chat/$orderId';
+  static const String chatUnreadCount = '/chat/unread/count';
+
+  // Feature 6: Listing Templates
+  static const String listingTemplates = '/listing-templates';
+  static String listingTemplateById(String id) => '/listing-templates/$id';
+
+  // Feature 7: Flash Sales
+  static const String flashSales = '/flash-sales';
+  static const String myFlashSales = '/flash-sales/my';
+  static String cancelFlashSale(String id) => '/flash-sales/$id';
+
+  // Feature 8: Operating Hours
+  static const String myOperatingHours = '/operating-hours/my';
+  static String vendorOperatingHours(String vendorId) => '/operating-hours/vendor/$vendorId';
+
+  // Feature 9: Donations
+  static const String donationPartners = '/donations/partners';
+  static const String donationStats = '/donations/stats';
+  static const String donate = '/donations';
+  static const String vendorDonate = '/donations/vendor';
+  static const String myDonations = '/donations/my';
+
+  // Feature 10: Disputes
+  static const String disputes = '/disputes';
+  static const String myDisputes = '/disputes/my';
+  static String resolveDispute(String id) => '/disputes/$id/resolve';
+
+  // Feature 11: Announcements
+  static const String announcements = '/announcements';
+  static const String allAnnouncements = '/announcements/all';
+  static String deactivateAnnouncement(String id) => '/announcements/$id/deactivate';
+
+  // Feature 12: Audit Log
+  static const String auditLog = '/audit-log';
+
+  // Feature 13: Vendor Verification
+  static const String uploadVerificationDoc = '/verification';
+  static const String myVerificationDocs = '/verification/my';
+  static const String pendingVerificationDocs = '/verification/pending';
+  static String reviewVerificationDoc(String id) => '/verification/$id/review';
+
+  // Feature 14: 2FA
+  static const String twoFaStatus = '/2fa/status';
+  static const String twoFaSetup = '/2fa/setup';
+  static const String twoFaEnable = '/2fa/enable';
+  static const String twoFaDisable = '/2fa/disable';
+
+  // Feature 15: Data Export + Account Deletion
+  static const String requestDataExport = '/data/export';
+  static const String myDataExports = '/data/export';
+  static String dataExportStatus(String id) => '/data/export/$id';
+  static const String permanentDeleteAccount = '/data/account';
 }

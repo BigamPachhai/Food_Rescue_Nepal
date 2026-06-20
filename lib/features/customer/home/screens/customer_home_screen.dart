@@ -1182,7 +1182,7 @@ class _FilterSheetState extends State<_FilterSheet> {
   static const _maxPriceValue = 5000.0;
   static const _maxDistanceValue = 50.0;
   static const _categories = [
-    'All', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
+    'All', 'Surprise Bag', 'Bakery', 'Restaurant', 'Cafe', 'Grocery', 'Sweets', 'Other',
   ];
 
   @override
@@ -1964,7 +1964,7 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                         ),
                       ),
                     // Surprise Bag overlay icon
-                    if (listing.category == 'Surprise Bag')
+                    if (listing.category == 'SURPRISE_BAG')
                       Positioned(
                         bottom: AppSizes.s1,
                         right: AppSizes.s1,
@@ -2071,7 +2071,7 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                                   borderRadius: BorderRadius.circular(AppSizes.radiusFull),
                                 ),
                                 child: Text(
-                                  listing.category,
+                                  Formatters.formatCategory(listing.category),
                                   style: AppTextStyles.caption.copyWith(
                                     fontSize: 10,
                                     color: AppColors.primaryMedium,
@@ -2197,10 +2197,7 @@ class _CountdownChip extends StatefulWidget {
 
 class _CountdownChipState extends State<_CountdownChip> {
   late Duration _remaining;
-  late final _timer = Stream.periodic(const Duration(seconds: 30), (_) => null);
-  late final _sub = _timer.listen((_) {
-    if (mounted) setState(() => _remaining = _timeLeft());
-  });
+  Timer? _timer;
 
   Duration _timeLeft() {
     final d = widget.pickupEnd.difference(DateTime.now());
@@ -2211,11 +2208,14 @@ class _CountdownChipState extends State<_CountdownChip> {
   void initState() {
     super.initState();
     _remaining = _timeLeft();
+    _timer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() => _remaining = _timeLeft());
+    });
   }
 
   @override
   void dispose() {
-    _sub.cancel();
+    _timer?.cancel();
     super.dispose();
   }
 

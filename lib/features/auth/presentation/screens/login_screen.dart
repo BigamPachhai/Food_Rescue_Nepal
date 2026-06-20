@@ -58,15 +58,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (next is AuthError) {
         context.showErrorSnackBar(next.message);
       } else if (next is AuthAuthenticated) {
+        // Router redirect handles navigation; just register FCM token here
         registerFcmToken(ref.read(dioClientProvider));
-        final user = next.user;
-        if (user.isAdmin) {
-          context.go('/admin/dashboard');
-        } else if (user.isVendor) {
-          context.go('/vendor/dashboard');
-        } else {
-          context.go('/customer/home');
-        }
       } else if (next is AuthGoogleNewUser) {
         _showRolePicker(context, next.firebaseIdToken);
       }

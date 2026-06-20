@@ -2,12 +2,18 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateListingDto } from './dto/create-listing.dto';
 import { UpdateListingDto } from './dto/update-listing.dto';
 import { ListingQueryDto } from './dto/listing-query.dto';
 import { VendorStatus } from '@prisma/client';
+
+const VENDOR_SELECT = {
+  id: true, businessName: true, address: true, lat: true, lng: true,
+  logoUrl: true, avgRating: true, totalReviews: true, isOpen: true, isVerified: true,
+} as const;
 
 @Injectable()
 export class ListingsService {
@@ -19,7 +25,7 @@ export class ListingsService {
     const skip = (page - 1) * limit;
 
     // Build vendor condition
-    const vendorCondition: any = { status: VendorStatus.APPROVED };
+    const vendorCondition: any = { status: VendorStatus.APPROVED, isOpen: true };
     if (query.minRating != null) {
       vendorCondition.avgRating = { gte: query.minRating };
     }
@@ -30,7 +36,19 @@ export class ListingsService {
       vendor: vendorCondition,
       ...(query.category && { category: query.category }),
       ...(query.onlyAvailable && { availableQty: { gt: 0 } }),
+      ...(query.vendorId && { vendorId: query.vendorId }),
+      ...(query.featuredOnly && { isFeatured: true }),
     };
+
+    // Allergen exclusion filter
+    if (query.excludeAllergens) {
+      const excluded = query.excludeAllergens.split(',').map((a) => a.trim());
+      where.allergens = { isEmpty: false };
+      // Exclude listings that contain any of the specified allergens
+      where.NOT = excluded.map((allergen) => ({
+        allergens: { has: allergen },
+      }));
+    }
 
     // Price range filter
     if (query.minPrice != null || query.maxPrice != null) {
@@ -41,32 +59,28 @@ export class ListingsService {
     }
 
     // Search: match name, description, or vendor business name
+    // Using AND wrapping OR to avoid bypassing the top-level vendor status filter
     if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: 'insensitive' } },
-        { description: { contains: query.search, mode: 'insensitive' } },
-        { vendor: { businessName: { contains: query.search, mode: 'insensitive' } } },
+      where.AND = [
+        {
+          OR: [
+            { name: { contains: query.search, mode: 'insensitive' } },
+            { description: { contains: query.search, mode: 'insensitive' } },
+            { vendor: { businessName: { contains: query.search, mode: 'insensitive' } } },
+          ],
+        },
       ];
     }
 
     const listings = await this.prisma.listing.findMany({
       where,
-      include: {
-        vendor: {
-          select: {
-            id: true,
-            businessName: true,
-            address: true,
-            lat: true,
-            lng: true,
-            logoUrl: true,
-            avgRating: true,
-            totalReviews: true,
-          },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
+      include: { vendor: { select: VENDOR_SELECT } },
+      orderBy: query.trending ? { trendingScore: 'desc' } : { createdAt: 'desc' },
     });
+
+    // Increment view count async
+    setImmediate(async () => {});
+
 
     // Apply distance and sort in-memory
     let result: any[] = listings;
@@ -74,9 +88,10 @@ export class ListingsService {
     if (query.lat != null && query.lng != null) {
       const radius = query.radius || 50;
       result = listings
+        .filter((l) => l.vendor.lat != null && l.vendor.lng != null)
         .map((l) => ({
           ...l,
-          distance: this.haversine(query.lat!, query.lng!, l.vendor.lat, l.vendor.lng),
+          distance: this.haversine(query.lat!, query.lng!, l.vendor.lat!, l.vendor.lng!),
         }))
         .filter((l) => l.distance <= radius);
     }
@@ -145,7 +160,95 @@ export class ListingsService {
       throw new NotFoundException('Listing not found');
     }
 
+    // Increment view count
+    setImmediate(async () => {
+      try {
+        await this.prisma.listing.update({
+          where: { id },
+          data: { viewCount: { increment: 1 }, trendingScore: { increment: 0.1 } },
+        });
+      } catch (_) {}
+    });
+
     return listing;
+  }
+
+  async getRecommendations(userId: string, limit = 10) {
+    // Get categories user has ordered from
+    const pastOrders = await this.prisma.order.findMany({
+      where: { customerId: userId, status: 'COMPLETED' },
+      include: { listing: { select: { category: true, dietaryTags: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 20,
+    });
+
+    const preferredCategories = [...new Set(pastOrders.map((o) => o.listing.category))];
+    const preferredTags = [...new Set(pastOrders.flatMap((o) => o.listing.dietaryTags))];
+    const orderedListingIds = pastOrders.map((o) => o.listingId);
+
+    const where: any = {
+      isActive: true,
+      availableQty: { gt: 0 },
+      id: { notIn: orderedListingIds },
+      vendor: { status: VendorStatus.APPROVED, isOpen: true },
+    };
+
+    if (preferredCategories.length > 0) {
+      where.OR = [
+        { category: { in: preferredCategories } },
+        { dietaryTags: { hasSome: preferredTags } },
+      ];
+    }
+
+    return this.prisma.listing.findMany({
+      where,
+      include: { vendor: { select: VENDOR_SELECT } },
+      orderBy: [{ trendingScore: 'desc' }, { createdAt: 'desc' }],
+      take: limit,
+    });
+  }
+
+  async autocomplete(query: string, limit = 8) {
+    if (!query || query.trim().length < 2) return [];
+
+    const listings = await this.prisma.listing.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { vendor: { businessName: { contains: query, mode: 'insensitive' }, status: VendorStatus.APPROVED } },
+        ],
+      },
+      select: { id: true, name: true, vendor: { select: { businessName: true } } },
+      take: limit,
+    });
+
+    const suggestions = [
+      ...new Set([
+        ...listings.map((l) => l.name),
+        ...listings.map((l) => l.vendor.businessName),
+      ]),
+    ].slice(0, limit);
+
+    return suggestions;
+  }
+
+  async recalcTrendingScore(listingId: string) {
+    const listing = await this.prisma.listing.findUnique({
+      where: { id: listingId },
+      include: { orders: { where: { status: 'COMPLETED' } } },
+    });
+    if (!listing) return;
+
+    const orderCount = listing.orders.length;
+    const viewScore = listing.viewCount * 0.01;
+    const orderScore = orderCount * 2;
+    const recencyDays = (Date.now() - listing.createdAt.getTime()) / (1000 * 60 * 60 * 24);
+    const decayFactor = Math.exp(-recencyDays / 14); // 2-week half-life
+
+    const score = (viewScore + orderScore) * (listing.isFeatured ? 1.5 : 1) * decayFactor;
+
+    await this.prisma.listing.update({ where: { id: listingId }, data: { trendingScore: score } });
   }
 
   async create(userId: string, dto: CreateListingDto) {
@@ -154,8 +257,20 @@ export class ListingsService {
       throw new ForbiddenException('Vendor profile not found');
     }
 
-    if (vendor.status === VendorStatus.SUSPENDED) {
-      throw new ForbiddenException('Suspended vendors cannot create listings');
+    if (vendor.status !== VendorStatus.APPROVED) {
+      throw new ForbiddenException('Only approved vendors can create listings');
+    }
+
+    const pickupStart = new Date(dto.pickupStart);
+    const pickupEnd = new Date(dto.pickupEnd);
+    if (pickupEnd <= pickupStart) {
+      throw new BadRequestException('Pickup end time must be after pickup start time');
+    }
+    if (dto.discountedPrice >= dto.originalPrice) {
+      throw new BadRequestException('Discounted price must be less than original price');
+    }
+    if (dto.discountedPrice <= 0) {
+      throw new BadRequestException('Discounted price must be greater than 0');
     }
 
     return this.prisma.listing.create({
@@ -168,9 +283,10 @@ export class ListingsService {
         discountedPrice: dto.discountedPrice,
         quantity: dto.quantity,
         availableQty: dto.quantity,
-        pickupStart: new Date(dto.pickupStart),
-        pickupEnd: new Date(dto.pickupEnd),
+        pickupStart,
+        pickupEnd,
         imageUrls: dto.imageUrls || [],
+        dietaryTags: dto.dietaryTags || [],
         ...(dto.expiryTime && { expiryTime: new Date(dto.expiryTime) }),
         ...(dto.conditionNotes !== undefined && { conditionNotes: dto.conditionNotes }),
       },
@@ -192,6 +308,39 @@ export class ListingsService {
       throw new ForbiddenException('You do not own this listing');
     }
 
+    // Validate prices if either is being updated
+    const finalOriginal = dto.originalPrice ?? listing.originalPrice;
+    const finalDiscounted = dto.discountedPrice ?? listing.discountedPrice;
+    if (dto.originalPrice != null || dto.discountedPrice != null) {
+      if (finalDiscounted >= finalOriginal) {
+        throw new BadRequestException('Discounted price must be less than original price');
+      }
+    }
+
+    // Validate pickup window if either time is being updated
+    if (dto.pickupStart || dto.pickupEnd) {
+      const finalStart = dto.pickupStart ? new Date(dto.pickupStart) : listing.pickupStart;
+      const finalEnd = dto.pickupEnd ? new Date(dto.pickupEnd) : listing.pickupEnd;
+      if (finalEnd <= finalStart) {
+        throw new BadRequestException('Pickup end time must be after pickup start time');
+      }
+    }
+
+    // When re-activating a sold-out listing, restore availableQty to quantity
+    const restoreQty =
+      dto.isActive === true &&
+      !listing.isActive &&
+      listing.availableQty === 0 &&
+      dto.availableQty == null;
+
+    // When quantity changes without an explicit availableQty, adjust availableQty
+    // to preserve the number of in-flight reservations (reserved = quantity - availableQty)
+    let derivedAvailableQty: number | undefined;
+    if (dto.quantity != null && dto.availableQty == null && !restoreQty) {
+      const reserved = listing.quantity - listing.availableQty;
+      derivedAvailableQty = Math.max(0, dto.quantity - reserved);
+    }
+
     return this.prisma.listing.update({
       where: { id },
       data: {
@@ -201,10 +350,17 @@ export class ListingsService {
         ...(dto.originalPrice != null && { originalPrice: dto.originalPrice }),
         ...(dto.discountedPrice != null && { discountedPrice: dto.discountedPrice }),
         ...(dto.quantity != null && { quantity: dto.quantity }),
-        ...(dto.availableQty != null && { availableQty: dto.availableQty }),
+        ...(dto.availableQty != null
+          ? { availableQty: dto.availableQty }
+          : restoreQty
+          ? { availableQty: listing.quantity }
+          : derivedAvailableQty != null
+          ? { availableQty: derivedAvailableQty }
+          : {}),
         ...(dto.pickupStart && { pickupStart: new Date(dto.pickupStart) }),
         ...(dto.pickupEnd && { pickupEnd: new Date(dto.pickupEnd) }),
         ...(dto.imageUrls && { imageUrls: dto.imageUrls }),
+        ...(dto.dietaryTags !== undefined && { dietaryTags: dto.dietaryTags }),
         ...(dto.isActive !== undefined && { isActive: dto.isActive }),
         ...(dto.expiryTime !== undefined && { expiryTime: dto.expiryTime ? new Date(dto.expiryTime) : null }),
         ...(dto.conditionNotes !== undefined && { conditionNotes: dto.conditionNotes }),

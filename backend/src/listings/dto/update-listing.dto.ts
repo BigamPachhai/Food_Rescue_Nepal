@@ -82,4 +82,10 @@ export class UpdateListingDto {
   @IsOptional()
   @IsString()
   conditionNotes?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['VEGAN', 'HALAL'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  dietaryTags?: string[];
 }

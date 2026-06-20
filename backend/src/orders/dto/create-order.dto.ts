@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsOptional, Min } from 'class-validator';
+import { IsString, IsInt, IsOptional, Min, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateOrderDto {
@@ -14,5 +14,6 @@ export class CreateOrderDto {
   @ApiPropertyOptional({ example: 'Please keep it warm' })
   @IsOptional()
   @IsString()
+  @MaxLength(300)
   notes?: string;
 }

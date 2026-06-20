@@ -7,6 +7,8 @@ import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/empty_state_view.dart';
 import '../../../core/widgets/error_view.dart';
 import '../../../core/widgets/shimmer_card.dart';
+import '../../../features/auth/presentation/providers/auth_provider.dart';
+import '../../../features/auth/domain/auth_state.dart';
 import '../providers/notifications_provider.dart';
 
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -246,7 +248,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     final orderId = notif.data['orderId'] as String?;
     final listingId = notif.data['listingId'] as String?;
     if (orderId != null) {
-      notif.type.startsWith('VENDOR_')
+      final authState = ref.read(authProvider);
+      final isVendor = authState is AuthAuthenticated && authState.user.isVendor;
+      isVendor
           ? context.push('/vendor/orders/$orderId')
           : context.push('/customer/orders/$orderId');
     } else if (listingId != null) {

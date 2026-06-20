@@ -181,6 +181,28 @@ class AdminDashboardScreen extends ConsumerWidget {
                   onRetry: () => ref.invalidate(adminOrdersProvider('')),
                 ),
               ),
+
+              const SizedBox(height: AppSizes.xxl),
+
+              // Admin Tools
+              Text('Admin Tools', style: AppTextStyles.h5),
+              const SizedBox(height: 12),
+              GridView.count(
+                crossAxisCount: 3,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 1.1,
+                children: [
+                  _AdminToolCard(icon: Icons.bar_chart_rounded, label: 'Analytics', color: Colors.blue, onTap: () => context.push('/admin/analytics')),
+                  _AdminToolCard(icon: Icons.gavel_rounded, label: 'Moderation', color: Colors.red, onTap: () => context.push('/admin/moderation')),
+                  _AdminToolCard(icon: Icons.campaign_rounded, label: 'Announcements', color: Colors.orange, onTap: () => context.push('/admin/announcements')),
+                  _AdminToolCard(icon: Icons.history_rounded, label: 'Audit Log', color: Colors.purple, onTap: () => context.push('/admin/audit-log')),
+                  _AdminToolCard(icon: Icons.people_rounded, label: 'Users', color: AppColors.primaryMedium, onTap: () => context.go('/admin/users')),
+                  _AdminToolCard(icon: Icons.store_rounded, label: 'Vendors', color: Colors.teal, onTap: () => context.go('/admin/vendors')),
+                ],
+              ),
             ],
           ),
         ),
@@ -337,4 +359,29 @@ class _AdminInlineError extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AdminToolCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _AdminToolCard({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 6)]),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 40, height: 40,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color, size: 22),
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+      ]),
+    ),
+  );
 }

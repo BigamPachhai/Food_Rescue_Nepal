@@ -77,4 +77,12 @@ class Formatters {
 
   // Duration from now until a given DateTime (positive = future)
   static Duration timeUntil(DateTime dt) => dt.difference(DateTime.now());
+
+  // Convert backend category enum to display name (e.g. "SURPRISE_BAG" → "Surprise Bag")
+  static String formatCategory(String category) {
+    return category
+        .split('_')
+        .map((w) => w.isEmpty ? '' : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+        .join(' ');
+  }
 }

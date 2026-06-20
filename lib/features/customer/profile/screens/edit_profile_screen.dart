@@ -62,10 +62,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final formData = FormData.fromMap({
         'file': await MultipartFile.fromFile(picked.path, filename: 'avatar.jpg'),
       });
-      await dio.post('/users/avatar', data: formData);
-      if (mounted) context.showSnackBar('Profile picture updated!');
+      final res = await dio.post('/users/avatar', data: formData);
+      final newUrl = (res.data as Map<String, dynamic>?)?['data']?['avatarUrl'] as String?
+          ?? (res.data as Map<String, dynamic>?)?['avatarUrl'] as String?;
+      if (mounted) {
+        if (newUrl != null) ref.read(authProvider.notifier).updateUser(avatarUrl: newUrl);
+        context.showSnackBar('Profile picture updated!');
+      }
     } catch (e) {
-      if (mounted) context.showErrorSnackBar('Failed to upload picture');
+      if (mounted) {
+        setState(() => _pickedImage = null);
+        context.showErrorSnackBar('Failed to upload picture');
+      }
     }
     if (mounted) setState(() => _isUploadingAvatar = false);
   }

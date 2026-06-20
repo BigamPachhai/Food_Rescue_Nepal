@@ -104,4 +104,31 @@ export class VendorsController {
     const vendor = await this.vendorsService.updateLogo(userId, url);
     return { success: true, data: vendor, message: 'Logo updated' };
   }
+
+  @Patch('toggle-open')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiOperation({ summary: 'Toggle vendor open/closed status' })
+  async toggleOpen(@CurrentUser('id') userId: string) {
+    const result = await this.vendorsService.toggleOpen(userId);
+    return { success: true, data: result, message: result.isOpen ? 'Vendor is now open' : 'Vendor is now closed' };
+  }
+
+  @Get('analytics/export-csv')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiOperation({ summary: 'Export vendor order analytics as CSV' })
+  async exportCsv(@CurrentUser('id') userId: string) {
+    const csv = await this.vendorsService.getAnalyticsCsv(userId);
+    return { success: true, data: { csv }, message: 'CSV generated' };
+  }
+
+  @Get('coverage-map')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN' as any)
+  @ApiOperation({ summary: 'Get vendor coverage map data (Admin)' })
+  async getCoverageMap() {
+    const data = await this.vendorsService.getCoverageMap();
+    return { success: true, data, message: 'Success' };
+  }
 }

@@ -76,4 +76,26 @@ export class ListingQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   onlyAvailable?: boolean;
+
+  @ApiPropertyOptional({ description: 'Filter by vendor ID' })
+  @IsOptional()
+  @IsString()
+  vendorId?: string;
+
+  @ApiPropertyOptional({ description: 'Exclude listings containing these allergens (comma-separated)' })
+  @IsOptional()
+  @IsString()
+  excludeAllergens?: string;
+
+  @ApiPropertyOptional({ description: 'Only featured listings' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  featuredOnly?: boolean;
+
+  @ApiPropertyOptional({ description: 'Sort by trending score' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  trending?: boolean;
 }

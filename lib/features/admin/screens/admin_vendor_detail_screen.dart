@@ -25,7 +25,25 @@ class _AdminVendorDetailScreenState
     extends ConsumerState<AdminVendorDetailScreen> {
   bool _isActing = false;
 
-  Future<void> _action(String endpoint, String successMsg) async {
+  Future<void> _action(String endpoint, String successMsg, {String? confirm}) async {
+    if (confirm != null) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Confirm'),
+          content: Text(confirm),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Confirm'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
     setState(() => _isActing = true);
     try {
       await ref.read(dioClientProvider).patch(endpoint);
@@ -47,87 +65,100 @@ class _AdminVendorDetailScreenState
     return Scaffold(
       appBar: AppBar(title: const Text('Vendor Details')),
       body: vendorAsync.when(
-        data: (vendor) => SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSizes.lg),
-          child: Column(
-            children: [
-              // Header
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: AppColors.primarySurface,
-                  borderRadius: BorderRadius.circular(16),
+        data: (vendor) => RefreshIndicator(
+          color: AppColors.primaryMedium,
+          onRefresh: () async =>
+              ref.invalidate(adminVendorDetailProvider(widget.vendorId)),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(AppSizes.lg),
+            child: Column(
+              children: [
+                // Header
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySurface,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      const CircleAvatar(
+                        radius: 36,
+                        backgroundColor: AppColors.primaryLight,
+                        child: Icon(Icons.store, color: Colors.white, size: 32),
+                      ),
+                      const SizedBox(height: 12),
+                      Text(vendor.businessName, style: AppTextStyles.h3),
+                      Text(vendor.businessType, style: AppTextStyles.bodySmall),
+                      const SizedBox(height: 8),
+                      StatusBadge(status: vendor.status),
+                    ],
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    const CircleAvatar(
-                      radius: 36,
-                      backgroundColor: AppColors.primaryLight,
-                      child: Icon(Icons.store, color: Colors.white, size: 32),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(vendor.businessName, style: AppTextStyles.h3),
-                    Text(vendor.businessType,
-                        style: AppTextStyles.bodySmall),
-                    const SizedBox(height: 8),
-                    StatusBadge(status: vendor.status),
-                  ],
-                ),
-              ),
-              const SizedBox(height: AppSizes.lg),
-              _Row('Owner', vendor.ownerName),
-              _Row('Email', vendor.ownerEmail),
-              if (vendor.address != null) _Row('Address', vendor.address!),
-              const SizedBox(height: AppSizes.xxl),
-              // Action buttons based on status
-              if (vendor.status == 'PENDING') ...[
-                AppButton(
-                  label: 'Approve Vendor',
-                  onPressed: _isActing
-                      ? null
-                      : () => _action(
-                            ApiEndpoints.adminApproveVendor(widget.vendorId),
-                            'Vendor approved',
-                          ),
-                  isLoading: _isActing,
-                  icon: Icons.check_circle_outline,
-                ),
-                const SizedBox(height: 12),
-                AppButton(
-                  label: 'Reject Vendor',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: _isActing
-                      ? null
-                      : () => _action(
-                            ApiEndpoints.adminRejectVendor(widget.vendorId),
-                            'Vendor rejected',
-                          ),
-                ),
-              ] else if (vendor.status == 'APPROVED') ...[
-                AppButton(
-                  label: 'Suspend Vendor',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: _isActing
-                      ? null
-                      : () => _action(
-                            ApiEndpoints.adminSuspendVendor(widget.vendorId),
-                            'Vendor suspended',
-                          ),
-                ),
-              ] else if (vendor.status == 'SUSPENDED') ...[
-                AppButton(
-                  label: 'Reinstate Vendor',
-                  onPressed: _isActing
-                      ? null
-                      : () => _action(
-                            ApiEndpoints.adminApproveVendor(widget.vendorId),
-                            'Vendor reinstated',
-                          ),
-                  isLoading: _isActing,
-                ),
+                const SizedBox(height: AppSizes.lg),
+                _Row('Owner', vendor.ownerName),
+                _Row('Email', vendor.ownerEmail),
+                if (vendor.address != null) _Row('Address', vendor.address!),
+                const SizedBox(height: AppSizes.xxl),
+                // Action buttons based on status
+                if (vendor.status == 'PENDING') ...[
+                  AppButton(
+                    label: 'Approve Vendor',
+                    onPressed: _isActing
+                        ? null
+                        : () => _action(
+                              ApiEndpoints.adminApproveVendor(widget.vendorId),
+                              'Vendor approved',
+                            ),
+                    isLoading: _isActing,
+                    icon: Icons.check_circle_outline,
+                  ),
+                  const SizedBox(height: 12),
+                  AppButton(
+                    label: 'Reject Vendor',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _isActing
+                        ? null
+                        : () => _action(
+                              ApiEndpoints.adminRejectVendor(widget.vendorId),
+                              'Vendor rejected',
+                              confirm: 'Are you sure you want to reject this vendor?',
+                            ),
+                  ),
+                ] else if (vendor.status == 'APPROVED') ...[
+                  AppButton(
+                    label: 'Suspend Vendor',
+                    variant: AppButtonVariant.secondary,
+                    onPressed: _isActing
+                        ? null
+                        : () => _action(
+                              ApiEndpoints.adminSuspendVendor(widget.vendorId),
+                              'Vendor suspended',
+                              confirm:
+                                  'Are you sure you want to suspend this vendor? Their active listings will be deactivated.',
+                            ),
+                  ),
+                ] else if (vendor.status == 'SUSPENDED' ||
+                    vendor.status == 'REJECTED') ...[
+                  AppButton(
+                    label: vendor.status == 'REJECTED'
+                        ? 'Approve Vendor'
+                        : 'Reinstate Vendor',
+                    onPressed: _isActing
+                        ? null
+                        : () => _action(
+                              ApiEndpoints.adminApproveVendor(widget.vendorId),
+                              vendor.status == 'REJECTED'
+                                  ? 'Vendor approved'
+                                  : 'Vendor reinstated',
+                            ),
+                    isLoading: _isActing,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
         loading: () => const ShimmerAdminDetail(),

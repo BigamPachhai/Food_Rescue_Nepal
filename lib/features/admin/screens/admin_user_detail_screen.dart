@@ -26,6 +26,24 @@ class _AdminUserDetailScreenState
   bool _isActing = false;
 
   Future<void> _toggleBan(bool currentlyActive) async {
+    if (currentlyActive) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Ban User'),
+          content: const Text('This will block the user from accessing the app. Are you sure?'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: TextButton.styleFrom(foregroundColor: AppColors.error),
+              child: const Text('Ban'),
+            ),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
     setState(() => _isActing = true);
     try {
       final dio = ref.read(dioClientProvider);

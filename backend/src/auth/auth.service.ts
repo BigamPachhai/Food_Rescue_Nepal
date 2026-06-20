@@ -3,6 +3,7 @@ import {
   BadRequestException,
   UnauthorizedException,
   ConflictException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
@@ -187,7 +188,11 @@ export class AuthService {
       await this.mailService.sendPasswordResetOtp(email, otp);
     } catch (err) {
       this.logger.error(`Failed to send OTP email to ${email}: ${err}`);
-      // In dev mode we still return the OTP so testing isn't blocked by email config
+      if (!isDevMode) {
+        throw new ServiceUnavailableException(
+          'Unable to send OTP email. Please try again later.',
+        );
+      }
     }
 
     return { otp: isDevMode ? otp : '', isDevMode };

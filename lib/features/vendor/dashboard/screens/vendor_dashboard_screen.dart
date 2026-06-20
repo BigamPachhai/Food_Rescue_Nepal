@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../../../core/constants/api_endpoints.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -15,6 +17,9 @@ import '../../listings/providers/vendor_listings_provider.dart';
 import '../../orders/providers/vendor_orders_provider.dart';
 import '../../profile/providers/vendor_profile_provider.dart';
 import '../providers/vendor_stats_provider.dart';
+import '../../../notifications/providers/notifications_provider.dart';
+
+final vendorIsOpenProvider = StateProvider<bool?>((ref) => null);
 
 class VendorDashboardScreen extends ConsumerWidget {
   const VendorDashboardScreen({super.key});
@@ -29,6 +34,7 @@ class VendorDashboardScreen extends ConsumerWidget {
 
     final vendorStatus = vendorProfileAsync.value?.status;
     final isPendingVendor = vendorStatus == 'PENDING';
+    final unreadCount = ref.watch(unreadCountProvider);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
@@ -42,7 +48,8 @@ class VendorDashboardScreen extends ConsumerWidget {
         },
         child: CustomScrollView(
           slivers: [
-            SliverToBoxAdapter(child: _buildHeader(context, authState)),
+            SliverToBoxAdapter(child: _buildHeader(context, authState, unreadCount)),
+            const SliverToBoxAdapter(child: _IsOpenToggle()),
             if (isPendingVendor) ...[
               SliverFillRemaining(
                 hasScrollBody: false,
@@ -193,6 +200,34 @@ class VendorDashboardScreen extends ConsumerWidget {
                   ) ??
                   const SizedBox.shrink(),
             ),
+            // Store Tools section
+            SliverToBoxAdapter(
+              child: _SectionHeader(title: 'Store Tools', onSeeAll: () => context.push('/vendor/analytics')),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(AppSizes.s4, 0, AppSizes.s4, AppSizes.s2),
+                child: GridView.count(
+                  crossAxisCount: 3,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1.1,
+                  children: [
+                    _ToolCard(icon: Icons.bar_chart_rounded, label: 'Analytics', color: Colors.blue, onTap: () => context.push('/vendor/analytics')),
+                    _ToolCard(icon: Icons.inventory_2_rounded, label: 'Inventory', color: Colors.orange, onTap: () => context.push('/vendor/inventory')),
+                    _ToolCard(icon: Icons.local_offer_rounded, label: 'Promotions', color: Colors.purple, onTap: () => context.push('/vendor/promotions')),
+                    _ToolCard(icon: Icons.schedule_rounded, label: 'Hours', color: Colors.teal, onTap: () => context.push('/vendor/hours')),
+                    _ToolCard(icon: Icons.photo_library_rounded, label: 'Gallery', color: Colors.green, onTap: () => context.push('/vendor/gallery')),
+                    _ToolCard(icon: Icons.stars_rounded, label: 'Loyalty', color: Colors.amber, onTap: () => context.push('/vendor/loyalty')),
+                    _ToolCard(icon: Icons.people_rounded, label: 'Customers', color: Colors.indigo, onTap: () => context.push('/vendor/customers')),
+                    _ToolCard(icon: Icons.psychology_rounded, label: 'AI Tools', color: AppColors.primaryMedium, onTap: () => context.push('/vendor/ai/description')),
+                    _ToolCard(icon: Icons.help_outline_rounded, label: 'FAQ', color: Colors.grey, onTap: () => context.push('/vendor/faq')),
+                  ],
+                ),
+              ),
+            ),
             // Pending orders header
             SliverToBoxAdapter(
               child: _SectionHeader(
@@ -332,7 +367,7 @@ class VendorDashboardScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeader(BuildContext context, AuthState authState) {
+  Widget _buildHeader(BuildContext context, AuthState authState, int unreadCount) {
     final name =
         authState is AuthAuthenticated ? authState.user.name : 'Vendor';
     final now = DateTime.now();
@@ -396,6 +431,32 @@ class VendorDashboardScreen extends ConsumerWidget {
                 ],
               ),
             ),
+          ),
+          const SizedBox(width: AppSizes.s1),
+          // Notification bell with unread badge
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconButton(
+                icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                onPressed: () => context.push('/notifications'),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -1423,6 +1484,96 @@ class _WeeklyTipCard extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── Tool Card ────────────────────────────────────────────────────────────
+
+class _ToolCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ToolCard({required this.icon, required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: Container(
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500), textAlign: TextAlign.center),
+      ]),
+    ),
+  );
+}
+
+// ─── isOpen Toggle ────────────────────────────────────────────────────────────
+
+class _IsOpenToggle extends ConsumerStatefulWidget {
+  const _IsOpenToggle();
+
+  @override
+  ConsumerState<_IsOpenToggle> createState() => _IsOpenToggleState();
+}
+
+class _IsOpenToggleState extends ConsumerState<_IsOpenToggle> {
+  bool _loading = false;
+
+  Future<void> _toggle(bool current) async {
+    setState(() => _loading = true);
+    try {
+      final dio = ref.read(dioClientProvider);
+      final res = await dio.patch(ApiEndpoints.vendorToggleOpen);
+      final data = (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>? ?? {};
+      ref.read(vendorIsOpenProvider.notifier).state = data['isOpen'] as bool? ?? !current;
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+    setState(() => _loading = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isOpen = ref.watch(vendorIsOpenProvider) ?? true;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
+      padding: const EdgeInsets.symmetric(horizontal: AppSizes.s4, vertical: AppSizes.s3),
+      decoration: BoxDecoration(
+        color: isOpen ? AppColors.successSurface : AppColors.errorSurface,
+        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+        border: Border.all(color: (isOpen ? AppColors.success : AppColors.error).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 10, height: 10,
+            decoration: BoxDecoration(color: isOpen ? AppColors.success : AppColors.error, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: AppSizes.s3),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(isOpen ? 'Shop is Open' : 'Shop is Closed',
+                    style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+                Text(isOpen ? 'Customers can see your listings' : 'Listings are hidden from customers',
+                    style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          _loading
+              ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+              : Switch(value: isOpen, onChanged: (_) => _toggle(isOpen)),
         ],
       ),
     );

@@ -541,36 +541,30 @@ class _AboutRow extends StatelessWidget {
 
 // ─── Dietary chip (local UI state — persisting to prefs is a future step) ──
 
-class _DietaryChip extends StatefulWidget {
+class _DietaryChip extends ConsumerWidget {
   const _DietaryChip({required this.label});
   final String label;
 
   @override
-  State<_DietaryChip> createState() => _DietaryChipState();
-}
-
-class _DietaryChipState extends State<_DietaryChip> {
-  bool _selected = false;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final selected = ref.watch(dietaryPrefsProvider).contains(label);
     return GestureDetector(
-      onTap: () => setState(() => _selected = !_selected),
+      onTap: () => ref.read(dietaryPrefsProvider.notifier).toggle(label),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: _selected ? AppColors.primaryMedium : AppColors.primarySurface,
+          color: selected ? AppColors.primaryMedium : AppColors.primarySurface,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: _selected ? AppColors.primaryMedium : AppColors.border,
+            color: selected ? AppColors.primaryMedium : AppColors.border,
           ),
         ),
         child: Text(
-          widget.label,
+          label,
           style: AppTextStyles.caption.copyWith(
-            color: _selected ? Colors.white : AppColors.textSecondary,
-            fontWeight: _selected ? FontWeight.w600 : FontWeight.w500,
+            color: selected ? Colors.white : AppColors.textSecondary,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
       ),
@@ -580,18 +574,12 @@ class _DietaryChipState extends State<_DietaryChip> {
 
 // ─── Nearby radius slider ───────────────────────────────────────────────────
 
-class _RadiusSlider extends StatefulWidget {
+class _RadiusSlider extends ConsumerWidget {
   const _RadiusSlider();
 
   @override
-  State<_RadiusSlider> createState() => _RadiusSliderState();
-}
-
-class _RadiusSliderState extends State<_RadiusSlider> {
-  double _radius = 5.0;
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final radius = ref.watch(nearbyRadiusProvider);
     return Column(
       children: [
         Row(
@@ -599,20 +587,20 @@ class _RadiusSliderState extends State<_RadiusSlider> {
           children: [
             Text('1 km', style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
             Text(
-              _radius >= 50 ? 'Any distance' : '${_radius.toInt()} km',
+              radius >= 50 ? 'Any distance' : '${radius.toInt()} km',
               style: AppTextStyles.label.copyWith(color: AppColors.primaryMedium, fontWeight: FontWeight.w700),
             ),
             Text('50 km', style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
           ],
         ),
         Slider(
-          value: _radius,
+          value: radius,
           min: 1,
           max: 50,
           divisions: 49,
           activeColor: AppColors.primaryMedium,
           inactiveColor: AppColors.primarySurface,
-          onChanged: (v) => setState(() => _radius = v),
+          onChanged: (v) => ref.read(nearbyRadiusProvider.notifier).set(v),
         ),
       ],
     );

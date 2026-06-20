@@ -33,19 +33,30 @@ class _EditVendorProfileScreenState extends ConsumerState<EditVendorProfileScree
   bool _isUploadingLogo = false;
   File? _pickedLogo;
 
+  bool _profileLoaded = false;
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadProfile());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Try to populate immediately if data is already available
+      _tryPopulate(ref.read(vendorProfileProvider));
+      // Also listen for when data arrives (in case it's still loading)
+      ref.listenManual(vendorProfileProvider, (_, next) => _tryPopulate(next));
+    });
   }
 
-  void _loadProfile() {
-    final async = ref.read(vendorProfileProvider);
+  void _tryPopulate(AsyncValue<VendorProfile> async) {
+    if (_profileLoaded) return;
     async.whenData((profile) {
-      _businessNameCtrl.text = profile.businessName;
-      _businessTypeCtrl.text = profile.businessType;
-      _descriptionCtrl.text = profile.description ?? '';
-      _addressCtrl.text = profile.address;
+      if (!mounted) return;
+      _profileLoaded = true;
+      setState(() {
+        _businessNameCtrl.text = profile.businessName;
+        _businessTypeCtrl.text = profile.businessType;
+        _descriptionCtrl.text = profile.description ?? '';
+        _addressCtrl.text = profile.address;
+      });
     });
   }
 
@@ -72,9 +83,13 @@ class _EditVendorProfileScreenState extends ConsumerState<EditVendorProfileScree
         'file': await MultipartFile.fromFile(picked.path, filename: 'logo.jpg'),
       });
       await dio.post('/vendors/logo', data: formData);
+      ref.invalidate(vendorProfileProvider);
       if (mounted) context.showSnackBar('Logo updated!');
     } catch (e) {
-      if (mounted) context.showErrorSnackBar('Failed to upload logo');
+      if (mounted) {
+        setState(() => _pickedLogo = null);
+        context.showErrorSnackBar('Failed to upload logo');
+      }
     }
     if (mounted) setState(() => _isUploadingLogo = false);
   }

@@ -145,17 +145,29 @@ class _ListingTile extends ConsumerWidget {
           ? IconButton(
               icon: const Icon(Icons.block, color: AppColors.error),
               onPressed: () async {
+                final ok = await showDialog<bool>(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    title: const Text('Deactivate Listing'),
+                    content: Text('Deactivate "${listing.name}"? Customers will no longer see it.'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                        child: const Text('Deactivate'),
+                      ),
+                    ],
+                  ),
+                );
+                if (ok != true) return;
                 try {
                   await ref.read(dioClientProvider).patch(
                       ApiEndpoints.adminDeactivateListing(listing.id));
                   ref.invalidate(_adminListingsProvider);
-                  if (context.mounted) {
-                    context.showSnackBar('Listing deactivated');
-                  }
+                  if (context.mounted) context.showSnackBar('Listing deactivated');
                 } catch (e) {
-                  if (context.mounted) {
-                    context.showErrorSnackBar(e.toString());
-                  }
+                  if (context.mounted) context.showErrorSnackBar(e.toString());
                 }
               },
               tooltip: 'Deactivate',

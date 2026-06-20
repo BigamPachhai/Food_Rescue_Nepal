@@ -10,7 +10,7 @@ import {
   DefaultValuePipe,
   ParseIntPipe,
 } from '@nestjs/common';
-import { OrdersService } from './orders.service';
+import { OrdersService, BulkAcceptDto } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -126,5 +126,14 @@ export class OrdersController {
   async cancel(@Param('id') id: string, @CurrentUser('id') userId: string) {
     const order = await this.ordersService.cancel(id, userId);
     return { success: true, data: order, message: 'Reservation cancelled' };
+  }
+
+  @Post('bulk-accept')
+  @UseGuards(RolesGuard)
+  @Roles('VENDOR' as any)
+  @ApiOperation({ summary: 'Bulk accept multiple pending orders (VENDOR only)' })
+  async bulkAccept(@CurrentUser('id') userId: string, @Body() dto: BulkAcceptDto) {
+    const results = await this.ordersService.bulkAccept(userId, dto);
+    return { success: true, data: results, message: 'Bulk accept processed' };
   }
 }

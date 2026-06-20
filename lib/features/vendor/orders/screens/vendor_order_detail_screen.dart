@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show Clipboard, ClipboardData, HapticFeedback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
@@ -96,6 +97,7 @@ class _VendorOrderDetailScreenState
   }
 
   Future<void> _performAction(Future<void> Function() action) async {
+    HapticFeedback.mediumImpact();
     setState(() => _isActing = true);
     try {
       await action();
@@ -127,41 +129,47 @@ class _VendorOrderDetailScreenState
         ],
       ),
       body: orderAsync.when(
-        data: (order) => SingleChildScrollView(
-          padding: const EdgeInsets.all(AppSizes.s4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _StatusHeader(order: order),
-              const SizedBox(height: AppSizes.s4),
-              if (order.listing != null) ...[
-                Text('Item', style: AppTextStyles.h4),
-                const SizedBox(height: AppSizes.s2),
-                _ItemCard(order: order),
-              ],
-              const SizedBox(height: AppSizes.s4),
-              Text('Details', style: AppTextStyles.h4),
-              const SizedBox(height: AppSizes.s2),
-              _InfoCard(rows: [
-                _InfoRowData('Reservation ID',
-                    '#${order.id.substring(0, 8).toUpperCase()}'),
-                _InfoRowData(
-                    'Created', Formatters.formatDateTime(order.createdAt)),
-                _InfoRowData('Quantity', '×${order.quantity}'),
-                _InfoRowData(
-                    'Total', Formatters.formatNPR(order.totalAmount)),
-                const _InfoRowData('Payment', 'Cash on Pickup'),
-              ]),
-              if (order.pickupCode != null) ...[
+        data: (order) => RefreshIndicator(
+          color: AppColors.primaryMedium,
+          onRefresh: () async =>
+              ref.invalidate(vendorOrderDetailProvider(widget.orderId)),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(AppSizes.s4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _StatusHeader(order: order),
                 const SizedBox(height: AppSizes.s4),
-                Text('Pickup Code', style: AppTextStyles.h4),
+                if (order.listing != null) ...[
+                  Text('Item', style: AppTextStyles.h4),
+                  const SizedBox(height: AppSizes.s2),
+                  _ItemCard(order: order),
+                ],
+                const SizedBox(height: AppSizes.s4),
+                Text('Details', style: AppTextStyles.h4),
                 const SizedBox(height: AppSizes.s2),
-                _PickupCodeCard(code: order.pickupCode!),
+                _InfoCard(rows: [
+                  _InfoRowData('Reservation ID',
+                      '#${order.id.substring(0, 8).toUpperCase()}'),
+                  _InfoRowData(
+                      'Created', Formatters.formatDateTime(order.createdAt)),
+                  _InfoRowData('Quantity', '×${order.quantity}'),
+                  _InfoRowData(
+                      'Total', Formatters.formatNPR(order.totalAmount)),
+                  const _InfoRowData('Payment', 'Cash on Pickup'),
+                ]),
+                if (order.pickupCode != null) ...[
+                  const SizedBox(height: AppSizes.s4),
+                  Text('Pickup Code', style: AppTextStyles.h4),
+                  const SizedBox(height: AppSizes.s2),
+                  _PickupCodeCard(code: order.pickupCode!),
+                ],
+                const SizedBox(height: AppSizes.s5),
+                _buildActionButtons(order),
+                const SizedBox(height: AppSizes.s4),
               ],
-              const SizedBox(height: AppSizes.s5),
-              _buildActionButtons(order),
-              const SizedBox(height: AppSizes.s4),
-            ],
+            ),
           ),
         ),
         loading: () => const ShimmerVendorOrderDetail(),
@@ -453,6 +461,22 @@ class _PickupCodeCard extends StatelessWidget {
             'Ask the customer for this code or scan their QR',
             style: AppTextStyles.caption,
             textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSizes.s3),
+          OutlinedButton.icon(
+            onPressed: () {
+              Clipboard.setData(ClipboardData(text: code));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Pickup code copied'), duration: Duration(seconds: 2)),
+              );
+            },
+            icon: const Icon(Icons.copy_rounded, size: 16),
+            label: const Text('Copy Code'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primaryMedium,
+              side: const BorderSide(color: AppColors.primaryMedium),
+              visualDensity: VisualDensity.compact,
+            ),
           ),
         ],
       ),

@@ -429,7 +429,7 @@ class _CommentSection extends StatelessWidget {
         TextField(
           controller: controller,
           maxLines: 5,
-          maxLength: 500,
+          maxLength: 1000,
           style: AppTextStyles.bodyMedium,
           decoration: InputDecoration(
             hintText: "Tell others what you loved (or didn't love) about this vendor…",
