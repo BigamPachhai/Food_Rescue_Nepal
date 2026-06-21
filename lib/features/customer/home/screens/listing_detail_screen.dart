@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -36,8 +35,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
   int _quantity = 1;
   bool _isReserving = false;
   bool _descExpanded = false;
-  bool _allergenExpanded = false;
-  bool _howToCollectExpanded = false;
   int _imageIndex = 0;
   final _pageCtrl = PageController();
 
@@ -182,28 +179,16 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                             const Divider(height: AppSizes.s6),
                             _buildStatsRow(listing),
                             const Divider(height: AppSizes.s6),
-                            _buildPickupSection(listing),
-                            const Divider(height: AppSizes.s6),
                             _buildVendorCard(listing),
                             if (listing.description != null &&
                                 listing.description!.isNotEmpty) ...[
                               const Divider(height: AppSizes.s6),
                               _buildDescription(listing),
                             ],
-                            const Divider(height: AppSizes.s6),
-                            _buildCarbonSection(listing),
                             if (listing.dietaryTags.isNotEmpty ||
                                 listing.conditionNotes != null) ...[
                               const Divider(height: AppSizes.s6),
                               _buildDietarySection(listing),
-                            ],
-                            const Divider(height: AppSizes.s6),
-                            _buildHowToCollect(listing),
-                            const Divider(height: AppSizes.s6),
-                            _buildAllergenDisclaimer(),
-                            if (isSoldOut) ...[
-                              const Divider(height: AppSizes.s6),
-                              _buildSoldOutAlternatives(),
                             ],
                             if (!isSoldOut) ...[
                               const Divider(height: AppSizes.s6),
@@ -251,9 +236,9 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
           if (hasImages && images.length > 1)
             PageView.builder(
               controller: _pageCtrl,
-              itemCount: images.length,
-              onPageChanged: (i) => setState(() => _imageIndex = i),
-              itemBuilder: (_, i) => _NetworkImage(url: images[i]),
+              itemCount: null,
+              onPageChanged: (i) => setState(() => _imageIndex = i % images.length),
+              itemBuilder: (_, i) => _NetworkImage(url: images[i % images.length]),
             )
           else if (hasImages)
             _NetworkImage(url: images.first)
@@ -433,85 +418,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
                 ? '${listing.distance!.toStringAsFixed(1)} km'
                 : 'Nearby',
             valueColor: AppColors.primaryMedium,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPickupSection(ListingEntity listing) {
-    final now = DateTime.now();
-    final pickupToday = listing.pickupStart.day == now.day &&
-        listing.pickupStart.month == now.month &&
-        listing.pickupStart.year == now.year;
-    final pickupTomorrow = listing.pickupStart.day ==
-        now.add(const Duration(days: 1)).day;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Pickup Window', style: AppTextStyles.h4),
-        const SizedBox(height: AppSizes.s3),
-        Container(
-          padding: const EdgeInsets.all(AppSizes.s3),
-          decoration: BoxDecoration(
-            color: AppColors.primarySurface,
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(
-                color: AppColors.primaryMedium.withValues(alpha: 0.15)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLight,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                ),
-                child: const Icon(Icons.schedule_rounded,
-                    color: AppColors.primaryMedium, size: AppSizes.iconMd),
-              ),
-              const SizedBox(width: AppSizes.s3),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      Formatters.formatPickupTime(
-                          listing.pickupStart, listing.pickupEnd),
-                      style: AppTextStyles.h6,
-                    ),
-                    Text(
-                      pickupToday
-                          ? 'Today'
-                          : pickupTomorrow
-                              ? 'Tomorrow'
-                              : Formatters.formatDate(listing.pickupStart),
-                      style: AppTextStyles.caption,
-                    ),
-                  ],
-                ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (pickupToday)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSizes.s2, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryMedium,
-                        borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                      ),
-                      child: Text('Today', style: AppTextStyles.caption.copyWith(color: Colors.white, fontWeight: FontWeight.w700)),
-                    ),
-                  if (pickupToday && listing.pickupEnd.isAfter(DateTime.now())) ...[
-                    const SizedBox(height: 4),
-                    _DetailCountdown(pickupEnd: listing.pickupEnd),
-                  ],
-                ],
-              ),
-            ],
           ),
         ),
       ],
@@ -755,81 +661,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  Widget _buildCarbonSection(ListingEntity listing) {
-    final savedAmount = listing.originalPrice - listing.discountedPrice;
-    final co2Saved = (savedAmount / 10000 * 2.5).clamp(0.1, 99.9);
-    final mealsRescued = listing.quantity;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Environmental Impact', style: AppTextStyles.h4),
-        const SizedBox(height: AppSizes.s3),
-        Container(
-          padding: const EdgeInsets.all(AppSizes.s3),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFFE8F5E9), Color(0xFFF1F8E9)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            border: Border.all(color: AppColors.success.withValues(alpha: 0.2)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _ImpactStat(
-                  icon: Icons.cloud_off_rounded,
-                  value: '~${co2Saved.toStringAsFixed(1)} kg',
-                  label: 'CO₂ saved',
-                  color: AppColors.success,
-                ),
-              ),
-              Container(width: 1, height: 44, color: AppColors.success.withValues(alpha: 0.2)),
-              Expanded(
-                child: _ImpactStat(
-                  icon: Icons.restaurant_rounded,
-                  value: '$mealsRescued',
-                  label: 'meals rescued',
-                  color: AppColors.primaryMedium,
-                ),
-              ),
-              Container(width: 1, height: 44, color: AppColors.success.withValues(alpha: 0.2)),
-              Expanded(
-                child: _ImpactStat(
-                  icon: Icons.water_drop_rounded,
-                  value: '~${(mealsRescued * 1.2).toStringAsFixed(0)} L',
-                  label: 'water saved',
-                  color: Colors.blue.shade400,
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (listing.expiryTime != null) ...[
-          const SizedBox(height: AppSizes.s2),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSizes.s3, vertical: AppSizes.s2),
-            decoration: BoxDecoration(
-              color: AppColors.warningSurface,
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.timer_outlined, size: 16, color: AppColors.accentAmber),
-                const SizedBox(width: AppSizes.s2),
-                Text(
-                  'Best before: ${Formatters.formatDateTime(listing.expiryTime!)}',
-                  style: AppTextStyles.bodySmall.copyWith(color: AppColors.accentAmber),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
   Widget _buildDietarySection(ListingEntity listing) {
     const tagColors = {
       'VEGAN': (Color(0xFF2E7D32), Color(0xFFE8F5E9)),
@@ -919,161 +750,6 @@ class _ListingDetailScreenState extends ConsumerState<ListingDetailScreen> {
     );
   }
 
-  Widget _buildHowToCollect(ListingEntity listing) {
-    const steps = [
-      (Icons.phone_android_rounded, 'Reserve in the app', 'Tap "Reserve Now" and confirm your order.'),
-      (Icons.directions_walk_rounded, 'Head to the vendor', 'Go to the pickup location within the time window.'),
-      (Icons.qr_code_scanner_rounded, 'Show your QR code', 'Present the QR code from your order to the staff.'),
-      (Icons.lunch_dining_rounded, 'Collect and enjoy!', 'Pick up your food and reduce waste together.'),
-    ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _howToCollectExpanded = !_howToCollectExpanded),
-          child: Row(
-            children: [
-              Text('How to Collect', style: AppTextStyles.h4),
-              const Spacer(),
-              Icon(
-                _howToCollectExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                color: AppColors.primaryMedium,
-              ),
-            ],
-          ),
-        ),
-        AnimatedCrossFade(
-          firstChild: const SizedBox(width: double.infinity),
-          secondChild: Column(
-            children: [
-              const SizedBox(height: AppSizes.s3),
-              ...steps.asMap().entries.map((e) {
-                final i = e.key;
-                final s = e.value;
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: AppSizes.s3),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        width: 36, height: 36,
-                        decoration: BoxDecoration(
-                          color: AppColors.primarySurface,
-                          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                        ),
-                        child: Icon(s.$1, size: 18, color: AppColors.primaryMedium),
-                      ),
-                      const SizedBox(width: AppSizes.s3),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(children: [
-                              Container(
-                                width: 18, height: 18,
-                                decoration: const BoxDecoration(color: AppColors.primaryMedium, shape: BoxShape.circle),
-                                child: Center(child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700))),
-                              ),
-                              const SizedBox(width: AppSizes.s2),
-                              Text(s.$2, style: AppTextStyles.h6),
-                            ]),
-                            const SizedBox(height: 2),
-                            Padding(
-                              padding: const EdgeInsets.only(left: 26),
-                              child: Text(s.$3, style: AppTextStyles.caption),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-            ],
-          ),
-          crossFadeState: _howToCollectExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 250),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSoldOutAlternatives() {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.s3),
-      decoration: BoxDecoration(
-        color: AppColors.primarySurface,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.primaryMedium.withValues(alpha: 0.2)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.search_rounded, size: 16, color: AppColors.primaryMedium),
-              const SizedBox(width: AppSizes.s2),
-              Text('This item is sold out', style: AppTextStyles.h6.copyWith(color: AppColors.primaryMedium)),
-            ],
-          ),
-          const SizedBox(height: AppSizes.s2),
-          Text('Check out other deals nearby — new listings are added daily!',
-              style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
-          const SizedBox(height: AppSizes.s3),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () => context.go('/customer/home'),
-              icon: const Icon(Icons.fastfood_rounded, size: 16),
-              label: const Text('Browse more deals'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryMedium,
-                side: const BorderSide(color: AppColors.primaryMedium),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSizes.radiusButton)),
-                padding: const EdgeInsets.symmetric(vertical: AppSizes.s2),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAllergenDisclaimer() {
-    return GestureDetector(
-      onTap: () => setState(() => _allergenExpanded = !_allergenExpanded),
-      child: Container(
-        padding: const EdgeInsets.all(AppSizes.s3),
-        decoration: BoxDecoration(
-          color: AppColors.neutral50,
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.textSecondary),
-                const SizedBox(width: AppSizes.s2),
-                Expanded(child: Text('Allergen Notice', style: AppTextStyles.label.copyWith(color: AppColors.textSecondary))),
-                Icon(
-                  _allergenExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                  size: 16, color: AppColors.textTertiary,
-                ),
-              ],
-            ),
-            if (_allergenExpanded) ...[
-              const SizedBox(height: AppSizes.s2),
-              Text(
-                'This food is prepared in a kitchen that may handle nuts, dairy, gluten, and other allergens. If you have severe allergies, please contact the vendor directly before reserving.',
-                style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, height: 1.5),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget _buildQuantitySection(ListingEntity listing) {
     final total = listing.discountedPrice * _quantity;
@@ -1443,12 +1119,6 @@ class _ReserveSheetState extends State<_ReserveSheet> {
               icon: Icons.shopping_bag_rounded,
               text: '${widget.quantity} portion${widget.quantity > 1 ? 's' : ''}',
             ),
-            const SizedBox(height: AppSizes.s2),
-            _SheetRow(
-              icon: Icons.schedule_rounded,
-              text: Formatters.formatPickupTime(
-                  widget.listing.pickupStart, widget.listing.pickupEnd),
-            ),
             const SizedBox(height: AppSizes.s3),
             const Divider(),
             const SizedBox(height: AppSizes.s3),
@@ -1578,86 +1248,3 @@ class _SheetRow extends StatelessWidget {
   }
 }
 
-class _ImpactStat extends StatelessWidget {
-  const _ImpactStat({
-    required this.icon,
-    required this.value,
-    required this.label,
-    required this.color,
-  });
-  final IconData icon;
-  final String value;
-  final String label;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Icon(icon, color: color, size: 22),
-        const SizedBox(height: 4),
-        Text(value, style: AppTextStyles.h6.copyWith(color: color), textAlign: TextAlign.center),
-        Text(label, style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
-      ],
-    );
-  }
-}
-
-// ─── Detail page countdown timer ───────────────────────────────────────────
-
-class _DetailCountdown extends StatefulWidget {
-  const _DetailCountdown({required this.pickupEnd});
-  final DateTime pickupEnd;
-
-  @override
-  State<_DetailCountdown> createState() => _DetailCountdownState();
-}
-
-class _DetailCountdownState extends State<_DetailCountdown> {
-  late Duration _remaining;
-  Timer? _timer;
-
-  Duration _calc() {
-    final d = widget.pickupEnd.difference(DateTime.now());
-    return d.isNegative ? Duration.zero : d;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _remaining = _calc();
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _remaining = _calc());
-    });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_remaining == Duration.zero) return const SizedBox.shrink();
-    final h = _remaining.inHours;
-    final m = _remaining.inMinutes % 60;
-    final s = _remaining.inSeconds % 60;
-    final isUrgent = _remaining.inMinutes <= 30;
-    final label = h > 0 ? '${h}h ${m}m remaining' : '${m}m ${s}s remaining';
-    final color = isUrgent ? AppColors.error : AppColors.accentAmber;
-    final bg = isUrgent ? AppColors.errorSurface : AppColors.warningSurface;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(AppSizes.radiusFull)),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.timer_rounded, size: 11, color: color),
-          const SizedBox(width: 3),
-          Text(label, style: AppTextStyles.caption.copyWith(color: color, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
-  }
-}

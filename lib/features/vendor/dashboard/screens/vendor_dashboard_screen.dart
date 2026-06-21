@@ -159,8 +159,6 @@ class VendorDashboardScreen extends ConsumerWidget {
                     : null,
               ) ?? const SizedBox.shrink(),
             ),
-            // Weekly tip card
-            const SliverToBoxAdapter(child: _WeeklyTipCard()),
             // Best-selling listing
             SliverToBoxAdapter(
               child: listingsAsync.whenOrNull(
@@ -200,6 +198,8 @@ class VendorDashboardScreen extends ConsumerWidget {
                   ) ??
                   const SizedBox.shrink(),
             ),
+            // Tip of the Week
+            const SliverToBoxAdapter(child: _TipOfTheWeek()),
             // Store Tools section
             SliverToBoxAdapter(
               child: _SectionHeader(title: 'Store Tools', onSeeAll: () => context.push('/vendor/analytics')),
@@ -224,9 +224,6 @@ class VendorDashboardScreen extends ConsumerWidget {
                     _ToolCard(icon: Icons.people_rounded, label: 'Customers', color: Colors.indigo, onTap: () => context.push('/vendor/customers')),
                     _ToolCard(icon: Icons.help_outline_rounded, label: 'FAQ', color: Colors.grey, onTap: () => context.push('/vendor/faq')),
                     _ToolCard(icon: Icons.verified_rounded, label: 'Verification', color: Colors.cyan.shade700, onTap: () => context.push('/vendor/verification')),
-                    _ToolCard(icon: Icons.auto_awesome_rounded, label: 'AI Description', color: AppColors.primaryMedium, onTap: () => context.push('/vendor/ai/description')),
-                    _ToolCard(icon: Icons.price_change_rounded, label: 'AI Pricing', color: Colors.deepPurple, onTap: () => context.push('/vendor/ai/pricing')),
-                    _ToolCard(icon: Icons.chat_rounded, label: 'AI Assistant', color: Colors.teal.shade700, onTap: () => context.push('/ai/chat')),
                   ],
                 ),
               ),
@@ -574,18 +571,6 @@ class _VendorPendingState extends StatelessWidget {
             isDone: false,
           ),
           const SizedBox(height: AppSizes.s5),
-          Text('While you wait', style: AppTextStyles.h4),
-          const SizedBox(height: AppSizes.s3),
-          const _TipCard(
-            icon: Icons.photo_camera_rounded,
-            text: 'Prepare high-quality photos of your food — listings with photos get 3× more clicks.',
-          ),
-          const SizedBox(height: AppSizes.s2),
-          const _TipCard(
-            icon: Icons.schedule_rounded,
-            text: 'Plan your pickup windows. Customers prefer specific 30–60 minute slots.',
-          ),
-          const SizedBox(height: AppSizes.s5),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
@@ -695,36 +680,6 @@ class _PendingStep extends StatelessWidget {
                         .copyWith(color: color)),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TipCard extends StatelessWidget {
-  const _TipCard({required this.icon, required this.text});
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSizes.s3),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: AppColors.primaryMedium),
-          const SizedBox(width: AppSizes.s2),
-          Expanded(
-            child: Text(text,
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSecondary)),
           ),
         ],
       ),
@@ -1173,118 +1128,142 @@ class _PerfTile extends StatelessWidget {
             : AppColors.error;
 
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSizes.s2),
-      padding: const EdgeInsets.all(AppSizes.s3),
+      margin: const EdgeInsets.only(bottom: AppSizes.s3),
       decoration: BoxDecoration(
         color: AppColors.surfaceLight,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        boxShadow: AppShadows.xs,
+        borderRadius: BorderRadius.circular(AppSizes.radiusCard),
+        boxShadow: AppShadows.card,
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: listing.isActive
-                      ? AppColors.primarySurface
-                      : AppColors.neutral100,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                ),
-                child: Icon(
-                  Icons.fastfood_rounded,
-                  size: AppSizes.iconSm,
-                  color: listing.isActive
-                      ? AppColors.primaryMedium
-                      : AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(width: AppSizes.s2),
-              Expanded(
-                child: Text(
-                  listing.name,
-                  style: AppTextStyles.h6,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.s2, vertical: 3),
-                decoration: BoxDecoration(
-                  color: listing.isActive
-                      ? AppColors.successSurface
-                      : AppColors.neutral100,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                ),
-                child: Text(
-                  listing.isActive ? 'Active' : 'Inactive',
-                  style: AppTextStyles.caption.copyWith(
-                    color: listing.isActive
-                        ? AppColors.success
-                        : AppColors.textSecondary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSizes.s3),
-          Row(
-            children: [
-              _PerfStat(
-                label: 'Orders',
-                value: '${listing.totalOrders}',
-                icon: Icons.receipt_outlined,
-              ),
-              _PerfStat(
-                label: 'Pickups',
-                value: '${listing.completedOrders}',
-                icon: Icons.check_circle_outline,
-              ),
-              _PerfStat(
-                label: 'Revenue',
-                value: Formatters.formatNPR(listing.revenuePaisa),
-                icon: Icons.payments_outlined,
-              ),
-              _PerfStat(
-                label: 'Qty Left',
-                value: '${listing.availableQty}',
-                icon: Icons.inventory_2_outlined,
-              ),
-            ],
-          ),
-          if (listing.totalOrders > 0) ...[
-            const SizedBox(height: AppSizes.s3),
-            Row(
+          // Header row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSizes.s3, AppSizes.s3, AppSizes.s3, 0),
+            child: Row(
               children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius:
-                        BorderRadius.circular(AppSizes.radiusFull),
-                    child: LinearProgressIndicator(
-                      value: conversionRate / 100,
-                      backgroundColor: AppColors.neutral100,
-                      valueColor: AlwaysStoppedAnimation<Color>(convColor),
-                      minHeight: 6,
-                    ),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: listing.isActive ? AppColors.primarySurface : AppColors.neutral100,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                  ),
+                  child: Icon(
+                    Icons.fastfood_rounded,
+                    size: AppSizes.iconSm,
+                    color: listing.isActive ? AppColors.primaryMedium : AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(width: AppSizes.s2),
-                Text(
-                  '$conversionRate% pickup rate',
-                  style: AppTextStyles.caption.copyWith(
-                    color: convColor,
-                    fontWeight: FontWeight.w600,
+                const SizedBox(width: AppSizes.s3),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        listing.name,
+                        style: AppTextStyles.h6,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Container(
+                            width: 6,
+                            height: 6,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: listing.isActive ? AppColors.success : AppColors.neutral300,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            listing.isActive ? 'Active' : 'Inactive',
+                            style: AppTextStyles.caption.copyWith(
+                              color: listing.isActive ? AppColors.success : AppColors.textTertiary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ],
+          ),
+          const SizedBox(height: AppSizes.s3),
+          const Divider(height: 1),
+          // Stats grid — 2 per row for breathing room
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSizes.s3, AppSizes.s3, AppSizes.s3, 0),
+            child: Row(
+              children: [
+                _PerfStat(
+                  label: 'Orders',
+                  value: '${listing.totalOrders}',
+                  icon: Icons.receipt_outlined,
+                ),
+                _PerfStat(
+                  label: 'Completed',
+                  value: '${listing.completedOrders}',
+                  icon: Icons.check_circle_outline,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(AppSizes.s3, AppSizes.s2, AppSizes.s3, AppSizes.s3),
+            child: Row(
+              children: [
+                _PerfStat(
+                  label: 'Revenue',
+                  value: Formatters.formatNPR(listing.revenuePaisa),
+                  icon: Icons.payments_outlined,
+                ),
+                _PerfStat(
+                  label: 'Qty Left',
+                  value: '${listing.availableQty}',
+                  icon: Icons.inventory_2_outlined,
+                ),
+              ],
+            ),
+          ),
+          // Pickup rate bar — only when there are orders
+          if (listing.totalOrders > 0) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.all(AppSizes.s3),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Pickup rate', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+                      Text(
+                        '$conversionRate%',
+                        style: AppTextStyles.label.copyWith(color: convColor, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: AppSizes.s2),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                    child: LinearProgressIndicator(
+                      value: conversionRate / 100,
+                      backgroundColor: AppColors.neutral100,
+                      valueColor: AlwaysStoppedAnimation<Color>(convColor),
+                      minHeight: 8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else
+            const SizedBox(height: 0),
         ],
       ),
     );
@@ -1304,18 +1283,32 @@ class _PerfStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Expanded(
-      child: Column(
+      child: Row(
         children: [
-          Icon(icon, size: AppSizes.iconSm, color: AppColors.textSecondary),
-          const SizedBox(height: 2),
-          Text(
-            value,
-            style:
-                AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: AppColors.neutral50,
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            ),
+            child: Icon(icon, size: 16, color: AppColors.textSecondary),
           ),
-          Text(label, style: AppTextStyles.caption),
+          const SizedBox(width: AppSizes.s2),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w700),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(label, style: AppTextStyles.caption.copyWith(color: AppColors.textTertiary)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1434,22 +1427,54 @@ class _DashImpactStat extends StatelessWidget {
   }
 }
 
-// ─── Weekly Tip Card ─────────────────────────────────────────────────────────
+// ─── Tip of the Week ─────────────────────────────────────────────────────
 
-class _WeeklyTipCard extends StatelessWidget {
-  const _WeeklyTipCard();
+class _TipOfTheWeek extends StatelessWidget {
+  const _TipOfTheWeek();
 
   static const _tips = [
-    ('Add photos to your listings', 'Listings with photos get 3× more reservations.', Icons.photo_camera_rounded),
-    ('Set accurate pickup windows', 'Customers who miss pickups are less likely to re-order.', Icons.schedule_rounded),
-    ('Try a Surprise Bag listing', 'Mystery bags drive curiosity and sell out faster than fixed items.', Icons.card_giftcard_rounded),
-    ('Offer bigger discounts on slow days', 'Higher discounts mean faster sell-outs.', Icons.local_offer_rounded),
-    ('Respond quickly to orders', 'Fast acceptance builds customer trust and repeat business.', Icons.speed_rounded),
-    ('Keep condition notes updated', 'Honest notes reduce complaints and bad reviews.', Icons.edit_note_rounded),
-    ('List at consistent times', 'Customers who know your schedule return more often.', Icons.repeat_rounded),
-    ('Bundle near-expiry items', 'Group small items into "Surprise Bags" for higher conversions.', Icons.inventory_2_rounded),
-    ('Encourage reviews', 'Vendors with 10+ reviews get 2× more clicks than unreviewed ones.', Icons.star_rounded),
-    ('Reply to low ratings', 'A professional response to a bad review shows trustworthiness.', Icons.chat_bubble_outline_rounded),
+    (
+      icon: Icons.access_time_rounded,
+      color: Color(0xFF7C3AED),
+      title: 'List early, sell more',
+      body: 'Posting surplus food 2–3 hours before closing gives customers time to plan pickup.',
+    ),
+    (
+      icon: Icons.camera_alt_rounded,
+      color: Color(0xFFDB2777),
+      title: 'A photo is worth 10 sales',
+      body: 'Listings with clear photos get up to 3× more reservations. Keep your gallery fresh.',
+    ),
+    (
+      icon: Icons.local_offer_rounded,
+      color: Color(0xFFD97706),
+      title: 'Sweet-spot discounts',
+      body: 'A 30–40% discount attracts the most buyers without cutting too deep into margin.',
+    ),
+    (
+      icon: Icons.notifications_active_rounded,
+      color: Color(0xFF0284C7),
+      title: 'Confirm orders fast',
+      body: 'Accepting orders within 15 minutes builds trust and reduces cancellations.',
+    ),
+    (
+      icon: Icons.star_rounded,
+      color: Color(0xFFF59E0B),
+      title: 'Reviews drive repeat visits',
+      body: 'Ask happy customers to leave a review — even one 5-star rating boosts visibility.',
+    ),
+    (
+      icon: Icons.eco_rounded,
+      color: Color(0xFF16A34A),
+      title: 'Share your impact',
+      body: 'Every meal rescued saves ~2.5 kg of CO₂. Share your milestone on social to attract eco-conscious buyers.',
+    ),
+    (
+      icon: Icons.schedule_rounded,
+      color: Color(0xFF0891B2),
+      title: 'Consistent hours win customers',
+      body: 'Keeping your pickup window consistent each day builds customer habits and loyalty.',
+    ),
   ];
 
   @override
@@ -1457,22 +1482,24 @@ class _WeeklyTipCard extends StatelessWidget {
     final tip = _tips[DateTime.now().weekday % _tips.length];
     return Container(
       margin: const EdgeInsets.fromLTRB(AppSizes.s4, AppSizes.s3, AppSizes.s4, 0),
-      padding: const EdgeInsets.all(AppSizes.s3),
+      padding: const EdgeInsets.all(AppSizes.s4),
       decoration: BoxDecoration(
-        color: AppColors.warningSurface,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: AppColors.accentAmber.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.xs,
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: AppColors.accentAmber.withValues(alpha: 0.15),
-              borderRadius: BorderRadius.circular(8),
+              color: tip.color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppSizes.radiusSm),
             ),
-            child: Icon(tip.$3, color: AppColors.accentAmber, size: 20),
+            child: Icon(tip.icon, color: tip.color, size: AppSizes.iconMd),
           ),
           const SizedBox(width: AppSizes.s3),
           Expanded(
@@ -1481,13 +1508,20 @@ class _WeeklyTipCard extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Text('💡 Tip of the week', style: AppTextStyles.caption.copyWith(color: AppColors.accentAmber, fontWeight: FontWeight.w700)),
+                    Text(
+                      'Tip of the week',
+                      style: AppTextStyles.caption.copyWith(
+                        color: tip.color,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 2),
-                Text(tip.$1, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 2),
-                Text(tip.$2, style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+                Text(tip.title, style: AppTextStyles.h6),
+                const SizedBox(height: 4),
+                Text(tip.body, style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, height: 1.4)),
               ],
             ),
           ),

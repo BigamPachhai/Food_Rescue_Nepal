@@ -120,6 +120,7 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
                     itemCount: filtered.length,
                     itemBuilder: (_, i) => _ListingCard(
                       listing: filtered[i],
+                      onTap: () => context.push('/vendor/listings/${filtered[i].id}'),
                       onEdit: () => context.push('/vendor/listings/${filtered[i].id}/edit'),
                       onToggleActive: () => _confirmToggleActive(context, filtered[i]),
                       onMarkSoldOut: () => _confirmMarkSoldOut(context, filtered[i]),
@@ -270,6 +271,7 @@ class _VendorListingsScreenState extends ConsumerState<VendorListingsScreen> {
 class _ListingCard extends StatelessWidget {
   const _ListingCard({
     required this.listing,
+    required this.onTap,
     required this.onEdit,
     required this.onToggleActive,
     required this.onMarkSoldOut,
@@ -279,6 +281,7 @@ class _ListingCard extends StatelessWidget {
   });
 
   final VendorListing listing;
+  final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onToggleActive;
   final VoidCallback onMarkSoldOut;
@@ -300,7 +303,9 @@ class _ListingCard extends StatelessWidget {
             ? 'Active'
             : 'Paused';
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -481,6 +486,7 @@ class _ListingCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 

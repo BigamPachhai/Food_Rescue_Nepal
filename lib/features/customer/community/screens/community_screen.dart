@@ -35,7 +35,6 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
       appBar: AppBar(
         title: const Text('Community'),
         actions: [
-          IconButton(icon: const Icon(Icons.leaderboard_rounded), onPressed: () => context.push('/customer/leaderboard'), tooltip: 'Leaderboard'),
           IconButton(icon: const Icon(Icons.flag_rounded), onPressed: () => context.push('/customer/challenges'), tooltip: 'Challenges'),
         ],
       ),
@@ -52,8 +51,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
           const SizedBox(height: 16),
           _WeeklyHighlight(),
           const SizedBox(height: 16),
-          Text('Community Feed', style: AppTextStyles.h5),
-          const SizedBox(height: 12),
+          const SizedBox(height: 4),
           ..._mockPosts.asMap().entries.map((e) => _PostCard(
             post: e.value,
             isLiked: _likes.contains(e.key) || e.value.isLiked,

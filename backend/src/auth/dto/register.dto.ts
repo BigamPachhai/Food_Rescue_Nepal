@@ -20,10 +20,11 @@ export class RegisterDto {
   @IsEmail()
   email: string;
 
-  @ApiProperty({ example: 'StrongPass@123', minLength: 8 })
+  @ApiPropertyOptional({ example: 'StrongPass@123', minLength: 8 })
+  @IsOptional()
   @IsString()
   @MinLength(8)
-  password: string;
+  password?: string;
 
   @ApiProperty({ enum: ['CUSTOMER', 'VENDOR'] })
   @IsEnum(['CUSTOMER', 'VENDOR'])

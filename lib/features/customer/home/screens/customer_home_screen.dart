@@ -117,36 +117,23 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundLight,
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedSlide(
-            duration: const Duration(milliseconds: 200),
-            offset: _showScrollTop ? Offset.zero : const Offset(0, 2),
-            child: AnimatedOpacity(
-              duration: const Duration(milliseconds: 200),
-              opacity: _showScrollTop ? 1 : 0,
-              child: FloatingActionButton.small(
-                heroTag: 'scrollTop',
-                onPressed: () => _scrollCtrl.animateTo(
-                  0,
-                  duration: const Duration(milliseconds: 400),
-                  curve: Curves.easeOut,
-                ),
-                backgroundColor: AppColors.primaryMedium,
-                child: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
-              ),
+      floatingActionButton: AnimatedSlide(
+        duration: const Duration(milliseconds: 200),
+        offset: _showScrollTop ? Offset.zero : const Offset(0, 2),
+        child: AnimatedOpacity(
+          duration: const Duration(milliseconds: 200),
+          opacity: _showScrollTop ? 1 : 0,
+          child: FloatingActionButton.small(
+            heroTag: 'scrollTop',
+            onPressed: () => _scrollCtrl.animateTo(
+              0,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeOut,
             ),
-          ),
-          const SizedBox(height: 10),
-          FloatingActionButton(
-            heroTag: 'aiChat',
-            onPressed: () => context.push('/ai/chat'),
             backgroundColor: AppColors.primaryMedium,
-            tooltip: 'AI Food Assistant',
-            child: const Icon(Icons.psychology_rounded, color: Colors.white),
+            child: const Icon(Icons.keyboard_arrow_up_rounded, color: Colors.white),
           ),
-        ],
+        ),
       ),
       body: RefreshIndicator(
         color: AppColors.primaryMedium,
@@ -983,54 +970,15 @@ class _FeaturedCard extends StatelessWidget {
                           fit: BoxFit.cover,
                           memCacheWidth: (cardW * 1.5).toInt(),
                           memCacheHeight: (imageH * 1.5).toInt(),
+                          placeholder: (_, __) => _placeholder(cardW, imageH),
                           errorWidget: (_, __, ___) => _placeholder(cardW, imageH),
                         )
                       : _placeholder(cardW, imageH),
-                ),
-                // Gradient scrim so pickup badge is legible
-                Positioned(
-                  bottom: 0, left: 0, right: 0,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(AppSizes.radiusCard)),
-                    child: Container(
-                      height: imageH * 0.4,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.transparent, Colors.black45],
-                        ),
-                      ),
-                    ),
-                  ),
                 ),
                 Positioned(
                   top: AppSizes.s2,
                   left: AppSizes.s2,
                   child: DiscountBadge(percent: listing.discountPercent),
-                ),
-                // Pickup window stamped on the image
-                Positioned(
-                  bottom: AppSizes.s2,
-                  right: AppSizes.s2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.schedule_rounded, size: 9, color: Colors.white70),
-                        const SizedBox(width: 3),
-                        Text(
-                          Formatters.formatPickupTime(listing.pickupStart, listing.pickupEnd),
-                          style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w500),
-                        ),
-                      ],
-                    ),
-                  ),
                 ),
               ],
             ),
@@ -2092,6 +2040,7 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                           ),
                         ],
                         const SizedBox(height: 6),
+                        // Meta row: rating + distance
                         Row(
                           children: [
                             const Icon(Icons.star_rounded, size: 12, color: AppColors.accentAmber),
@@ -2100,40 +2049,14 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                             const SizedBox(width: AppSizes.s2),
                             const Icon(Icons.location_on_rounded, size: 12, color: AppColors.textTertiary),
                             const SizedBox(width: 2),
-                            Flexible(
-                              child: Text(
-                                listing.distance != null ? '${listing.distance!.toStringAsFixed(1)} km' : '—',
-                                style: AppTextStyles.caption,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                            Text(
+                              listing.distance != null ? '${listing.distance!.toStringAsFixed(1)} km' : '—',
+                              style: AppTextStyles.caption,
                             ),
-                            if (urgency != null) ...[
-                              const SizedBox(width: AppSizes.s1),
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                  decoration: BoxDecoration(
-                                    color: urgency.bgColor,
-                                    borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                                  ),
-                                  child: Text(
-                                    urgency.label,
-                                    style: AppTextStyles.caption.copyWith(
-                                      color: urgency.color,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 9,
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                            ] else if (!isSoldOut && listing.availableQty > 0) ...[
-                              const SizedBox(width: AppSizes.s1),
-                              _CountdownChip(pickupEnd: listing.pickupEnd),
-                            ],
                           ],
                         ),
-                        const SizedBox(height: 4),
+                        const SizedBox(height: 5),
+                        // Price row
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -2171,6 +2094,35 @@ class _ListingCardState extends ConsumerState<ListingCard> {
                             ),
                           ],
                         ),
+                        // Urgency / countdown badge on its own row
+                        if (urgency != null) ...[
+                          const SizedBox(height: 5),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: urgency.bgColor,
+                              borderRadius: BorderRadius.circular(AppSizes.radiusFull),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.timer_rounded, size: 10, color: urgency.color),
+                                const SizedBox(width: 3),
+                                Text(
+                                  urgency.label,
+                                  style: AppTextStyles.caption.copyWith(
+                                    color: urgency.color,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ] else if (!isSoldOut && listing.availableQty > 0) ...[
+                          const SizedBox(height: 5),
+                          _CountdownChip(pickupEnd: listing.pickupEnd),
+                        ],
                     ],
                   ),
                 ),

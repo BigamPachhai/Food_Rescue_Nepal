@@ -21,6 +21,17 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   String _filter = 'All';
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final state = ref.read(notificationsProvider);
+      if (state is! AsyncData) {
+        ref.read(notificationsProvider.notifier).fetch();
+      }
+    });
+  }
+
   static bool _isOrder(NotificationEntity n) =>
       n.type.startsWith('ORDER_') ||
       n.type.startsWith('VENDOR_') ||
@@ -245,15 +256,17 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   }
 
   void _navigate(NotificationEntity notif) {
-    final orderId = notif.data['orderId'] as String?;
-    final listingId = notif.data['listingId'] as String?;
-    if (orderId != null) {
+    final rawOrderId = notif.data['orderId'];
+    final rawListingId = notif.data['listingId'];
+    final orderId = rawOrderId?.toString();
+    final listingId = rawListingId?.toString();
+    if (orderId != null && orderId.isNotEmpty) {
       final authState = ref.read(authProvider);
       final isVendor = authState is AuthAuthenticated && authState.user.isVendor;
       isVendor
           ? context.push('/vendor/orders/$orderId')
           : context.push('/customer/orders/$orderId');
-    } else if (listingId != null) {
+    } else if (listingId != null && listingId.isNotEmpty) {
       context.push('/customer/listing/$listingId');
     }
   }
@@ -429,6 +442,7 @@ class _NotifIcon extends StatelessWidget {
   static const _typeConfig = <String, (IconData, Color)>{
     'ORDER_PLACED': (Icons.add_shopping_cart_outlined, AppColors.info),
     'ORDER_CONFIRMED': (Icons.check_circle_outline, AppColors.success),
+    'ORDER_ACCEPTED': (Icons.check_circle_outline, AppColors.success),
     'ORDER_READY': (Icons.restaurant_outlined, AppColors.success),
     'ORDER_PICKED_UP': (Icons.done_all, AppColors.primaryMedium),
     'ORDER_CANCELLED': (Icons.cancel_outlined, AppColors.error),

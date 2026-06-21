@@ -7,6 +7,7 @@ import '../../../customer/home/providers/listings_provider.dart';
 class VendorOrder {
   final String id;
   final String customerId;
+  final String? customerName;
   final String vendorId;
   final String listingId;
   final int quantity;
@@ -21,6 +22,7 @@ class VendorOrder {
   const VendorOrder({
     required this.id,
     required this.customerId,
+    this.customerName,
     required this.vendorId,
     required this.listingId,
     required this.quantity,
@@ -33,26 +35,30 @@ class VendorOrder {
     this.listing,
   });
 
-  factory VendorOrder.fromJson(Map<String, dynamic> json) => VendorOrder(
-        id: json['id'] as String? ?? '',
-        customerId: json['customerId'] as String? ?? '',
-        vendorId: json['vendorId'] as String? ?? '',
-        listingId: json['listingId'] as String? ?? '',
-        quantity: (json['quantity'] as num?)?.toInt() ?? 0,
-        totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
-        status: json['status'] as String? ?? 'PENDING',
-        pickupCode: json['pickupCode'] as String?,
-        notes: json['notes'] as String?,
-        createdAt: json['createdAt'] != null
-            ? DateTime.parse(json['createdAt'] as String)
-            : DateTime.now(),
-        updatedAt: json['updatedAt'] != null
-            ? DateTime.parse(json['updatedAt'] as String)
-            : DateTime.now(),
-        listing: json['listing'] != null
-            ? ListingEntity.fromJson(json['listing'] as Map<String, dynamic>)
-            : null,
-      );
+  factory VendorOrder.fromJson(Map<String, dynamic> json) {
+    final customer = json['customer'] as Map<String, dynamic>?;
+    return VendorOrder(
+      id: json['id'] as String? ?? '',
+      customerId: json['customerId'] as String? ?? '',
+      customerName: customer?['name'] as String?,
+      vendorId: json['vendorId'] as String? ?? '',
+      listingId: json['listingId'] as String? ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
+      totalAmount: (json['totalAmount'] as num?)?.toInt() ?? 0,
+      status: json['status'] as String? ?? 'PENDING',
+      pickupCode: json['pickupCode'] as String?,
+      notes: json['notes'] as String?,
+      createdAt: json['createdAt'] != null
+          ? DateTime.parse(json['createdAt'] as String)
+          : DateTime.now(),
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.parse(json['updatedAt'] as String)
+          : DateTime.now(),
+      listing: json['listing'] != null
+          ? ListingEntity.fromJson(json['listing'] as Map<String, dynamic>)
+          : null,
+    );
+  }
 }
 
 class VendorOrdersNotifier extends StateNotifier<AsyncValue<List<VendorOrder>>> {
@@ -62,6 +68,7 @@ class VendorOrdersNotifier extends StateNotifier<AsyncValue<List<VendorOrder>>> 
   final Dio _dio;
 
   Future<void> fetch() async {
+    state = const AsyncValue.loading();
     try {
       final response = await _dio.get(ApiEndpoints.vendorOrders);
       final data = response.data;
@@ -70,9 +77,11 @@ class VendorOrdersNotifier extends StateNotifier<AsyncValue<List<VendorOrder>>> 
         items = data;
       } else if (data is Map && data['data'] is List) {
         items = data['data'] as List<dynamic>;
-      } else if (data is Map && data['data'] is Map && data['data']['orders'] is List) {
-        items = data['data']['orders'] as List<dynamic>;
+      } else if (data is Map && data['data'] is Map && (data['data'] as Map)['orders'] is List) {
+        items = (data['data'] as Map)['orders'] as List<dynamic>;
       } else {
+        // Log unexpected shape so it's visible during debugging
+        assert(false, 'Unexpected vendor orders response shape: ${data.runtimeType}');
         items = [];
       }
       state = AsyncValue.data(

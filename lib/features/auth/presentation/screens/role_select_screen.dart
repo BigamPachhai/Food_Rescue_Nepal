@@ -97,30 +97,18 @@ class RoleSelectScreen extends StatelessWidget {
                     _RoleCard(
                       emoji: '🛒',
                       bgColor: AppColors.primarySurface,
-                      accentColor: AppColors.primaryMedium,
                       title: "I'm a Customer",
                       subtitle:
                           'Discover discounted food near you and rescue it from waste.',
-                      benefits: const [
-                        'Browse nearby deals',
-                        'Save up to 70%',
-                        'Reserve & pickup',
-                      ],
                       onTap: () => context.push('/register/customer'),
                     ),
                     const SizedBox(height: AppSizes.s3),
                     _RoleCard(
                       emoji: '🏪',
                       bgColor: AppColors.warningSurface,
-                      accentColor: AppColors.warning,
                       title: "I'm a Vendor",
                       subtitle:
                           'List your surplus food, reduce waste, and reach more customers.',
-                      benefits: const [
-                        'List surplus food',
-                        'Earn extra revenue',
-                        'Reduce waste',
-                      ],
                       onTap: () => context.push('/register/vendor'),
                     ),
                     const Spacer(),
@@ -210,19 +198,15 @@ class _RoleCard extends StatelessWidget {
   const _RoleCard({
     required this.emoji,
     required this.bgColor,
-    required this.accentColor,
     required this.title,
     required this.subtitle,
-    required this.benefits,
     required this.onTap,
   });
 
   final String emoji;
   final Color bgColor;
-  final Color accentColor;
   final String title;
   final String subtitle;
-  final List<String> benefits;
   final VoidCallback onTap;
 
   @override
@@ -265,30 +249,6 @@ class _RoleCard extends StatelessWidget {
                   Text(title, style: AppTextStyles.h4),
                   const SizedBox(height: AppSizes.s1),
                   Text(subtitle, style: AppTextStyles.bodySmall),
-                  const SizedBox(height: AppSizes.s3),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: benefits.map((b) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: bgColor,
-                          borderRadius: BorderRadius.circular(AppSizes.radiusFull),
-                        ),
-                        child: Text(
-                          b,
-                          style: AppTextStyles.caption.copyWith(
-                            color: accentColor,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
                 ],
               ),
             ),

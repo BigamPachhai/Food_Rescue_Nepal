@@ -1,3 +1,19 @@
+class GoogleUserData {
+  final String email;
+  final String name;
+  final String? phone;
+  final String? picture;
+  final String? firebaseIdToken;
+
+  const GoogleUserData({
+    required this.email,
+    required this.name,
+    this.phone,
+    this.picture,
+    this.firebaseIdToken,
+  });
+}
+
 class LoginRequest {
   final String email;
   final String password;
@@ -34,9 +50,9 @@ class RegisterRequest {
     final map = <String, dynamic>{
       'name': name,
       'email': email,
-      'password': password,
       'role': role,
     };
+    if (password.isNotEmpty) map['password'] = password;
     if (phone != null && phone!.isNotEmpty) map['phone'] = phone;
     if (businessName != null) map['businessName'] = businessName;
     if (businessType != null) map['businessType'] = businessType;
@@ -46,7 +62,6 @@ class RegisterRequest {
     return map;
   }
 }
-
 
 class AuthResponse {
   final String accessToken;
@@ -94,7 +109,8 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     // Unwrap API envelope if present
-    final d = json.containsKey('data') ? json['data'] as Map<String, dynamic> : json;
+    final d =
+        json.containsKey('data') ? json['data'] as Map<String, dynamic> : json;
     return UserModel(
       id: d['id'] as String,
       name: d['name'] as String,
@@ -104,7 +120,9 @@ class UserModel {
       avatarUrl: d['avatarUrl'] as String?,
       fcmToken: d['fcmToken'] as String?,
       isActive: d['isActive'] as bool? ?? true,
-      createdAt: d['createdAt'] != null ? DateTime.parse(d['createdAt'] as String) : DateTime.now(),
+      createdAt: d['createdAt'] != null
+          ? DateTime.parse(d['createdAt'] as String)
+          : DateTime.now(),
     );
   }
 

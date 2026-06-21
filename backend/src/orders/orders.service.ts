@@ -90,7 +90,7 @@ export class OrdersService {
             userId: listing.vendor.user.id,
             title: 'New Order! 🎉',
             body: `${customer!.name} ordered ${listing.name} × ${dto.quantity}`,
-            type: 'NEW_ORDER',
+            type: 'VENDOR_NEW_ORDER',
             data: { orderId: order.id },
             fcmToken: listing.vendor.user.fcmToken || undefined,
           });
@@ -460,7 +460,7 @@ export class OrdersService {
           userId: order.vendor.user.id,
           title: 'Order Cancelled',
           body: `${order.customer.name} cancelled their order for ${order.listing.name}`,
-          type: 'ORDER_CANCELLED',
+          type: 'VENDOR_ORDER_CANCELLED',
           data: { orderId },
           fcmToken: order.vendor.user.fcmToken || undefined,
         });

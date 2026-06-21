@@ -101,14 +101,6 @@ class ApiEndpoints {
   static const String vendors = '/vendors';
   static String vendorPublicById(String id) => '/vendors/$id';
 
-  // AI
-  static const String aiChat = '/ai/chat';
-  static const String aiDescription = '/ai/description';
-  static const String aiPricing = '/ai/pricing';
-  static const String aiRecipes = '/ai/recipes';
-  static const String aiSentiment = '/ai/sentiment';
-  static const String aiDemand = '/ai/demand';
-
   // Feature 1: Waitlist
   static String waitlistJoin(String listingId) => '/waitlist/$listingId';
   static String waitlistLeave(String listingId) => '/waitlist/$listingId';
@@ -119,6 +111,9 @@ class ApiEndpoints {
   static const String validatePromo = '/promo-codes/validate';
   static const String promoCodes = '/promo-codes';
   static String promoCodeToggle(String id) => '/promo-codes/$id/toggle';
+  static const String myPromoCodes = '/promo-codes/my';
+  static String myPromoCodeToggle(String id) => '/promo-codes/my/$id/toggle';
+  static String myPromoCodeDelete(String id) => '/promo-codes/my/$id';
 
   // Feature 3: Loyalty Points
   static const String loyalty = '/loyalty';

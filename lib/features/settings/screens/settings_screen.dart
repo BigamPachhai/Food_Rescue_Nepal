@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_text_styles.dart';
+import '../../../core/network/dio_client.dart';
+import '../../../core/utils/extensions.dart';
+import '../../auth/presentation/providers/auth_provider.dart';
 import '../providers/settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -159,6 +163,14 @@ class SettingsScreen extends ConsumerWidget {
               label: 'Change Password',
               onTap: () => context.push('/forgot-password'),
             ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
+              title: Text('Delete Account',
+                  style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error)),
+              trailing: const Icon(Icons.chevron_right, color: AppColors.error),
+              onTap: () => _showDeleteAccount(context, ref),
+            ),
           ]),
 
           // ── Legal ───────────────────────────────────────────────────────
@@ -236,6 +248,27 @@ class SettingsScreen extends ConsumerWidget {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const _AboutScreen()),
+    );
+  }
+
+  void _showDeleteAccount(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _DeleteAccountSheet(
+        onConfirmed: () async {
+          try {
+            final dio = ref.read(dioClientProvider);
+            await dio.delete(ApiEndpoints.deleteAccount);
+          } catch (_) {}
+          await ref.read(authProvider.notifier).logout();
+          if (context.mounted) {
+            context.go('/login');
+            context.showSnackBar('Your account has been deleted.');
+          }
+        },
+      ),
     );
   }
 }
@@ -568,6 +601,207 @@ class _DietaryChip extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ─── Delete account sheet ──────────────────────────────────────────────────
+
+class _DeleteAccountSheet extends StatefulWidget {
+  const _DeleteAccountSheet({required this.onConfirmed});
+  final Future<void> Function() onConfirmed;
+
+  @override
+  State<_DeleteAccountSheet> createState() => _DeleteAccountSheetState();
+}
+
+class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
+  int _step = 0;
+  final _controller = TextEditingController();
+  bool _isDeleting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  bool get _canConfirm => _controller.text.trim() == 'DELETE';
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: _step == 0 ? _buildStep1() : _buildStep2(),
+      ),
+    );
+  }
+
+  Widget _buildStep1() {
+    return Column(
+      key: const ValueKey(0),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.neutral200,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.errorSurface,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.delete_forever_rounded,
+                  color: AppColors.error, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Text('Delete Account',
+                style: AppTextStyles.h3.copyWith(color: AppColors.error)),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Text('This will permanently delete:',
+            style: AppTextStyles.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        ...[
+          'Your profile and personal information',
+          'All reservation history',
+          'Your saved favorites',
+          'Any pending reservations',
+        ].map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(Icons.remove_circle_outline_rounded,
+                      size: 16, color: AppColors.error),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(item, style: AppTextStyles.bodySmall)),
+                ],
+              ),
+            )),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: () => setState(() => _step = 1),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Continue',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Keep my account',
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStep2() {
+    return Column(
+      key: const ValueKey(1),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Center(
+          child: Container(
+            width: 40, height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.neutral200,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        Text('Confirm deletion',
+            style: AppTextStyles.h4.copyWith(color: AppColors.error)),
+        const SizedBox(height: 8),
+        Text(
+          'Type DELETE in the box below to confirm you want to permanently remove your account.',
+          style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 16),
+        TextField(
+          controller: _controller,
+          autofocus: true,
+          onChanged: (_) => setState(() {}),
+          textCapitalization: TextCapitalization.characters,
+          decoration: InputDecoration(
+            hintText: 'Type DELETE here',
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            onPressed: _canConfirm && !_isDeleting
+                ? () async {
+                    setState(() => _isDeleting = true);
+                    Navigator.pop(context);
+                    await widget.onConfirmed();
+                  }
+                : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              disabledBackgroundColor: AppColors.error.withValues(alpha: 0.3),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: _isDeleting
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                : const Text('Delete My Account',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () => setState(() => _step = 0),
+            child: Text('Go back',
+                style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary)),
+          ),
+        ),
+      ],
     );
   }
 }

@@ -206,9 +206,17 @@ class _AuthInterceptor extends Interceptor {
     try {
       final data = err.response?.data;
       if (data is Map<String, dynamic>) {
+        // Handle { error: { message } } envelope (error responses)
+        final errorObj = data['error'];
+        if (errorObj is Map<String, dynamic>) {
+          final msg = errorObj['message'];
+          if (msg is List) return msg.join(', ');
+          if (msg is String && msg.isNotEmpty) return msg;
+        }
+        // Handle flat { message } envelope (validation errors)
         final msg = data['message'];
         if (msg is List) return msg.join(', ');
-        return msg as String? ?? 'Something went wrong';
+        if (msg is String && msg.isNotEmpty) return msg;
       }
     } catch (_) {}
     return 'Something went wrong. Please try again.';

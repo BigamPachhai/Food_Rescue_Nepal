@@ -27,7 +27,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> login(String email, String password) async {
     state = const AuthLoading();
     try {
-      final user = await _repository.login(LoginRequest(email: email, password: password));
+      final user = await _repository
+          .login(LoginRequest(email: email, password: password));
       state = AuthAuthenticated(user);
     } catch (e) {
       state = AuthError(AppException.extractMessage(e));
@@ -59,14 +60,27 @@ class AuthNotifier extends StateNotifier<AuthState> {
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
-      final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
       final firebaseIdToken = await userCredential.user?.getIdToken();
-      if (firebaseIdToken == null) throw Exception('Failed to get Firebase ID token');
+      if (firebaseIdToken == null) {
+        throw Exception('Failed to get Firebase ID token');
+      }
+
+      // Extract user data from Firebase user
+      final firebaseUser = userCredential.user;
+      final googleUserData = GoogleUserData(
+        email: firebaseUser?.email ?? googleUser.email,
+        name: firebaseUser?.displayName ?? googleUser.displayName ?? '',
+        phone: firebaseUser?.phoneNumber,
+        picture: firebaseUser?.photoURL ?? googleUser.photoUrl,
+        firebaseIdToken: firebaseIdToken,
+      );
 
       final user = await _repository.googleSignIn(firebaseIdToken);
       if (user == null) {
         // New user — needs to pick a role before account is created
-        state = AuthGoogleNewUser(firebaseIdToken);
+        state = AuthGoogleNewUser(firebaseIdToken, googleUserData);
       } else {
         state = AuthAuthenticated(user);
       }
@@ -77,14 +91,33 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// Called after a new Google user selects their role.
   /// role must be 'CUSTOMER' or 'VENDOR'.
-  Future<void> completeGoogleSignIn(String firebaseIdToken, String role) async {
+  Future<void> completeGoogleSignIn(
+    String firebaseIdToken,
+    String role, {
+    String? businessName,
+    String? businessType,
+    String? address,
+    double? lat,
+    double? lng,
+    String? phone,
+  }) async {
     state = const AuthLoading();
     try {
-      final user = await _repository.googleSignIn(firebaseIdToken, role: role);
+      final user = await _repository.googleSignIn(
+        firebaseIdToken,
+        role: role,
+        businessName: businessName,
+        businessType: businessType,
+        address: address,
+        lat: lat,
+        lng: lng,
+        phone: phone,
+      );
       if (user != null) {
         state = AuthAuthenticated(user);
       } else {
-        state = const AuthError('Failed to complete sign-in. Please try again.');
+        state =
+            const AuthError('Failed to complete sign-in. Please try again.');
       }
     } catch (e) {
       state = AuthError(AppException.extractMessage(e));
@@ -96,6 +129,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthUnauthenticated();
   }
 
+  Future<void> deleteAccount() async {
+    await _repository.deleteAccount();
+    state = const AuthUnauthenticated();
+  }
+
   void setAuthenticated(UserEntity user) {
     state = AuthAuthenticated(user);
   }
@@ -103,7 +141,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void updateUser({String? name, String? phone, String? avatarUrl}) {
     final s = state;
     if (s is AuthAuthenticated) {
-      state = AuthAuthenticated(s.user.copyWith(name: name, phone: phone, avatarUrl: avatarUrl));
+      state = AuthAuthenticated(
+          s.user.copyWith(name: name, phone: phone, avatarUrl: avatarUrl));
     }
   }
 

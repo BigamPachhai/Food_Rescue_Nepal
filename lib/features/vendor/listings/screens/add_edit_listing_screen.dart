@@ -42,9 +42,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
   final _qtyCtrl = TextEditingController();
 
   String _category = 'Restaurant';
-  DateTime _pickupStart = DateTime.now().add(const Duration(hours: 1));
-  DateTime _pickupEnd = DateTime.now().add(const Duration(hours: 4));
-  DateTime? _expiryTime;
   final List<String> _imageUrls = [];
   final List<File> _pendingImages = [];
   bool _isLoading = false;
@@ -125,9 +122,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
     _qtyCtrl.text = listing.quantity.toString();
     setState(() {
       _category = _normalizeCategory(listing.category);
-      _pickupStart = listing.pickupStart;
-      _pickupEnd = listing.pickupEnd;
-      _expiryTime = listing.expiryTime;
       _imageUrls.addAll(listing.imageUrls);
       _dietaryTags.addAll(listing.dietaryTags);
     });
@@ -145,36 +139,33 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
   }
 
   Future<void> _pickImage() async {
-    if (_imageUrls.length + _pendingImages.length >= 3) {
-      context.showSnackBar('Maximum 3 images allowed');
+    final currentCount = _imageUrls.length + _pendingImages.length;
+    if (currentCount >= 5) {
+      context.showSnackBar('Maximum 5 images allowed');
       return;
     }
     final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1200,
-      imageQuality: 80,
-    );
-    if (picked == null) return;
+    final remaining = 5 - currentCount;
+    final picked = await picker.pickMultipleMedia();
+    if (picked.isEmpty) return;
 
-    final ext = picked.path.toLowerCase();
-    final validExt = ext.endsWith('.jpg') ||
-        ext.endsWith('.jpeg') ||
-        ext.endsWith('.png') ||
-        ext.endsWith('.webp');
-    if (!validExt) {
-      if (mounted) context.showSnackBar('Only JPG, PNG, or WEBP images are allowed');
-      return;
+    final toAdd = picked.take(remaining).toList();
+    if (picked.length > remaining && mounted) {
+      context.showSnackBar('Only $remaining more image(s) could be added (max 5 total)');
     }
 
-    final file = File(picked.path);
-    final sizeBytes = await file.length();
-    if (sizeBytes > 5 * 1024 * 1024) {
-      if (mounted) context.showSnackBar('Image must be under 5 MB');
-      return;
+    final newFiles = <File>[];
+    for (final xfile in toAdd) {
+      final file = File(xfile.path);
+      final sizeBytes = await file.length();
+      if (sizeBytes > 5 * 1024 * 1024) {
+        if (mounted) context.showSnackBar('${xfile.name} exceeds 5 MB and was skipped');
+        continue;
+      }
+      newFiles.add(file);
     }
 
-    setState(() => _pendingImages.add(file));
+    if (newFiles.isNotEmpty) setState(() => _pendingImages.addAll(newFiles));
   }
 
   Future<List<String>> _uploadPendingImages() async {
@@ -209,14 +200,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       context.showSnackBar('Discounted price must be less than original price');
       return;
     }
-    if (!_pickupEnd.isAfter(_pickupStart)) {
-      context.showSnackBar('Pickup end time must be after pickup start time');
-      return;
-    }
-    if (_expiryTime != null && _expiryTime!.isBefore(_pickupEnd)) {
-      context.showSnackBar('Expiry time must be after pickup end time');
-      return;
-    }
     setState(() => _isLoading = true);
     try {
       final newUrls = await _uploadPendingImages();
@@ -234,12 +217,11 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
         'originalPrice': originalPaisa,
         'discountedPrice': discountedPaisa,
         'quantity': int.parse(_qtyCtrl.text),
-        'pickupStart': _pickupStart.toIso8601String(),
-        'pickupEnd': _pickupEnd.toIso8601String(),
+        'pickupStart': DateTime.now().add(const Duration(hours: 1)).toIso8601String(),
+        'pickupEnd': DateTime.now().add(const Duration(hours: 24)).toIso8601String(),
         'imageUrls': allUrls,
         if (_conditionCtrl.text.trim().isNotEmpty)
           'conditionNotes': _conditionCtrl.text.trim(),
-        if (_expiryTime != null) 'expiryTime': _expiryTime!.toIso8601String(),
         if (_dietaryTags.isNotEmpty) 'dietaryTags': _dietaryTags.toList(),
       };
 
@@ -274,57 +256,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
       }
     }
     if (mounted) setState(() => _isLoading = false);
-  }
-
-  Future<void> _pickExpiryTime() async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: _expiryTime ?? now.add(const Duration(hours: 6)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 30)),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_expiryTime ?? now.add(const Duration(hours: 6))),
-    );
-    if (time == null) return;
-    setState(() {
-      _expiryTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    });
-  }
-
-  Future<void> _pickDateTime({required bool isStart}) async {
-    final now = DateTime.now();
-    final date = await showDatePicker(
-      context: context,
-      initialDate: isStart ? _pickupStart : _pickupEnd,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 30)),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(isStart ? _pickupStart : _pickupEnd),
-    );
-    if (time == null) return;
-    final dt = DateTime(date.year, date.month, date.day, time.hour, time.minute);
-    setState(() {
-      if (isStart) {
-        _pickupStart = dt;
-        // Ensure end is always after start
-        if (!_pickupEnd.isAfter(_pickupStart)) {
-          _pickupEnd = _pickupStart.add(const Duration(hours: 2));
-        }
-      } else {
-        if (!dt.isAfter(_pickupStart)) {
-          context.showSnackBar('Pickup end must be after pickup start');
-          return;
-        }
-        _pickupEnd = dt;
-      }
-    });
   }
 
   @override
@@ -540,69 +471,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
                 textInputAction: TextInputAction.done,
               ),
               const SizedBox(height: AppSizes.lg),
-              // Pickup times
-              Row(
-                children: [
-                  Expanded(
-                    child: _DateTimeTile(
-                      label: 'Pickup Start',
-                      dateTime: _pickupStart,
-                      onTap: () => _pickDateTime(isStart: true),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _DateTimeTile(
-                      label: 'Pickup End',
-                      dateTime: _pickupEnd,
-                      onTap: () => _pickDateTime(isStart: false),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSizes.lg),
-              // Expiry time
-              GestureDetector(
-                onTap: _pickExpiryTime,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySurface,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.timer_outlined,
-                        size: 20,
-                        color: _expiryTime != null ? AppColors.warning : AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Food Expiry Time (optional)', style: AppTextStyles.caption),
-                            if (_expiryTime != null)
-                              Text(
-                                '${_expiryTime!.day}/${_expiryTime!.month}/${_expiryTime!.year}  ${_expiryTime!.hour.toString().padLeft(2, '0')}:${_expiryTime!.minute.toString().padLeft(2, '0')}',
-                                style: AppTextStyles.bodySmall.copyWith(color: AppColors.warning, fontWeight: FontWeight.w500),
-                              )
-                            else
-                              Text('Tap to set expiry time', style: AppTextStyles.bodySmall),
-                          ],
-                        ),
-                      ),
-                      if (_expiryTime != null)
-                        GestureDetector(
-                          onTap: () => setState(() => _expiryTime = null),
-                          child: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: AppSizes.lg),
               AppTextField(
                 label: 'Condition Notes (optional)',
                 hint: 'e.g. Freshly baked, no preservatives, best before pickup',
@@ -630,7 +498,7 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
                             setState(() => _pendingImages.removeAt(e.key)),
                       )),
                   // Add button
-                  if (_imageUrls.length + _pendingImages.length < 3)
+                  if (_imageUrls.length + _pendingImages.length < 5)
                     GestureDetector(
                       onTap: _pickImage,
                       child: Container(
@@ -661,56 +529,6 @@ class _AddEditListingScreenState extends ConsumerState<AddEditListingScreen> {
               const SizedBox(height: 16),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DateTimeTile extends StatelessWidget {
-  const _DateTimeTile({
-    required this.label,
-    required this.dateTime,
-    required this.onTap,
-  });
-  final String label;
-  final DateTime dateTime;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: AppColors.primarySurface,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(label, style: AppTextStyles.caption),
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Icon(Icons.schedule,
-                    size: 14, color: AppColors.primaryMedium),
-                const SizedBox(width: 4),
-                Expanded(
-                  child: Text(
-                    '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}',
-                    style: AppTextStyles.bodySmall
-                        .copyWith(color: AppColors.primaryMedium),
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              '${dateTime.day}/${dateTime.month}/${dateTime.year}',
-              style: AppTextStyles.caption,
-            ),
-          ],
         ),
       ),
     );

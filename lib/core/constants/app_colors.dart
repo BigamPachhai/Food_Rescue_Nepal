@@ -53,8 +53,8 @@ class AppColors {
   static const Color textOnSurface = Color(0xFF111827);
 
   // Order / status
-  static const Color statusPending = Color(0xFFF59E0B);
-  static const Color statusPendingSurface = Color(0xFFFEF9C3);
+  static const Color statusPending = Color(0xFFD97706);
+  static const Color statusPendingSurface = Color(0xFFFFF7ED);
   static const Color statusAccepted = Color(0xFF2563EB);
   static const Color statusAcceptedSurface = Color(0xFFDBEAFE);
   static const Color statusReady = Color(0xFF16A34A);

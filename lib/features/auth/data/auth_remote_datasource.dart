@@ -48,10 +48,29 @@ class AuthRemoteDataSource {
     });
   }
 
+  Future<void> deleteAccount() async {
+    await _dio.delete(ApiEndpoints.permanentDeleteAccount);
+  }
+
   /// Returns `null` when the user is new and needs to select a role first.
-  Future<AuthResponse?> googleSignIn(String firebaseIdToken, {String? role}) async {
+  Future<AuthResponse?> googleSignIn(
+    String firebaseIdToken, {
+    String? role,
+    String? businessName,
+    String? businessType,
+    String? address,
+    double? lat,
+    double? lng,
+    String? phone,
+  }) async {
     final body = <String, dynamic>{'idToken': firebaseIdToken};
     if (role != null) body['role'] = role;
+    if (businessName != null) body['businessName'] = businessName;
+    if (businessType != null) body['businessType'] = businessType;
+    if (address != null) body['address'] = address;
+    if (lat != null) body['lat'] = lat;
+    if (lng != null) body['lng'] = lng;
+    if (phone != null && phone.isNotEmpty) body['phone'] = phone;
     final response = await _dio.post(ApiEndpoints.googleSignIn, data: body);
     final raw = response.data as Map<String, dynamic>;
     final data = raw['data'] as Map<String, dynamic>;

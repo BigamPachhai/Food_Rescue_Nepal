@@ -1,5 +1,7 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/dio_client.dart';
 
@@ -26,7 +28,13 @@ final verificationDocsProvider = FutureProvider<List<VerificationDoc>>((ref) asy
   return items.map((e) => VerificationDoc.fromJson(e as Map<String, dynamic>)).toList();
 });
 
-const _docTypes = ['BUSINESS_REGISTRATION', 'TAX_CERTIFICATE', 'FOOD_LICENSE', 'IDENTITY_PROOF', 'OTHER'];
+const _docTypes = ['BUSINESS_REG', 'TAX', 'ID', 'OTHER'];
+const _docTypeLabels = {
+  'BUSINESS_REG': 'Business Registration',
+  'TAX': 'Tax Certificate',
+  'ID': 'Identity Proof',
+  'OTHER': 'Other',
+};
 
 class VendorVerificationScreen extends ConsumerStatefulWidget {
   const VendorVerificationScreen({super.key});
@@ -37,35 +45,63 @@ class VendorVerificationScreen extends ConsumerStatefulWidget {
 
 class _VendorVerificationScreenState extends ConsumerState<VendorVerificationScreen> {
   String? _selectedDocType;
-  final _urlCtrl = TextEditingController();
+  String? _pickedFileName;
+  String? _uploadedUrl;
   bool _uploading = false;
+  bool _submitting = false;
 
-  @override
-  void dispose() {
-    _urlCtrl.dispose();
-    super.dispose();
+  Future<void> _pickFile() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 90);
+    if (picked == null) return;
+
+    setState(() {
+      _uploading = true;
+      _pickedFileName = picked.name;
+      _uploadedUrl = null;
+    });
+
+    try {
+      final dio = ref.read(dioClientProvider);
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(picked.path, filename: picked.name),
+      });
+      final res = await dio.post(ApiEndpoints.uploadImage, data: formData);
+      final url = (res.data as Map<String, dynamic>)['data']?['url'] as String?;
+      setState(() => _uploadedUrl = url);
+      if (mounted && url == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Upload failed: no URL returned')));
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+      setState(() => _pickedFileName = null);
+    }
+    if (mounted) setState(() => _uploading = false);
   }
 
-  Future<void> _upload() async {
-    if (_selectedDocType == null || _urlCtrl.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a document type and provide the file URL')));
+  Future<void> _submit() async {
+    if (_selectedDocType == null || _uploadedUrl == null) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please select a document type and upload a file')));
       return;
     }
-    setState(() => _uploading = true);
+    setState(() => _submitting = true);
     try {
       final dio = ref.read(dioClientProvider);
       await dio.post(ApiEndpoints.uploadVerificationDoc, data: {
         'docType': _selectedDocType,
-        'fileUrl': _urlCtrl.text.trim(),
+        'docUrl': _uploadedUrl,
       });
       ref.invalidate(verificationDocsProvider);
-      _urlCtrl.clear();
-      setState(() => _selectedDocType = null);
+      setState(() {
+        _selectedDocType = null;
+        _pickedFileName = null;
+        _uploadedUrl = null;
+      });
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document submitted for review')));
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
-    setState(() => _uploading = false);
+    if (mounted) setState(() => _submitting = false);
   }
 
   @override
@@ -95,26 +131,64 @@ class _VendorVerificationScreenState extends ConsumerState<VendorVerificationScr
             DropdownButtonFormField<String>(
               initialValue: _selectedDocType,
               decoration: const InputDecoration(labelText: 'Document Type', border: OutlineInputBorder()),
-              items: _docTypes.map((t) => DropdownMenuItem(value: t, child: Text(t.replaceAll('_', ' ')))).toList(),
+              items: _docTypes.map((t) => DropdownMenuItem(value: t, child: Text(_docTypeLabels[t] ?? t))).toList(),
               onChanged: (v) => setState(() => _selectedDocType = v),
             ),
             const SizedBox(height: 12),
-            TextField(
-              controller: _urlCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Document URL',
-                hintText: 'https://…',
-                border: OutlineInputBorder(),
-                helperText: 'Upload your file to a storage service and paste the link here',
+            GestureDetector(
+              onTap: _uploading ? null : _pickFile,
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: _uploadedUrl != null ? Colors.green : Colors.grey.shade400),
+                  borderRadius: BorderRadius.circular(8),
+                  color: _uploadedUrl != null ? Colors.green.shade50 : Colors.grey.shade50,
+                ),
+                child: Row(children: [
+                  if (_uploading)
+                    const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  else
+                    Icon(
+                      _uploadedUrl != null ? Icons.check_circle_rounded : Icons.upload_file_rounded,
+                      color: _uploadedUrl != null ? Colors.green : Colors.grey.shade600,
+                    ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      _uploading
+                          ? 'Uploading...'
+                          : _uploadedUrl != null
+                              ? _pickedFileName ?? 'File uploaded'
+                              : 'Tap to pick an image or document photo',
+                      style: TextStyle(
+                        color: _uploadedUrl != null ? Colors.green.shade700 : Colors.grey.shade700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                  if (_uploadedUrl != null)
+                    TextButton(
+                      onPressed: _uploading ? null : _pickFile,
+                      child: const Text('Change'),
+                    ),
+                ]),
               ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Supported: JPG, PNG, WebP (max 10MB)',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                icon: const Icon(Icons.upload_file),
+                icon: _submitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.upload_file),
                 label: const Text('Submit Document'),
-                onPressed: _uploading ? null : _upload,
+                onPressed: (_submitting || _uploading || _uploadedUrl == null) ? null : _submit,
               ),
             ),
             const SizedBox(height: 32),
@@ -148,7 +222,7 @@ class _DocTile extends StatelessWidget {
           doc.status == 'APPROVED' ? Icons.verified : doc.status == 'REJECTED' ? Icons.cancel : Icons.pending,
           color: color,
         ),
-        title: Text(doc.docType.replaceAll('_', ' ')),
+        title: Text(_docTypeLabels[doc.docType] ?? doc.docType.replaceAll('_', ' ')),
         subtitle: doc.rejectionReason != null ? Text(doc.rejectionReason!, style: const TextStyle(color: Colors.red, fontSize: 12)) : null,
         trailing: Chip(
           label: Text(doc.status, style: const TextStyle(fontSize: 11)),

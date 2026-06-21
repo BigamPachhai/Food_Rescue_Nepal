@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../dashboard/providers/vendor_stats_provider.dart';
+import '../../orders/providers/vendor_orders_provider.dart';
 
 class VendorAnalyticsScreen extends ConsumerStatefulWidget {
   const VendorAnalyticsScreen({super.key});
@@ -66,28 +68,79 @@ class _VendorAnalyticsScreenState extends ConsumerState<VendorAnalyticsScreen> w
   }
 }
 
-class _OverviewTab extends StatelessWidget {
+class _OverviewTab extends ConsumerWidget {
   final String period;
   const _OverviewTab({required this.period});
 
   @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        _KPIGrid(),
-        const SizedBox(height: 16),
-        _RevenueChart(),
-        const SizedBox(height: 16),
-        _TopItemsCard(),
-        const SizedBox(height: 16),
-        _QuickLinksRow(),
-      ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(vendorStatsProvider);
+    final ordersAsync = ref.watch(vendorOrdersProvider);
+
+    return statsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Failed to load stats: $e')),
+      data: (stats) => ordersAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Failed to load orders: $e')),
+        data: (orders) {
+          final totalRevenue = stats.totalRevenuePaisa ~/ 100;
+          final completedOrders = stats.completedPickups;
+          final avgOrderValue = completedOrders > 0 ? totalRevenue ~/ completedOrders : 0;
+          final cancelled = orders.where((o) => o.status == 'CANCELLED').length;
+
+          final weeklyData = _buildWeeklyRevenue(orders);
+
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _KPIGrid(
+                revenue: totalRevenue,
+                orders: completedOrders,
+                avgOrderValue: avgOrderValue,
+                cancellations: cancelled,
+              ),
+              const SizedBox(height: 16),
+              _RevenueChart(weeklyData: weeklyData),
+              const SizedBox(height: 16),
+              _TopItemsCard(listings: stats.listingPerformance),
+              const SizedBox(height: 16),
+              _QuickLinksRow(),
+            ],
+          );
+        },
+      ),
     );
+  }
+
+  List<int> _buildWeeklyRevenue(List<VendorOrder> orders) {
+    final now = DateTime.now();
+    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final daily = List<int>.filled(7, 0);
+    for (final o in orders) {
+      if (o.status != 'COMPLETED') continue;
+      final diff = o.createdAt.difference(DateTime(weekStart.year, weekStart.month, weekStart.day)).inDays;
+      if (diff >= 0 && diff < 7) {
+        daily[diff] += o.totalAmount ~/ 100;
+      }
+    }
+    return daily;
   }
 }
 
 class _KPIGrid extends StatelessWidget {
+  final int revenue;
+  final int orders;
+  final int avgOrderValue;
+  final int cancellations;
+
+  const _KPIGrid({
+    required this.revenue,
+    required this.orders,
+    required this.avgOrderValue,
+    required this.cancellations,
+  });
+
   @override
   Widget build(BuildContext context) {
     return GridView.count(
@@ -97,21 +150,23 @@ class _KPIGrid extends StatelessWidget {
       childAspectRatio: 1.5,
       mainAxisSpacing: 12,
       crossAxisSpacing: 12,
-      children: const [
-        _KPICard(title: 'Revenue', value: 'Rs. 8,450', change: '+12%', icon: Icons.attach_money_rounded, positive: true),
-        _KPICard(title: 'Orders', value: '47', change: '+8%', icon: Icons.receipt_long_rounded, positive: true),
-        _KPICard(title: 'Avg Order Value', value: 'Rs. 180', change: '+3%', icon: Icons.trending_up_rounded, positive: true),
-        _KPICard(title: 'Cancellations', value: '3', change: '-2%', icon: Icons.cancel_outlined, positive: false),
+      children: [
+        _KPICard(title: 'Revenue', value: 'Rs. ${_fmt(revenue)}', icon: Icons.attach_money_rounded),
+        _KPICard(title: 'Orders', value: '$orders', icon: Icons.receipt_long_rounded),
+        _KPICard(title: 'Avg Order Value', value: 'Rs. ${_fmt(avgOrderValue)}', icon: Icons.trending_up_rounded),
+        _KPICard(title: 'Cancellations', value: '$cancellations', icon: Icons.cancel_outlined, negative: true),
       ],
     );
   }
+
+  String _fmt(int v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : '$v';
 }
 
 class _KPICard extends StatelessWidget {
-  final String title, value, change;
+  final String title, value;
   final IconData icon;
-  final bool positive;
-  const _KPICard({required this.title, required this.value, required this.change, required this.icon, required this.positive});
+  final bool negative;
+  const _KPICard({required this.title, required this.value, required this.icon, this.negative = false});
 
   @override
   Widget build(BuildContext context) {
@@ -126,17 +181,7 @@ class _KPICard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Icon(icon, color: AppColors.primaryMedium, size: 22),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: (positive ? Colors.green : Colors.red).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(change, style: TextStyle(fontSize: 11, color: positive ? Colors.green.shade700 : Colors.red, fontWeight: FontWeight.bold)),
-            ),
-          ]),
+          Icon(icon, color: negative ? Colors.red.shade400 : AppColors.primaryMedium, size: 22),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -151,11 +196,14 @@ class _KPICard extends StatelessWidget {
 }
 
 class _RevenueChart extends StatelessWidget {
+  final List<int> weeklyData;
+  const _RevenueChart({required this.weeklyData});
+
   @override
   Widget build(BuildContext context) {
-    final data = [2100, 3200, 1800, 4100, 2900, 3800, 2400];
     final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final maxVal = data.reduce((a, b) => a > b ? a : b);
+    final maxVal = weeklyData.reduce((a, b) => a > b ? a : b);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
@@ -169,25 +217,32 @@ class _RevenueChart extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: List.generate(7, (i) {
-                final h = data[i] / maxVal;
+                final h = maxVal > 0 ? weeklyData[i] / maxVal : 0.0;
+                final label = weeklyData[i] >= 1000
+                    ? '${(weeklyData[i] / 1000).toStringAsFixed(1)}k'
+                    : '${weeklyData[i]}';
                 return Expanded(
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 3),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text('${(data[i] / 1000).toStringAsFixed(1)}k', style: const TextStyle(fontSize: 8, color: Colors.grey)),
+                        Text(label, style: const TextStyle(fontSize: 8, color: Colors.grey)),
                         const SizedBox(height: 2),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 600),
-                          height: 100 * h,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [AppColors.primaryMedium, AppColors.primaryDark],
-                              begin: Alignment.bottomCenter,
-                              end: Alignment.topCenter,
+                        Flexible(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 600),
+                            height: 100 * h,
+                            constraints: const BoxConstraints(maxHeight: 100),
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [AppColors.primaryMedium, AppColors.primaryDark],
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                              ),
+                              borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
                             ),
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(6)),
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -206,14 +261,29 @@ class _RevenueChart extends StatelessWidget {
 }
 
 class _TopItemsCard extends StatelessWidget {
+  final List<ListingPerf> listings;
+  const _TopItemsCard({required this.listings});
+
   @override
   Widget build(BuildContext context) {
-    const items = [
-      ('Surprise Bag', 18, 'Rs. 3,240'),
-      ('Dal Bhat Special', 14, 'Rs. 1,680'),
-      ('Café Pastry Box', 9, 'Rs. 2,250'),
-      ('Fresh Salad', 6, 'Rs. 1,080'),
-    ];
+    final sorted = [...listings]..sort((a, b) => b.quantitySold.compareTo(a.quantitySold));
+    final top = sorted.take(4).toList();
+
+    if (top.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Top Selling Items', style: AppTextStyles.h5),
+            const SizedBox(height: 12),
+            const Center(child: Text('No sales data yet', style: TextStyle(color: Colors.grey))),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
@@ -222,7 +292,7 @@ class _TopItemsCard extends StatelessWidget {
         children: [
           Text('Top Selling Items', style: AppTextStyles.h5),
           const SizedBox(height: 12),
-          ...items.asMap().entries.map((e) => Padding(
+          ...top.asMap().entries.map((e) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: Row(children: [
               Container(
@@ -232,29 +302,31 @@ class _TopItemsCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(e.value.$1, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
-                Text('${e.value.$2} orders', style: AppTextStyles.caption),
+                Text(e.value.name, style: AppTextStyles.bodySmall.copyWith(fontWeight: FontWeight.w600)),
+                Text('${e.value.quantitySold} orders', style: AppTextStyles.caption),
               ])),
-              Text(e.value.$3, style: AppTextStyles.label.copyWith(color: AppColors.primaryMedium)),
+              Text('Rs. ${_fmt(e.value.revenuePaisa ~/ 100)}', style: AppTextStyles.label.copyWith(color: AppColors.primaryMedium)),
             ]),
           )),
         ],
       ),
     );
   }
+
+  String _fmt(int v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : '$v';
 }
 
 class _QuickLinksRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      _QuickLink(icon: Icons.bar_chart_rounded, label: 'Revenue\nReport', onTap: () => context.push('/vendor/analytics/revenue')),
+      _QuickLink(icon: Icons.bar_chart_rounded, label: 'Revenue\nReport', onTap: () => context.push('/vendor/analytics/revenue-report')),
       const SizedBox(width: 10),
       _QuickLink(icon: Icons.schedule_rounded, label: 'Peak\nHours', onTap: () => context.push('/vendor/analytics/peak-hours')),
       const SizedBox(width: 10),
       _QuickLink(icon: Icons.people_outline_rounded, label: 'Customer\nInsights', onTap: () => context.push('/vendor/customers')),
       const SizedBox(width: 10),
-      _QuickLink(icon: Icons.eco_rounded, label: 'Waste\nReport', onTap: () => context.push('/vendor/analytics/waste')),
+      _QuickLink(icon: Icons.eco_rounded, label: 'Waste\nReport', onTap: () => context.push('/vendor/analytics/waste-report')),
     ]);
   }
 }
@@ -281,48 +353,70 @@ class _QuickLink extends StatelessWidget {
   );
 }
 
-class _RevenueTab extends StatelessWidget {
+class _RevenueTab extends ConsumerWidget {
   final String period;
   const _RevenueTab({required this.period});
+
   @override
-  Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(16),
-    children: [
-      _SummaryCard(period: period),
-      const SizedBox(height: 16),
-      _MonthlyBreakdown(),
-    ],
-  );
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(vendorStatsProvider);
+
+    return statsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Failed to load: $e')),
+      data: (stats) {
+        final total = stats.totalRevenuePaisa ~/ 100;
+        final foodSales = (total * 0.80).round();
+        final packaging = (total * 0.10).round();
+        final delivery = total - foodSales - packaging;
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _SummaryCard(period: period, totalRevenue: total),
+            const SizedBox(height: 16),
+            _MonthlyBreakdown(total: total, foodSales: foodSales, packaging: packaging, delivery: delivery),
+          ],
+        );
+      },
+    );
+  }
 }
 
 class _SummaryCard extends StatelessWidget {
   final String period;
-  const _SummaryCard({required this.period});
+  final int totalRevenue;
+  const _SummaryCard({required this.period, required this.totalRevenue});
+
   @override
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(20),
     decoration: const BoxDecoration(gradient: LinearGradient(colors: [AppColors.primaryDark, AppColors.primaryMedium]), borderRadius: BorderRadius.all(Radius.circular(16))),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('$period Revenue', style: AppTextStyles.bodySmallOnPrimary),
-      Text('Rs. 8,450', style: AppTextStyles.display.copyWith(color: Colors.white)),
-      const SizedBox(height: 8),
-      const Row(children: [
-        Icon(Icons.trending_up_rounded, color: Colors.greenAccent, size: 18),
-        SizedBox(width: 4),
-        Text('+12% vs last period', style: TextStyle(color: Colors.greenAccent)),
-      ]),
+      Text('Rs. ${_fmt(totalRevenue)}', style: AppTextStyles.display.copyWith(color: Colors.white)),
     ]),
   );
+
+  String _fmt(int v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : '$v';
 }
 
 class _MonthlyBreakdown extends StatelessWidget {
+  final int total;
+  final int foodSales;
+  final int packaging;
+  final int delivery;
+
+  const _MonthlyBreakdown({required this.total, required this.foodSales, required this.packaging, required this.delivery});
+
   @override
   Widget build(BuildContext context) {
-    const breakdown = [
-      ('Food Sales', 'Rs. 6,800', 0.80),
-      ('Packaging Fees', 'Rs. 850', 0.10),
-      ('Delivery Commission', 'Rs. 800', 0.10),
+    final breakdown = [
+      ('Food Sales', 'Rs. ${_fmt(foodSales)}', total > 0 ? foodSales / total : 0.0),
+      ('Packaging Fees', 'Rs. ${_fmt(packaging)}', total > 0 ? packaging / total : 0.0),
+      ('Delivery Commission', 'Rs. ${_fmt(delivery)}', total > 0 ? delivery / total : 0.0),
     ];
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
@@ -343,35 +437,57 @@ class _MonthlyBreakdown extends StatelessWidget {
       ]),
     );
   }
+
+  String _fmt(int v) => v >= 1000 ? '${(v / 1000).toStringAsFixed(1)}k' : '$v';
 }
 
-class _OrdersTab extends StatelessWidget {
+class _OrdersTab extends ConsumerWidget {
   final String period;
   const _OrdersTab({required this.period});
+
   @override
-  Widget build(BuildContext context) {
-    const statuses = [('Completed', 41, Colors.green), ('Cancelled', 3, Colors.red), ('Expired', 2, Colors.orange), ('Pending', 1, Colors.blue)];
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ordersAsync = ref.watch(vendorOrdersProvider);
+
+    return ordersAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Failed to load: $e')),
+      data: (orders) {
+        final completed = orders.where((o) => o.status == 'COMPLETED').length;
+        final cancelled = orders.where((o) => o.status == 'CANCELLED').length;
+        final expired = orders.where((o) => o.status == 'EXPIRED').length;
+        final pending = orders.where((o) => o.status == 'PENDING' || o.status == 'RESERVED').length;
+
+        final statuses = [
+          ('Completed', completed, Colors.green),
+          ('Cancelled', cancelled, Colors.red),
+          ('Expired', expired, Colors.orange),
+          ('Pending', pending, Colors.blue),
+        ];
+
+        return ListView(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Order Status Breakdown', style: AppTextStyles.h5),
-            const SizedBox(height: 14),
-            ...statuses.map((s) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(children: [
-                Container(width: 12, height: 12, decoration: BoxDecoration(color: s.$3, shape: BoxShape.circle)),
-                const SizedBox(width: 10),
-                Expanded(child: Text(s.$1, style: AppTextStyles.bodySmall)),
-                Text('${s.$2}', style: AppTextStyles.label.copyWith(color: AppColors.primaryDark)),
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Order Status Breakdown', style: AppTextStyles.h5),
+                const SizedBox(height: 14),
+                ...statuses.map((s) => Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Row(children: [
+                    Container(width: 12, height: 12, decoration: BoxDecoration(color: s.$3, shape: BoxShape.circle)),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(s.$1, style: AppTextStyles.bodySmall)),
+                    Text('${s.$2}', style: AppTextStyles.label.copyWith(color: AppColors.primaryDark)),
+                  ]),
+                )),
               ]),
-            )),
-          ]),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 }

@@ -57,8 +57,26 @@ class AuthRepository {
   }
 
   /// Returns null when user is new and needs to select a role.
-  Future<UserEntity?> googleSignIn(String firebaseIdToken, {String? role}) async {
-    final response = await _dataSource.googleSignIn(firebaseIdToken, role: role);
+  Future<UserEntity?> googleSignIn(
+    String firebaseIdToken, {
+    String? role,
+    String? businessName,
+    String? businessType,
+    String? address,
+    double? lat,
+    double? lng,
+    String? phone,
+  }) async {
+    final response = await _dataSource.googleSignIn(
+      firebaseIdToken,
+      role: role,
+      businessName: businessName,
+      businessType: businessType,
+      address: address,
+      lat: lat,
+      lng: lng,
+      phone: phone,
+    );
     if (response == null) return null;
     await DioClient.saveTokens(
       accessToken: response.accessToken,
@@ -73,6 +91,14 @@ class AuthRepository {
     final refreshToken = await DioClient.getRefreshToken();
     try {
       await _dataSource.logout(refreshToken: refreshToken);
+    } catch (_) {}
+    await DioClient.clearTokens();
+    await _clearCachedUser();
+  }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _dataSource.deleteAccount();
     } catch (_) {}
     await DioClient.clearTokens();
     await _clearCachedUser();

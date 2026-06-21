@@ -122,7 +122,14 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Sign in or register with Google (Firebase ID token)' })
   async googleSignIn(@Body() dto: GoogleAuthDto, @Res({ passthrough: true }) res: Response) {
-    const result = await this.authService.googleSignIn(dto.idToken, dto.role);
+    const result = await this.authService.googleSignIn(dto.idToken, dto.role, {
+      businessName: dto.businessName,
+      businessType: dto.businessType,
+      address: dto.address,
+      lat: dto.lat,
+      lng: dto.lng,
+      phone: dto.phone,
+    });
     if (result.isNewUser && !result.accessToken) {
       // New user who hasn't selected a role yet — don't set a cookie
       return { success: true, data: { isNewUser: true }, message: 'Role selection required' };

@@ -1,23 +1,90 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import '../../../../core/constants/api_endpoints.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_text_styles.dart';
+import '../../../../core/network/dio_client.dart';
 
-class VendorGalleryScreen extends StatefulWidget {
+class VendorGalleryScreen extends ConsumerStatefulWidget {
   const VendorGalleryScreen({super.key});
 
   @override
-  State<VendorGalleryScreen> createState() => _VendorGalleryScreenState();
+  ConsumerState<VendorGalleryScreen> createState() => _VendorGalleryScreenState();
 }
 
-class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
-  final List<_GalleryItem> _items = [
-    const _GalleryItem('Store Front', 'store'),
-    const _GalleryItem('Bakery Section', 'bakery'),
-    const _GalleryItem('Fresh Produce', 'produce'),
-    const _GalleryItem('Prepared Meals', 'meals'),
-    const _GalleryItem('Team Photo', 'team'),
-    const _GalleryItem('Special Packaging', 'pack'),
-  ];
+class _VendorGalleryScreenState extends ConsumerState<VendorGalleryScreen> {
+  final List<String> _imageUrls = [];
+  bool _uploading = false;
+
+  Future<void> _pickAndUpload(ImageSource source) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: source, imageQuality: 85, maxWidth: 1080);
+    if (picked == null) return;
+    setState(() => _uploading = true);
+    try {
+      final dio = ref.read(dioClientProvider);
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(picked.path, filename: 'gallery.jpg'),
+      });
+      final res = await dio.post(ApiEndpoints.uploadImage, data: formData);
+      final url = (res.data as Map<String, dynamic>)['data']?['url'] as String?;
+      if (url != null) setState(() => _imageUrls.add(url));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Photo added')));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
+    }
+    if (mounted) setState(() => _uploading = false);
+  }
+
+  void _addPhoto() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Add Photo', style: AppTextStyles.h5),
+          const SizedBox(height: 16),
+          ListTile(
+            leading: const Icon(Icons.camera_alt_rounded),
+            title: const Text('Take Photo'),
+            onTap: () { Navigator.pop(ctx); _pickAndUpload(ImageSource.camera); },
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_rounded),
+            title: const Text('Choose from Gallery'),
+            onTap: () { Navigator.pop(ctx); _pickAndUpload(ImageSource.gallery); },
+          ),
+        ]),
+      ),
+    );
+  }
+
+  void _deletePhoto(int index) {
+    setState(() => _imageUrls.removeAt(index));
+  }
+
+  void _viewPhoto(BuildContext context, String url, int index) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Image.network(url, height: 240, width: double.infinity, fit: BoxFit.cover),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+                onPressed: () { Navigator.pop(context); _deletePhoto(index); },
+              ),
+            ]),
+          ),
+        ]),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,10 +93,13 @@ class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
       appBar: AppBar(
         title: const Text('Store Gallery'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_photo_alternate_rounded),
-            onPressed: _addPhoto,
-          ),
+          if (_uploading)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+            )
+          else
+            IconButton(icon: const Icon(Icons.add_photo_alternate_rounded), onPressed: _addPhoto),
         ],
       ),
       body: Column(children: [
@@ -37,15 +107,11 @@ class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
           color: Colors.white,
           padding: const EdgeInsets.all(16),
           child: Row(children: [
-            _StatPill(Icons.photo_library_rounded, '${_items.length} Photos'),
-            const SizedBox(width: 8),
-            const _StatPill(Icons.visibility_rounded, '2.4k Views'),
-            const SizedBox(width: 8),
-            const _StatPill(Icons.thumb_up_rounded, '142 Likes'),
+            _StatPill(Icons.photo_library_rounded, '${_imageUrls.length} Photos'),
           ]),
         ),
         Expanded(
-          child: _items.isEmpty
+          child: _imageUrls.isEmpty
               ? _EmptyGallery(onAdd: _addPhoto)
               : GridView.builder(
                   padding: const EdgeInsets.all(8),
@@ -54,7 +120,7 @@ class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
                     crossAxisSpacing: 4,
                     mainAxisSpacing: 4,
                   ),
-                  itemCount: _items.length + 1,
+                  itemCount: _imageUrls.length + 1,
                   itemBuilder: (_, i) {
                     if (i == 0) {
                       return GestureDetector(
@@ -63,7 +129,7 @@ class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
                           decoration: BoxDecoration(
                             color: AppColors.primaryMedium.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.primaryMedium.withValues(alpha: 0.3), style: BorderStyle.solid),
+                            border: Border.all(color: AppColors.primaryMedium.withValues(alpha: 0.3)),
                           ),
                           child: const Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                             Icon(Icons.add_rounded, color: AppColors.primaryMedium, size: 28),
@@ -73,30 +139,19 @@ class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
                         ),
                       );
                     }
-                    final item = _items[i - 1];
+                    final url = _imageUrls[i - 1];
                     return GestureDetector(
-                      onTap: () => _viewPhoto(context, item, i - 1),
-                      onLongPress: () => _showOptions(context, i - 1),
-                      child: Stack(fit: StackFit.expand, children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            color: _colorForTag(item.tag),
-                            child: Icon(_iconForTag(item.tag), color: Colors.white.withValues(alpha: 0.6), size: 36),
+                      onTap: () => _viewPhoto(context, url, i - 1),
+                      onLongPress: () => _deletePhoto(i - 1),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(url, fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.grey[200],
+                            child: const Icon(Icons.broken_image_rounded, color: Colors.grey),
                           ),
                         ),
-                        Positioned(
-                          bottom: 0, left: 0, right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withValues(alpha: 0.7), Colors.transparent]),
-                              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-                            ),
-                            child: Text(item.label, style: const TextStyle(color: Colors.white, fontSize: 9), maxLines: 1, overflow: TextOverflow.ellipsis),
-                          ),
-                        ),
-                      ]),
+                      ),
                     );
                   },
                 ),
@@ -105,86 +160,6 @@ class _VendorGalleryScreenState extends State<VendorGalleryScreen> {
       ]),
     );
   }
-
-  Color _colorForTag(String tag) {
-    switch (tag) {
-      case 'bakery': return Colors.orange;
-      case 'produce': return Colors.green;
-      case 'meals': return Colors.purple;
-      case 'team': return Colors.blue;
-      case 'pack': return Colors.teal;
-      default: return AppColors.primaryMedium;
-    }
-  }
-
-  IconData _iconForTag(String tag) {
-    switch (tag) {
-      case 'bakery': return Icons.bakery_dining_rounded;
-      case 'produce': return Icons.eco_rounded;
-      case 'meals': return Icons.restaurant_rounded;
-      case 'team': return Icons.people_rounded;
-      case 'pack': return Icons.inventory_2_rounded;
-      default: return Icons.store_rounded;
-    }
-  }
-
-  void _addPhoto([ BuildContext? ctx]) {
-    final context = ctx ?? this.context;
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Text('Add Photo', style: AppTextStyles.h5),
-          const SizedBox(height: 16),
-          ListTile(
-            leading: const Icon(Icons.camera_alt_rounded),
-            title: const Text('Take Photo'),
-            onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Camera opened'))); },
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_rounded),
-            title: const Text('Choose from Gallery'),
-            onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Gallery opened'))); },
-          ),
-        ]),
-      ),
-    );
-  }
-
-  void _viewPhoto(BuildContext context, _GalleryItem item, int index) {
-    showDialog(
-      context: context,
-      builder: (_) => Dialog(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(height: 200, color: _colorForTag(item.tag), child: Center(child: Icon(_iconForTag(item.tag), color: Colors.white, size: 64))),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(children: [
-              Expanded(child: Text(item.label, style: AppTextStyles.h5)),
-              IconButton(icon: const Icon(Icons.delete_outline_rounded, color: Colors.red), onPressed: () { setState(() => _items.removeAt(index)); Navigator.pop(context); }),
-            ]),
-          ),
-        ]),
-      ),
-    );
-  }
-
-  void _showOptions(BuildContext context, int index) {
-    showModalBottomSheet(
-      context: context,
-      builder: (_) => Column(mainAxisSize: MainAxisSize.min, children: [
-        ListTile(leading: const Icon(Icons.star_rounded, color: Colors.amber), title: const Text('Set as Cover Photo'), onTap: () { Navigator.pop(context); ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cover photo updated'))); }),
-        ListTile(leading: const Icon(Icons.delete_outline_rounded, color: Colors.red), title: const Text('Delete Photo'), onTap: () { setState(() => _items.removeAt(index)); Navigator.pop(context); }),
-      ]),
-    );
-  }
-}
-
-class _GalleryItem {
-  final String label, tag;
-  const _GalleryItem(this.label, this.tag);
 }
 
 class _StatPill extends StatelessWidget {

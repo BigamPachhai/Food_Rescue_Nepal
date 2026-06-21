@@ -14,7 +14,6 @@ import { FavoritesModule } from './favorites/favorites.module';
 import { UploadModule } from './upload/upload.module';
 import { AdminModule } from './admin/admin.module';
 import { ReportsModule } from './reports/reports.module';
-import { AiModule } from './ai/ai.module';
 import { validateEnv } from './config/env.config';
 // New feature modules
 import { WaitlistModule } from './waitlist/waitlist.module';
@@ -55,7 +54,6 @@ import { DataExportModule } from './data-export/data-export.module';
     UploadModule,
     AdminModule,
     ReportsModule,
-    AiModule,
     // Feature modules
     WaitlistModule,
     PromoCodesModule,

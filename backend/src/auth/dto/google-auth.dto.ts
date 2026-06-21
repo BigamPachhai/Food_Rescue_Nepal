@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsIn } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsIn, IsNumber } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class GoogleAuthDto {
@@ -12,4 +12,34 @@ export class GoogleAuthDto {
   @IsString()
   @IsIn(['CUSTOMER', 'VENDOR'])
   role?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  businessName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  businessType?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  lat?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  lng?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phone?: string;
 }

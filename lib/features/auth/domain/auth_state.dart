@@ -1,4 +1,5 @@
 import 'user_entity.dart';
+import '../data/auth_models.dart';
 
 sealed class AuthState {
   const AuthState();
@@ -29,6 +30,6 @@ class AuthError extends AuthState {
 /// New Google user — account doesn't exist yet; app must ask for role before creating.
 class AuthGoogleNewUser extends AuthState {
   final String firebaseIdToken;
-  const AuthGoogleNewUser(this.firebaseIdToken);
+  final GoogleUserData googleUserData;
+  const AuthGoogleNewUser(this.firebaseIdToken, this.googleUserData);
 }
-

@@ -44,7 +44,9 @@ export class AuthService {
       }
     }
 
-    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const passwordHash = dto.password
+      ? await bcrypt.hash(dto.password, BCRYPT_ROUNDS)
+      : null;
 
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -184,16 +186,10 @@ export class AuthService {
 
     await this.prisma.passwordResetOtp.create({ data: { email, otp, expiresAt } });
 
-    try {
-      await this.mailService.sendPasswordResetOtp(email, otp);
-    } catch (err) {
+    // Fire-and-forget — OTP is already persisted; don't block the response on SMTP
+    this.mailService.sendPasswordResetOtp(email, otp).catch((err) => {
       this.logger.error(`Failed to send OTP email to ${email}: ${err}`);
-      if (!isDevMode) {
-        throw new ServiceUnavailableException(
-          'Unable to send OTP email. Please try again later.',
-        );
-      }
-    }
+    });
 
     return { otp: isDevMode ? otp : '', isDevMode };
   }
@@ -216,7 +212,7 @@ export class AuthService {
     ]);
   }
 
-  async googleSignIn(idToken: string, role?: string) {
+  async googleSignIn(idToken: string, role?: string, vendorFields?: { businessName?: string; businessType?: string; address?: string; lat?: number; lng?: number; phone?: string }) {
     if (admin.apps.length === 0) {
       throw new BadRequestException('Google Sign-In is not configured on the server');
     }
@@ -264,7 +260,36 @@ export class AuthService {
       return { isNewUser: true, user: null, accessToken: null, refreshToken: null };
     }
 
-    // Create the new user with the chosen role (CUSTOMER only via Google; VENDOR goes through full registration)
+    if (role === 'VENDOR') {
+      const { businessName, businessType, address, lat, lng, phone } = vendorFields ?? {};
+      if (!businessName || !businessType || !address || lat == null || lng == null) {
+        throw new BadRequestException('VENDOR registration requires businessName, businessType, address, lat, lng');
+      }
+      const newUser = await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            name: name ?? email.split('@')[0],
+            email,
+            googleId,
+            avatarUrl: picture ?? null,
+            role: role as Role,
+            phone: phone ?? null,
+          },
+        });
+        await tx.vendor.create({
+          data: { userId: user.id, businessName, businessType, address, lat, lng },
+        });
+        return user;
+      });
+      const tokens = await this.generateTokens(newUser.id, newUser.email, newUser.role);
+      return {
+        isNewUser: true,
+        user: { id: newUser.id, name: newUser.name, email: newUser.email, phone: newUser.phone, role: newUser.role, avatarUrl: newUser.avatarUrl, isActive: newUser.isActive, createdAt: newUser.createdAt, vendor: null },
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
+    }
+
     const newUser = await this.prisma.user.create({
       data: {
         name: name ?? email.split('@')[0],

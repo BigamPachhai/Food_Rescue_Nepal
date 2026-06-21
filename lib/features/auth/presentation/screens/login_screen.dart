@@ -14,6 +14,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../providers/auth_provider.dart';
 import '../../domain/auth_state.dart';
+import '../../data/auth_models.dart';
 import '../../../../main.dart' show registerFcmToken;
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -37,15 +38,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _login() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    await ref.read(authProvider.notifier).login(_emailCtrl.text.trim(), _passwordCtrl.text);
+    await ref
+        .read(authProvider.notifier)
+        .login(_emailCtrl.text.trim(), _passwordCtrl.text);
   }
 
-  void _showRolePicker(BuildContext context, String firebaseIdToken) {
+  void _showRolePicker(BuildContext context, String firebaseIdToken,
+      GoogleUserData googleUserData) {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _GoogleRolePickerSheet(firebaseIdToken: firebaseIdToken),
+      builder: (_) => _GoogleRolePickerSheet(
+        firebaseIdToken: firebaseIdToken,
+        googleUserData: googleUserData,
+      ),
     );
   }
 
@@ -61,7 +68,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         // Router redirect handles navigation; just register FCM token here
         registerFcmToken(ref.read(dioClientProvider));
       } else if (next is AuthGoogleNewUser) {
-        _showRolePicker(context, next.firebaseIdToken);
+        _showRolePicker(context, next.firebaseIdToken, next.googleUserData);
       }
     });
 
@@ -75,10 +82,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               _buildHero(),
               Center(
                 child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: Responsive.maxFormWidth(context)),
+                  constraints: BoxConstraints(
+                      maxWidth: Responsive.maxFormWidth(context)),
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSizes.s4, AppSizes.s6, AppSizes.s4, AppSizes.s4,
+                      AppSizes.s4,
+                      AppSizes.s6,
+                      AppSizes.s4,
+                      AppSizes.s4,
                     ),
                     child: Form(
                       key: _formKey,
@@ -239,7 +250,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final authState = ref.watch(authProvider);
     final isLoading = authState is AuthLoading;
     return OutlinedButton(
-      onPressed: isLoading ? null : () => ref.read(authProvider.notifier).googleSignIn(),
+      onPressed: isLoading
+          ? null
+          : () => ref.read(authProvider.notifier).googleSignIn(),
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(double.infinity, AppSizes.buttonHeight),
         shape: RoundedRectangleBorder(
@@ -252,7 +265,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          SvgPicture.asset('assets/images/google_logo.svg', width: 20, height: 20),
+          SvgPicture.asset('assets/images/google_logo.svg',
+              width: 20, height: 20),
           const SizedBox(width: AppSizes.s2),
           Text(
             'Continue with Google',
@@ -340,25 +354,33 @@ const _devAccounts = [
 ];
 
 class _GoogleRolePickerSheet extends ConsumerWidget {
-  const _GoogleRolePickerSheet({required this.firebaseIdToken});
+  const _GoogleRolePickerSheet({
+    required this.firebaseIdToken,
+    required this.googleUserData,
+  });
   final String firebaseIdToken;
+  final GoogleUserData googleUserData;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       decoration: const BoxDecoration(
         color: AppColors.backgroundLight,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(AppSizes.radiusXxl)),
+        borderRadius:
+            BorderRadius.vertical(top: Radius.circular(AppSizes.radiusXxl)),
       ),
       padding: EdgeInsets.fromLTRB(
-        AppSizes.s4, AppSizes.s3, AppSizes.s4,
+        AppSizes.s4,
+        AppSizes.s3,
+        AppSizes.s4,
         AppSizes.s4 + MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 40, height: 4,
+            width: 40,
+            height: 4,
             decoration: BoxDecoration(
               color: AppColors.border,
               borderRadius: BorderRadius.circular(AppSizes.radiusFull),
@@ -381,7 +403,9 @@ class _GoogleRolePickerSheet extends ConsumerWidget {
             accentColor: AppColors.primaryMedium,
             onTap: () {
               Navigator.pop(context);
-              ref.read(authProvider.notifier).completeGoogleSignIn(firebaseIdToken, 'CUSTOMER');
+              ref
+                  .read(authProvider.notifier)
+                  .completeGoogleSignIn(firebaseIdToken, 'CUSTOMER');
             },
           ),
           const SizedBox(height: AppSizes.s3),
@@ -394,7 +418,7 @@ class _GoogleRolePickerSheet extends ConsumerWidget {
             onTap: () {
               Navigator.pop(context);
               // Vendor needs full registration with business details
-              context.push('/register/vendor');
+              context.push('/register/vendor', extra: googleUserData);
             },
           ),
           const SizedBox(height: AppSizes.s4),
@@ -435,12 +459,14 @@ class _RoleTile extends StatelessWidget {
         child: Row(
           children: [
             Container(
-              width: 52, height: 52,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
                 color: bgColor,
                 borderRadius: BorderRadius.circular(AppSizes.radiusMd),
               ),
-              child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
+              child: Center(
+                  child: Text(emoji, style: const TextStyle(fontSize: 24))),
             ),
             const SizedBox(width: AppSizes.s3),
             Expanded(

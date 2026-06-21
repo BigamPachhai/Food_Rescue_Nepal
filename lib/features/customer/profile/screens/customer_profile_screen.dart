@@ -5,9 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_sizes.dart';
 import '../../../../core/constants/app_text_styles.dart';
-import '../../../../core/constants/api_endpoints.dart';
-import '../../../../core/network/dio_client.dart';
-import '../../../../core/utils/extensions.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/utils/responsive.dart';
 import '../../../auth/domain/auth_state.dart';
@@ -43,25 +40,6 @@ class CustomerProfileScreen extends ConsumerWidget {
                         label: 'Edit Profile',
                         subtitle: 'Name, phone, profile picture',
                         onTap: () => context.push('/customer/profile/edit'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _SectionCard(
-                    title: 'Activity',
-                    children: [
-                      _ProfileTile(
-                        icon: Icons.favorite_outline,
-                        iconColor: AppColors.error,
-                        label: 'My Favorites',
-                        subtitle: 'Saved vendors and listings',
-                        onTap: () => context.push('/customer/favorites'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.receipt_long_outlined,
-                        label: 'My Orders',
-                        subtitle: 'View order history',
-                        onTap: () => context.go('/customer/orders'),
                         showDivider: false,
                       ),
                     ],
@@ -71,13 +49,6 @@ class CustomerProfileScreen extends ConsumerWidget {
                     title: 'Impact & Rewards',
                     children: [
                       _ProfileTile(
-                        icon: Icons.eco_rounded,
-                        iconColor: Colors.green,
-                        label: 'My Impact',
-                        subtitle: 'CO₂ saved, meals rescued, streaks',
-                        onTap: () => context.push('/customer/impact'),
-                      ),
-                      _ProfileTile(
                         icon: Icons.emoji_events_rounded,
                         iconColor: Colors.amber,
                         label: 'Achievements',
@@ -85,46 +56,11 @@ class CustomerProfileScreen extends ConsumerWidget {
                         onTap: () => context.push('/customer/achievements'),
                       ),
                       _ProfileTile(
-                        icon: Icons.leaderboard_rounded,
-                        iconColor: Colors.purple,
-                        label: 'Leaderboard',
-                        subtitle: 'See top food rescuers',
-                        onTap: () => context.push('/customer/leaderboard'),
-                      ),
-                      _ProfileTile(
                         icon: Icons.stars_rounded,
                         iconColor: Colors.orange,
                         label: 'Loyalty Points',
                         subtitle: 'Your points balance and history',
                         onTap: () => context.push('/customer/loyalty'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.card_giftcard_rounded,
-                        iconColor: AppColors.primaryMedium,
-                        label: 'My Rewards',
-                        subtitle: 'Points, discounts, and redemptions',
-                        onTap: () => context.push('/customer/rewards'),
-                        showDivider: false,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _SectionCard(
-                    title: 'AI Tools',
-                    children: [
-                      _ProfileTile(
-                        icon: Icons.psychology_rounded,
-                        iconColor: AppColors.primaryMedium,
-                        label: 'AI Food Assistant',
-                        subtitle: 'Chat with AI for recipes and food tips',
-                        onTap: () => context.push('/ai/chat'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.restaurant_menu_rounded,
-                        iconColor: Colors.deepPurple,
-                        label: 'AI Recipe Suggestions',
-                        subtitle: 'Get recipes from your rescued food items',
-                        onTap: () => context.push('/ai/recipes'),
                         showDivider: false,
                       ),
                     ],
@@ -134,25 +70,11 @@ class CustomerProfileScreen extends ConsumerWidget {
                     title: 'Order Tools',
                     children: [
                       _ProfileTile(
-                        icon: Icons.bar_chart_rounded,
-                        iconColor: Colors.blue,
-                        label: 'Order Statistics',
-                        subtitle: 'Your rescue history and spending',
-                        onTap: () => context.push('/customer/orders/stats'),
-                      ),
-                      _ProfileTile(
                         icon: Icons.calendar_month_rounded,
                         iconColor: Colors.teal,
                         label: 'Pickup Calendar',
                         subtitle: 'View scheduled pickups by date',
                         onTap: () => context.push('/customer/orders/calendar'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.no_meals_rounded,
-                        iconColor: Colors.orange,
-                        label: 'Dietary Preferences',
-                        subtitle: 'Allergens and dietary filters',
-                        onTap: () => context.push('/customer/dietary-alerts'),
                         showDivider: false,
                       ),
                     ],
@@ -162,70 +84,11 @@ class CustomerProfileScreen extends ConsumerWidget {
                     title: 'Community',
                     children: [
                       _ProfileTile(
-                        icon: Icons.forum_rounded,
-                        iconColor: AppColors.success,
-                        label: 'Community Feed',
-                        subtitle: 'Share your food rescue stories',
-                        onTap: () => context.push('/customer/community'),
-                      ),
-                      _ProfileTile(
                         icon: Icons.flag_rounded,
                         iconColor: Colors.deepOrange,
                         label: 'Challenges',
                         subtitle: 'Weekly and monthly rescue challenges',
                         onTap: () => context.push('/customer/challenges'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.people_outline_rounded,
-                        iconColor: Colors.indigo,
-                        label: 'Refer a Friend',
-                        subtitle: 'Earn rewards for each referral',
-                        onTap: () => context.push('/customer/referral'),
-                        showDivider: false,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _SectionCard(
-                    title: 'Preferences',
-                    children: [
-                      _ProfileTile(
-                        icon: Icons.settings_outlined,
-                        label: 'Settings',
-                        subtitle: 'Theme, language, notifications',
-                        onTap: () => context.push('/settings'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.notifications_outlined,
-                        label: 'Notification Settings',
-                        subtitle: 'Manage what alerts you receive',
-                        onTap: () => context.push('/settings/notifications'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.accessibility_new_rounded,
-                        label: 'Accessibility',
-                        subtitle: 'Font size, contrast, motion',
-                        onTap: () => context.push('/settings/accessibility'),
-                        showDivider: false,
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _SectionCard(
-                    title: 'Support',
-                    children: [
-                      _ProfileTile(
-                        icon: Icons.help_outline_rounded,
-                        iconColor: AppColors.primaryMedium,
-                        label: 'How It Works',
-                        subtitle: 'Learn how to reserve and pick up',
-                        onTap: () => context.push('/how-it-works'),
-                      ),
-                      _ProfileTile(
-                        icon: Icons.support_agent_outlined,
-                        label: 'Help & Support',
-                        subtitle: 'Contact us, FAQs',
-                        onTap: () => context.push('/customer/support'),
                         showDivider: false,
                       ),
                     ],
@@ -323,6 +186,40 @@ class CustomerProfileScreen extends ConsumerWidget {
     );
   }
 
+  Widget _deleteAccountButton(BuildContext context, WidgetRef ref) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Delete account?'),
+              content: const Text(
+                'This will permanently delete your account and all associated data. This action cannot be undone.',
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, true),
+                  style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed == true) ref.read(authProvider.notifier).deleteAccount();
+        },
+        icon: const Icon(Icons.delete_forever_rounded, color: AppColors.error),
+        label: Text(
+          'Delete Account',
+          style: AppTextStyles.bodyMedium.copyWith(color: AppColors.error, fontWeight: FontWeight.w600),
+        ),
+      ),
+    );
+  }
+
   Widget _logoutButton(BuildContext context, WidgetRef ref) {
     return SizedBox(
       width: double.infinity,
@@ -353,40 +250,6 @@ class CustomerProfileScreen extends ConsumerWidget {
           side: const BorderSide(color: AppColors.primaryMedium),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
-      ),
-    );
-  }
-
-  Widget _deleteAccountButton(BuildContext context, WidgetRef ref) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton(
-        onPressed: () => _confirmDeleteAccount(context, ref),
-        child: Text(
-          'Delete Account',
-          style: AppTextStyles.bodySmall.copyWith(color: AppColors.error),
-        ),
-      ),
-    );
-  }
-
-  void _confirmDeleteAccount(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => _DeleteAccountSheet(
-        onConfirmed: () async {
-          try {
-            final dio = ref.read(dioClientProvider);
-            await dio.delete(ApiEndpoints.deleteAccount);
-          } catch (_) {}
-          await ref.read(authProvider.notifier).logout();
-          if (context.mounted) {
-            context.go('/login');
-            context.showSnackBar('Your account has been deleted.');
-          }
-        },
       ),
     );
   }
@@ -471,213 +334,3 @@ class _ProfileTile extends StatelessWidget {
   }
 }
 
-// ─── Multi-step account deletion sheet ────────────────────────────────────
-
-class _DeleteAccountSheet extends StatefulWidget {
-  const _DeleteAccountSheet({required this.onConfirmed});
-  final Future<void> Function() onConfirmed;
-
-  @override
-  State<_DeleteAccountSheet> createState() => _DeleteAccountSheetState();
-}
-
-class _DeleteAccountSheetState extends State<_DeleteAccountSheet> {
-  int _step = 0;
-  final _controller = TextEditingController();
-  bool _isDeleting = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  bool get _canConfirm => _controller.text.trim() == 'DELETE';
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: EdgeInsets.fromLTRB(
-        24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 250),
-        child: _step == 0 ? _buildStep1() : _buildStep2(),
-      ),
-    );
-  }
-
-  Widget _buildStep1() {
-    return Column(
-      key: const ValueKey(0),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Container(
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.neutral200,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Container(
-              width: 44, height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.errorSurface,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.delete_forever_rounded,
-                  color: AppColors.error, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Text('Delete Account',
-                style: AppTextStyles.h3.copyWith(color: AppColors.error)),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Text('This will permanently delete:',
-            style: AppTextStyles.bodyMedium
-                .copyWith(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        ...[
-          'Your profile and personal information',
-          'All reservation history',
-          'Your saved favorites',
-          'Any pending reservations',
-        ].map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.remove_circle_outline_rounded,
-                      size: 16, color: AppColors.error),
-                  const SizedBox(width: 8),
-                  Expanded(
-                      child: Text(item, style: AppTextStyles.bodySmall)),
-                ],
-              ),
-            )),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: () => setState(() => _step = 1),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: const Text('Continue',
-                style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('Keep my account',
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSecondary)),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStep2() {
-    return Column(
-      key: const ValueKey(1),
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Container(
-            width: 40, height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.neutral200,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text('Confirm deletion',
-            style: AppTextStyles.h4.copyWith(color: AppColors.error)),
-        const SizedBox(height: 8),
-        Text(
-          'Type DELETE in the box below to confirm you want to permanently remove your account.',
-          style: AppTextStyles.bodySmall
-              .copyWith(color: AppColors.textSecondary),
-        ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _controller,
-          autofocus: true,
-          onChanged: (_) => setState(() {}),
-          textCapitalization: TextCapitalization.characters,
-          decoration: InputDecoration(
-            hintText: 'Type DELETE here',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.error, width: 1.5),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: _canConfirm && !_isDeleting
-                ? () async {
-                    setState(() => _isDeleting = true);
-                    Navigator.pop(context);
-                    await widget.onConfirmed();
-                  }
-                : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              disabledBackgroundColor:
-                  AppColors.error.withValues(alpha: 0.3),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-            child: _isDeleting
-                ? const SizedBox(
-                    width: 20, height: 20,
-                    child: CircularProgressIndicator(
-                        color: Colors.white, strokeWidth: 2))
-                : const Text('Delete My Account',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ),
-        const SizedBox(height: 8),
-        SizedBox(
-          width: double.infinity,
-          child: TextButton(
-            onPressed: () => setState(() => _step = 0),
-            child: Text('Go back',
-                style: AppTextStyles.bodySmall
-                    .copyWith(color: AppColors.textSecondary)),
-          ),
-        ),
-      ],
-    );
-  }
-}

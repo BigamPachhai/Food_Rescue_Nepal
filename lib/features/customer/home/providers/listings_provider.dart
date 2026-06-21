@@ -103,8 +103,12 @@ class ListingEntity {
         discountedPrice: (json['discountedPrice'] as num?)?.toInt() ?? 0,
         quantity: (json['quantity'] as num?)?.toInt() ?? 0,
         availableQty: (json['availableQty'] as num?)?.toInt() ?? (json['quantity'] as num?)?.toInt() ?? 0,
-        pickupStart: DateTime.parse(json['pickupStart'] as String),
-        pickupEnd: DateTime.parse(json['pickupEnd'] as String),
+        pickupStart: json['pickupStart'] != null
+            ? DateTime.parse(json['pickupStart'] as String)
+            : DateTime.now(),
+        pickupEnd: json['pickupEnd'] != null
+            ? DateTime.parse(json['pickupEnd'] as String)
+            : DateTime.now().add(const Duration(hours: 2)),
         imageUrls: (json['imageUrls'] as List<dynamic>?)
                 ?.map((e) => e as String)
                 .toList() ??

@@ -12,10 +12,15 @@ export class MailService {
       host: this.configService.get<string>('SMTP_HOST') || 'smtp.gmail.com',
       port: Number(this.configService.get<string>('SMTP_PORT') || 587),
       secure: false,
+      pool: true,
+      maxConnections: 3,
       auth: {
         user: this.configService.get<string>('SMTP_USER'),
         pass: this.configService.get<string>('SMTP_PASS'),
       },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
   }
 

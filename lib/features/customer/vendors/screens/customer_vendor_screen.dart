@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_shadows.dart';
 import '../../../../core/constants/app_sizes.dart';
@@ -414,93 +413,6 @@ class _VendorHeader extends StatelessWidget {
             ),
           ),
 
-        // ── Action buttons card ───────────────────────────────────────────
-        Container(
-          margin: const EdgeInsets.fromLTRB(
-              AppSizes.s4, AppSizes.s3, AppSizes.s4, AppSizes.s4),
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.s3, vertical: AppSizes.s2),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceLight,
-            borderRadius: BorderRadius.circular(AppSizes.radiusCard),
-            boxShadow: AppShadows.card,
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final uri =
-                        (vendor.lat != null && vendor.lng != null)
-                            ? Uri.parse(
-                                'https://www.google.com/maps/search/?api=1&query=${vendor.lat},${vendor.lng}')
-                            : vendor.address != null
-                                ? Uri.parse(
-                                    'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(vendor.address!)}')
-                                : null;
-                    if (uri != null && await canLaunchUrl(uri)) {
-                      await launchUrl(uri,
-                          mode: LaunchMode.externalApplication);
-                    }
-                  },
-                  icon: const Icon(Icons.directions_rounded, size: 16),
-                  label: const Text('Directions'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primaryMedium,
-                    side: const BorderSide(color: AppColors.primaryMedium),
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSizes.radiusSm)),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSizes.s2),
-                    textStyle: AppTextStyles.caption
-                        .copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ),
-              if (vendor.phone != null && vendor.phone!.isNotEmpty) ...[
-                const SizedBox(width: AppSizes.s2),
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    final uri =
-                        Uri(scheme: 'tel', path: vendor.phone);
-                    if (await canLaunchUrl(uri)) await launchUrl(uri);
-                  },
-                  icon: const Icon(Icons.call_rounded, size: 16),
-                  label: const Text('Call'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.success,
-                    side: const BorderSide(color: AppColors.success),
-                    shape: RoundedRectangleBorder(
-                        borderRadius:
-                            BorderRadius.circular(AppSizes.radiusSm)),
-                    padding:
-                        const EdgeInsets.symmetric(vertical: AppSizes.s2),
-                    textStyle: AppTextStyles.caption
-                        .copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-              const SizedBox(width: AppSizes.s2),
-              OutlinedButton.icon(
-                onPressed: onReviews,
-                icon: const Icon(Icons.star_rounded, size: 16),
-                label: const Text('Reviews'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.accentAmber,
-                  side: const BorderSide(color: AppColors.accentAmber),
-                  shape: RoundedRectangleBorder(
-                      borderRadius:
-                          BorderRadius.circular(AppSizes.radiusSm)),
-                  padding:
-                      const EdgeInsets.symmetric(vertical: AppSizes.s2),
-                  textStyle: AppTextStyles.caption
-                      .copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-            ],
-          ),
-        ),
       ],
     );
   }

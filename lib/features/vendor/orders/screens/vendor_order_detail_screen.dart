@@ -424,10 +424,10 @@ class _PickupCodeCard extends StatelessWidget {
       padding: const EdgeInsets.symmetric(
           vertical: AppSizes.s5, horizontal: AppSizes.s4),
       decoration: BoxDecoration(
-        color: AppColors.primarySurface,
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(
-            color: AppColors.primaryMedium.withValues(alpha: 0.3)),
+        border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.xs,
       ),
       child: Column(
         children: [
@@ -435,12 +435,12 @@ class _PickupCodeCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(Icons.lock_open_rounded,
-                  color: AppColors.primaryMedium, size: AppSizes.iconMd),
+                  color: AppColors.textSecondary, size: AppSizes.iconMd),
               const SizedBox(width: AppSizes.s2),
               Text(
                 'Pickup Code',
                 style: AppTextStyles.label.copyWith(
-                  color: AppColors.primaryMedium,
+                  color: AppColors.textSecondary,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -451,7 +451,7 @@ class _PickupCodeCard extends StatelessWidget {
             code,
             style: AppTextStyles.h2.copyWith(
               letterSpacing: 6,
-              color: AppColors.primaryMedium,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
@@ -473,8 +473,8 @@ class _PickupCodeCard extends StatelessWidget {
             icon: const Icon(Icons.copy_rounded, size: 16),
             label: const Text('Copy Code'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primaryMedium,
-              side: const BorderSide(color: AppColors.primaryMedium),
+              foregroundColor: AppColors.textSecondary,
+              side: const BorderSide(color: AppColors.border),
               visualDensity: VisualDensity.compact,
             ),
           ),

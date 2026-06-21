@@ -100,9 +100,9 @@ class _StatusCard extends StatelessWidget {
       ),
       const SizedBox(height: 16),
       const Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-        _BannerStat('42', 'Active Members'),
-        _BannerStat('1,280', 'Points Issued'),
-        _BannerStat('840', 'Points Redeemed'),
+        _BannerStat('0', 'Active Members'),
+        _BannerStat('0', 'Points Issued'),
+        _BannerStat('0', 'Points Redeemed'),
       ]),
     ]),
   );
@@ -125,10 +125,10 @@ class _StatsGrid extends StatelessWidget {
     physics: const NeverScrollableScrollPhysics(),
     crossAxisSpacing: 10, mainAxisSpacing: 10, childAspectRatio: 1.8,
     children: const [
-      _StatTile('67%', 'Repeat Rate', Colors.green),
-      _StatTile('NPR 312', 'Avg Loyal Order', Colors.blue),
-      _StatTile('8.3', 'Days Between Orders', Colors.orange),
-      _StatTile('4.7★', 'Avg Rating from Loyals', Colors.amber),
+      _StatTile('—', 'Repeat Rate', Colors.green),
+      _StatTile('—', 'Avg Loyal Order', Colors.blue),
+      _StatTile('—', 'Days Between Orders', Colors.orange),
+      _StatTile('—', 'Avg Rating from Loyals', Colors.amber),
     ],
   );
 }
@@ -246,41 +246,20 @@ class _RewardsTab extends StatelessWidget {
 }
 
 class _MembersTab extends StatelessWidget {
-  static const _members = [
-    ('Sita M.', 480, 'Gold', 12),
-    ('Ram K.', 320, 'Silver', 9),
-    ('Anita S.', 280, 'Silver', 8),
-    ('Bikram T.', 140, 'Bronze', 5),
-    ('Priya G.', 100, 'Bronze', 4),
-  ];
-
   @override
   Widget build(BuildContext context) => ListView(
     padding: const EdgeInsets.all(16),
     children: [
-      Text('Loyalty Members (42 total)', style: AppTextStyles.h5),
-      const SizedBox(height: 12),
-      Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)),
-        child: Column(
-          children: _members.asMap().entries.map((e) {
-            final m = e.value;
-            final tierColor = m.$3 == 'Gold' ? Colors.amber : m.$3 == 'Silver' ? Colors.blueGrey : Colors.brown;
-            return Column(children: [
-              ListTile(
-                leading: CircleAvatar(backgroundColor: AppColors.primaryMedium.withValues(alpha: 0.15), child: Text('${e.key + 1}', style: const TextStyle(color: AppColors.primaryMedium, fontWeight: FontWeight.bold))),
-                title: Text(m.$1, style: AppTextStyles.label),
-                subtitle: Text('${m.$2} pts • ${m.$4} orders', style: AppTextStyles.caption),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(color: tierColor.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
-                  child: Text(m.$3, style: TextStyle(color: tierColor, fontSize: 11, fontWeight: FontWeight.w600)),
-                ),
-              ),
-              if (e.key < _members.length - 1) const Divider(height: 1, indent: 56),
-            ]);
-          }).toList(),
-        ),
+      Text('Loyalty Members', style: AppTextStyles.h5),
+      const SizedBox(height: 40),
+      Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey),
+          const SizedBox(height: 12),
+          Text('No members yet', style: AppTextStyles.h5.copyWith(color: AppColors.textSecondary)),
+          const SizedBox(height: 4),
+          Text('Customers who earn points will appear here', style: AppTextStyles.bodySmall.copyWith(color: AppColors.textSecondary), textAlign: TextAlign.center),
+        ]),
       ),
     ],
   );

@@ -257,8 +257,6 @@ class _CommunityStatsRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _CommStat(value: '${impact.communityRank}', label: 'Your Rank', icon: Icons.leaderboard_rounded),
-        const SizedBox(width: 8),
         _CommStat(value: '${impact.vendorsSupported}', label: 'Vendors\nSupported', icon: Icons.store_rounded),
         const SizedBox(width: 8),
         _CommStat(value: '${impact.reviewsGiven}', label: 'Reviews\nGiven', icon: Icons.star_rounded),
